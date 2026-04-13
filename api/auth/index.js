@@ -1,7 +1,7 @@
 import bcrypt from 'bcryptjs'
-import { connectToDatabase } from '../../../src/server/lib/mongodb.js'
-import { createToken } from '../../../src/server/lib/auth.js'
-import { User } from '../../../src/server/models/User.js'
+import { connectToDatabase } from '../../src/server/lib/mongodb.js'
+import { createToken } from '../../src/server/lib/auth.js'
+import { User } from '../../src/server/models/User.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
