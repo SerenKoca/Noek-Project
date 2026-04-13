@@ -77,6 +77,11 @@ exports.authHandler = async (req, res) => {
     res.status(400).json({ error: 'Gebruik action: register of login.' })
   } catch (error) {
     console.error('authHandler error:', error)
+    if (error?.message === 'Missing MONGO_URI') {
+      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.' })
+      return
+    }
+
     if (error?.message === 'Missing JWT_SECRET') {
       res.status(500).json({ error: 'Serverconfiguratie mist JWT_SECRET.' })
       return

@@ -34,6 +34,11 @@ export default async function handler(req, res) {
     await connectToDatabase()
   } catch (error) {
     console.error('MongoDB connection error:', error)
+    if (error?.message === 'Missing MONGO_URI') {
+      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.' })
+      return
+    }
+
     res.status(500).json({ error: 'Databaseverbinding mislukt.' })
     return
   }
