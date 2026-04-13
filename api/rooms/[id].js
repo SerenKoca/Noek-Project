@@ -1,5 +1,5 @@
 import Room from '../../backend/models/Room.js'
-import { connectToDatabase } from '../lib/mongodb.js'
+import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
