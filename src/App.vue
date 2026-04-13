@@ -8,9 +8,17 @@ import EditorBrand from './components/EditorBrand.vue'
 import EditorHistoryControls from './components/EditorHistoryControls.vue'
 import SceneOverlays from './components/SceneOverlays.vue'
 import { saveRoom, updateRoom, getRooms } from './services/roomService.js'
+import { loginAccount, registerAccount, getStoredAuth, clearAuth } from './services/authService.js'
 
 const view = ref('home')
 const rooms = ref([])
+const authState = ref(getStoredAuth())
+const authEmail = ref('')
+const authPassword = ref('')
+const authDisplayName = ref('')
+const authMode = ref('login')
+const authStatus = ref('')
+const authStatusType = ref('')
 const loadRequest = ref(null)
 const selected = ref(null)
 const selectedAnchor = ref(null)
@@ -24,6 +32,11 @@ const currentRoomData = ref(null) // For loading room data into scene
 const currentRoom = ref(null) // The current room being edited (for updates)
 
 async function loadRooms() {
+  if (!authState.value?.token) {
+    rooms.value = []
+    return
+  }
+
   try {
     rooms.value = await getRooms()
   } catch (error) {
@@ -62,8 +75,60 @@ function showHome() {
 }
 
 onMounted(() => {
-  loadRooms()
+  if (authState.value?.token) {
+    loadRooms()
+  }
 })
+
+async function onAuthSubmit() {
+  authStatus.value = ''
+  authStatusType.value = ''
+
+  const email = authEmail.value.trim()
+  const password = authPassword.value
+  const displayName = authDisplayName.value.trim()
+
+  if (!email || !password) {
+    authStatus.value = 'Email en wachtwoord zijn verplicht.'
+    authStatusType.value = 'error'
+    return
+  }
+
+  if (authMode.value === 'register' && password.length < 8) {
+    authStatus.value = 'Wachtwoord moet minstens 8 tekens hebben.'
+    authStatusType.value = 'error'
+    return
+  }
+
+  authStatus.value = authMode.value === 'register' ? 'Account aanmaken...' : 'Inloggen...'
+  authStatusType.value = 'loading'
+
+  try {
+    const result = authMode.value === 'register'
+      ? await registerAccount({ email, password, displayName })
+      : await loginAccount({ email, password })
+
+    authState.value = result
+    authPassword.value = ''
+    authStatus.value = `Welkom ${result?.user?.displayName || result?.user?.email || ''}`
+    authStatusType.value = 'success'
+    await loadRooms()
+  } catch (error) {
+    authStatus.value = error?.response?.data?.error || 'Authenticatie mislukt.'
+    authStatusType.value = 'error'
+  }
+}
+
+function onLogout() {
+  clearAuth()
+  authState.value = null
+  rooms.value = []
+  currentRoom.value = null
+  currentRoomData.value = null
+  view.value = 'home'
+  authStatus.value = 'Je bent uitgelogd.'
+  authStatusType.value = 'success'
+}
 
 function onLoadModel(modelLike) {
   // Ensure watch triggers even if the same item is loaded twice.
@@ -168,13 +233,52 @@ function onHistoryAction() {
       <div class="home-header">
         <h1>🏠 Noek Kamer Editor</h1>
         <p>Maak en bewerk je virtuele kamers. Klik op een kamer om verder te werken, of maak een nieuwe.</p>
+
+        <div v-if="!authState?.token" class="auth-panel">
+          <h3>{{ authMode === 'register' ? 'Nieuw account' : 'Inloggen' }}</h3>
+          <div class="auth-row">
+            <input v-model="authEmail" type="email" placeholder="Email" autocomplete="email" />
+            <input v-model="authPassword" type="password" placeholder="Wachtwoord" autocomplete="current-password" />
+            <input
+              v-if="authMode === 'register'"
+              v-model="authDisplayName"
+              type="text"
+              placeholder="Weergavenaam (optioneel)"
+              autocomplete="nickname"
+            />
+          </div>
+          <div class="auth-actions">
+            <button type="button" class="primary-btn" @click="onAuthSubmit">
+              {{ authMode === 'register' ? 'Account aanmaken' : 'Inloggen' }}
+            </button>
+            <button
+              type="button"
+              class="secondary-btn"
+              @click="authMode = authMode === 'register' ? 'login' : 'register'"
+            >
+              {{ authMode === 'register' ? 'Ik heb al een account' : 'Nieuwe gebruiker' }}
+            </button>
+          </div>
+          <div v-if="authStatus" class="editor-save-status" :class="authStatusType">{{ authStatus }}</div>
+        </div>
+
+        <div v-else class="auth-userbar">
+          <span>Ingelogd als <strong>{{ authState.user.displayName }}</strong> ({{ authState.user.email }})</span>
+          <button type="button" class="secondary-btn" @click="onLogout">Uitloggen</button>
+        </div>
+
         <div class="home-actions">
-          <button type="button" class="primary-btn" @click="openEditor()">✨ Nieuwe kamer</button>
-          <button type="button" class="secondary-btn" @click="loadRooms">🔄 Ververs lijst</button>
+          <button type="button" class="primary-btn" :disabled="!authState?.token" @click="openEditor()">✨ Nieuwe kamer</button>
+          <button type="button" class="secondary-btn" :disabled="!authState?.token" @click="loadRooms">🔄 Ververs lijst</button>
         </div>
       </div>
       <div class="room-list">
-        <div v-if="rooms.length === 0" class="room-empty">
+        <div v-if="!authState?.token" class="room-empty">
+          <div class="empty-icon">🔐</div>
+          <h3>Log eerst in</h3>
+          <p>Je kamers zijn alleen zichtbaar voor jouw account.</p>
+        </div>
+        <div v-else-if="rooms.length === 0" class="room-empty">
           <div class="empty-icon">📭</div>
           <h3>Geen kamers gevonden</h3>
           <p>Maak je eerste kamer om te beginnen!</p>

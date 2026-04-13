@@ -8,15 +8,23 @@ Deze backend slaat Noek-kamers op in MongoDB.
 2. `npm install`
 3. Kopieer `.env.example` naar `.env`
 4. Stel `MONGO_URI` in
-5. Start de server met `npm run dev`
+5. Stel `JWT_SECRET` in
+6. Start de server met `npm run dev`
 
 ## API endpoints
+
+- `POST /auth` - login/register
+  - body register: `{ action: "register", email, password, displayName? }`
+  - body login: `{ action: "login", email, password }`
+  - response: `{ token, user }`
 
 - `POST /rooms` - kamer opslaan
   - body: `{ name, sceneData, userId? }`
 - `GET /rooms` - alle kamers ophalen
 - `GET /rooms/:id` - één kamer ophalen
 - `DELETE /rooms/:id` - kamer verwijderen
+
+Alle `/rooms` endpoints vereisen `Authorization: Bearer <token>`.
 
 ## Voorbeeld frontend-aanroep
 

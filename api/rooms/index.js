@@ -1,5 +1,6 @@
 import Room from '../../backend/models/Room.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
+import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
@@ -16,6 +17,9 @@ function parseBody(req) {
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
+  const auth = requireAuth(req, res)
+  if (!auth) return
+
   try {
     await connectToDatabase()
   } catch (error) {
@@ -26,7 +30,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const rooms = await Room.find().sort({ createdAt: -1 })
+      const rooms = await Room.find({ ownerId: auth.userId }).sort({ createdAt: -1 })
       res.status(200).json(rooms)
     } catch (error) {
       console.error('getRooms error:', error)
@@ -44,7 +48,12 @@ export default async function handler(req, res) {
         return
       }
 
-      const room = new Room({ name, userId: userId || null, sceneData })
+      const room = new Room({
+        name,
+        userId: userId || null,
+        ownerId: auth.userId,
+        sceneData
+      })
       await room.save()
 
       res.status(201).json(room)

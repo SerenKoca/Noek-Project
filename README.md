@@ -9,6 +9,8 @@ Minimal Vue 3 + Three.js + Tailwind PoC that fetches models from Poly Pizza (per
 ```
 VITE_POLYPIZZA_API_KEY=your_key_here
 POLYPIZZA_API_KEY=your_key_here # used by the Vercel proxy
+MONGO_URI=your_mongodb_connection_string
+JWT_SECRET=your_long_random_secret
 ```
 
 Optional overrides if you expose your own proxy endpoints:

@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { getAuthToken } from './authService.js'
 
 const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
 
@@ -8,6 +9,14 @@ const http = axios.create({
   headers: {
     'Content-Type': 'application/json'
   }
+})
+
+http.interceptors.request.use((config) => {
+  const token = getAuthToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 export async function saveRoom(roomData) {

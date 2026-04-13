@@ -3,6 +3,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const roomRoutes = require('./routes/roomRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 const app = express();
 const primaryMongoUri = process.env.MONGO_URI;
@@ -48,6 +49,7 @@ app.get('/', (req, res) => {
 });
 
 app.use('/rooms', roomRoutes);
+app.use('/auth', authRoutes);
 
 // Proxy voor poly-static assets (Poly Pizza)
 app.use('/api/poly-static', async (req, res, next) => {

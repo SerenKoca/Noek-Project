@@ -1,5 +1,6 @@
 const express = require('express');
 const router = express.Router();
+const { requireAuth } = require('../middleware/authMiddleware');
 const {
   createRoom,
   getRooms,
@@ -7,6 +8,8 @@ const {
   updateRoom,
   deleteRoom
 } = require('../controllers/roomController');
+
+router.use(requireAuth);
 
 router.post('/', createRoom);
 router.get('/', getRooms);

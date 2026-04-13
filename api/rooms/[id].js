@@ -1,5 +1,6 @@
 import Room from '../../backend/models/Room.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
+import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
@@ -16,6 +17,9 @@ function parseBody(req) {
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
+  const auth = requireAuth(req, res)
+  if (!auth) return
+
   try {
     await connectToDatabase()
   } catch (error) {
@@ -28,7 +32,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      const room = await Room.findById(id)
+      const room = await Room.findOne({ _id: id, ownerId: auth.userId })
       if (!room) {
         res.status(404).json({ error: 'Kamer niet gevonden.' })
         return
@@ -51,8 +55,8 @@ export default async function handler(req, res) {
         return
       }
 
-      const room = await Room.findByIdAndUpdate(
-        id,
+      const room = await Room.findOneAndUpdate(
+        { _id: id, ownerId: auth.userId },
         { name, sceneData },
         { new: true, runValidators: true }
       )
@@ -72,7 +76,7 @@ export default async function handler(req, res) {
 
   if (req.method === 'DELETE') {
     try {
-      const room = await Room.findByIdAndDelete(id)
+      const room = await Room.findOneAndDelete({ _id: id, ownerId: auth.userId })
       if (!room) {
         res.status(404).json({ error: 'Kamer niet gevonden.' })
         return

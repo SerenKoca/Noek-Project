@@ -10,6 +10,11 @@ const roomSchema = new mongoose.Schema({
     type: String,
     default: null
   },
+  ownerId: {
+    type: String,
+    default: null,
+    index: true
+  },
   sceneData: {
     type: Object,
     required: true
