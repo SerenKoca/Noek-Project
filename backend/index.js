@@ -5,12 +5,40 @@ const cors = require('cors');
 const roomRoutes = require('./routes/roomRoutes');
 
 const app = express();
-const mongoUri = process.env.MONGO_URI || 'mongodb://127.0.0.1:27017/noek';
+const primaryMongoUri = process.env.MONGO_URI;
+const fallbackMongoUri = 'mongodb://127.0.0.1:27017/noek';
 
-mongoose
-  .connect(mongoUri)
-  .then(() => console.log('MongoDB connected'))
-  .catch((err) => console.error('MongoDB connection error:', err));
+async function connectMongo() {
+  const attemptedUris = [];
+
+  if (primaryMongoUri) {
+    attemptedUris.push(primaryMongoUri);
+  }
+
+  if (!attemptedUris.includes(fallbackMongoUri)) {
+    attemptedUris.push(fallbackMongoUri);
+  }
+
+  let lastError = null;
+
+  for (const uri of attemptedUris) {
+    try {
+      await mongoose.connect(uri);
+      console.log(`MongoDB connected (${uri === primaryMongoUri ? 'MONGO_URI' : 'local fallback'})`);
+      return;
+    } catch (error) {
+      lastError = error;
+      console.error(`MongoDB connection failed for ${uri === primaryMongoUri ? 'MONGO_URI' : 'local fallback'}:`, error.message);
+    }
+  }
+
+  throw lastError;
+}
+
+connectMongo().catch((err) => {
+  console.error('MongoDB connection error:', err);
+  process.exit(1);
+});
 
 app.use(cors());
 app.use(express.json());
