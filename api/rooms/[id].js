@@ -1,0 +1,91 @@
+import Room from '../../backend/models/Room.js'
+import { connectToDatabase } from '../lib/mongodb.js'
+
+function setJsonHeaders(res) {
+  res.setHeader('Content-Type', 'application/json')
+}
+
+function parseBody(req) {
+  if (!req.body) return {}
+  if (typeof req.body === 'string') {
+    return JSON.parse(req.body)
+  }
+  return req.body
+}
+
+export default async function handler(req, res) {
+  setJsonHeaders(res)
+
+  try {
+    await connectToDatabase()
+  } catch (error) {
+    console.error('MongoDB connection error:', error)
+    res.status(500).json({ error: 'Databaseverbinding mislukt.' })
+    return
+  }
+
+  const { id } = req.query
+
+  if (req.method === 'GET') {
+    try {
+      const room = await Room.findById(id)
+      if (!room) {
+        res.status(404).json({ error: 'Kamer niet gevonden.' })
+        return
+      }
+
+      res.status(200).json(room)
+    } catch (error) {
+      console.error('getRoomById error:', error)
+      res.status(500).json({ error: 'Kon kamer niet ophalen.' })
+    }
+    return
+  }
+
+  if (req.method === 'PUT') {
+    try {
+      const { name, sceneData } = parseBody(req)
+
+      if (!name || !sceneData) {
+        res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' })
+        return
+      }
+
+      const room = await Room.findByIdAndUpdate(
+        id,
+        { name, sceneData },
+        { new: true, runValidators: true }
+      )
+
+      if (!room) {
+        res.status(404).json({ error: 'Kamer niet gevonden.' })
+        return
+      }
+
+      res.status(200).json(room)
+    } catch (error) {
+      console.error('updateRoom error:', error)
+      res.status(500).json({ error: 'Kon de kamer niet bijwerken.' })
+    }
+    return
+  }
+
+  if (req.method === 'DELETE') {
+    try {
+      const room = await Room.findByIdAndDelete(id)
+      if (!room) {
+        res.status(404).json({ error: 'Kamer niet gevonden.' })
+        return
+      }
+
+      res.status(200).json({ message: 'Kamer verwijderd.' })
+    } catch (error) {
+      console.error('deleteRoom error:', error)
+      res.status(500).json({ error: 'Kon kamer niet verwijderen.' })
+    }
+    return
+  }
+
+  res.setHeader('Allow', ['GET', 'PUT', 'DELETE'])
+  res.status(405).json({ error: 'Method Not Allowed' })
+}

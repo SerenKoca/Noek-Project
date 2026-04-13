@@ -1,6 +1,6 @@
 import axios from 'axios'
 
-const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || 'http://localhost:5000'
+const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
 
 const http = axios.create({
   baseURL: BACKEND_BASE_URL,
