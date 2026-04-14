@@ -132,6 +132,14 @@ exports.createRoomContribution = async (req, res) => {
       return res.status(400).json({ error: 'Type en naam van gever zijn verplicht.' });
     }
 
+    if ((type === 'photo' || type === 'video_file') && !mediaUrl.trim()) {
+      return res.status(400).json({ error: 'Media-URL is verplicht voor foto en video bestanden.' });
+    }
+
+    if ((type === 'video_url' || type === 'music_url') && !externalUrl.trim()) {
+      return res.status(400).json({ error: 'Externe URL is verplicht voor muziek en video links.' });
+    }
+
     if (countWords(tributeText) > 150) {
       return res.status(400).json({ error: 'Tekst mag maximaal 150 woorden bevatten.' });
     }

@@ -76,6 +76,16 @@ export default async function handler(req, res) {
         return
       }
 
+      if ((type === 'photo' || type === 'video_file') && !mediaUrl.trim()) {
+        res.status(400).json({ error: 'Media-URL is verplicht voor foto en video bestanden.' })
+        return
+      }
+
+      if ((type === 'video_url' || type === 'music_url') && !externalUrl.trim()) {
+        res.status(400).json({ error: 'Externe URL is verplicht voor muziek en video links.' })
+        return
+      }
+
       if (countWords(tributeText) > 150) {
         res.status(400).json({ error: 'Tekst mag maximaal 150 woorden bevatten.' })
         return

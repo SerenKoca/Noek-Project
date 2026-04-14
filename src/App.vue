@@ -44,7 +44,15 @@ const contributionLoadState = ref({ loadingRoomId: '', error: '' })
 const newCandleForm = ref({ tributeText: '' })
 const newMusicUrlForm = ref({ externalUrl: '', tributeText: '' })
 const newVideoUrlForm = ref({ externalUrl: '', tributeText: '' })
+const newPhotoFile = ref(null)
+const newVideoFile = ref(null)
+const newPhotoFileForm = ref({ tributeText: '' })
+const newVideoFileForm = ref({ tributeText: '' })
+const photoInputKey = ref(0)
+const videoInputKey = ref(0)
 const contributionCreateState = ref({ loading: false, error: '', success: '' })
+const photoUploadState = ref({ loading: false, error: '', success: '' })
+const videoFileUploadState = ref({ loading: false, error: '', success: '' })
 const commentDrafts = ref({})
 const commentStateByItem = ref({})
 const currentUserId = computed(() => authState.value?.user?.id || '')
@@ -72,6 +80,14 @@ function resetContributionDrafts() {
   newCandleForm.value = { tributeText: '' }
   newMusicUrlForm.value = { externalUrl: '', tributeText: '' }
   newVideoUrlForm.value = { externalUrl: '', tributeText: '' }
+  newPhotoFile.value = null
+  newVideoFile.value = null
+  newPhotoFileForm.value = { tributeText: '' }
+  newVideoFileForm.value = { tributeText: '' }
+  photoInputKey.value += 1
+  videoInputKey.value += 1
+  photoUploadState.value = { loading: false, error: '', success: '' }
+  videoFileUploadState.value = { loading: false, error: '', success: '' }
 }
 
 function countWords(value) {
@@ -172,6 +188,41 @@ function isSpotifyId(id) {
   return /^[A-Za-z0-9]+$/.test(id || '')
 }
 
+function handlePhotoFileChange(event) {
+  newPhotoFile.value = event.target.files?.[0] || null
+}
+
+function handleVideoFileChange(event) {
+  newVideoFile.value = event.target.files?.[0] || null
+}
+
+async function uploadToCloudinary(file, resourceType) {
+  const cloudName = import.meta.env.VITE_CLOUDINARY_CLOUD_NAME || ''
+  const uploadPreset = import.meta.env.VITE_CLOUDINARY_UPLOAD_PRESET || ''
+
+  if (!cloudName || !uploadPreset) {
+    throw new Error('Cloudinary configuratie ontbreekt.')
+  }
+
+  const formData = new FormData()
+  formData.append('file', file)
+  formData.append('upload_preset', uploadPreset)
+
+  const response = await fetch(
+    `https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`,
+    {
+      method: 'POST',
+      body: formData
+    }
+  )
+
+  if (!response.ok) {
+    throw new Error('Upload naar Cloudinary mislukt.')
+  }
+
+  return response.json()
+}
+
 async function loadRooms() {
   if (!authState.value?.token) {
     rooms.value = []
@@ -260,6 +311,94 @@ async function addVideoUrlContribution(room) {
   })
 }
 
+async function addPhotoFileContribution(room) {
+  const file = newPhotoFile.value
+  const tributeText = (newPhotoFileForm.value.tributeText || '').trim()
+
+  if (!file) {
+    photoUploadState.value = { loading: false, error: 'Kies eerst een fotobestand.', success: '' }
+    return
+  }
+
+  if (!file.type?.startsWith('image/')) {
+    photoUploadState.value = { loading: false, error: 'Kies een geldig afbeeldingsbestand.', success: '' }
+    return
+  }
+
+  if (countWords(tributeText) > 150) {
+    photoUploadState.value = { loading: false, error: 'Tekst mag maximaal 150 woorden bevatten.', success: '' }
+    return
+  }
+
+  photoUploadState.value = { loading: true, error: '', success: '' }
+
+  try {
+    const uploadResult = await uploadToCloudinary(file, 'image')
+    await addContribution(room, {
+      type: 'photo',
+      tributeText,
+      externalUrl: '',
+      mediaUrl: uploadResult.secure_url || '',
+      platform: 'none',
+      successMessage: 'Foto toegevoegd.'
+    })
+
+    newPhotoFile.value = null
+    newPhotoFileForm.value = { tributeText: '' }
+    photoUploadState.value = { loading: false, error: '', success: 'Foto geüpload.' }
+  } catch (error) {
+    photoUploadState.value = {
+      loading: false,
+      error: error?.response?.data?.error || error?.message || 'Foto uploaden mislukt.',
+      success: ''
+    }
+  }
+}
+
+async function addVideoFileContribution(room) {
+  const file = newVideoFile.value
+  const tributeText = (newVideoFileForm.value.tributeText || '').trim()
+
+  if (!file) {
+    videoFileUploadState.value = { loading: false, error: 'Kies eerst een videobestand.', success: '' }
+    return
+  }
+
+  if (!file.type?.startsWith('video/')) {
+    videoFileUploadState.value = { loading: false, error: 'Kies een geldig videobestand.', success: '' }
+    return
+  }
+
+  if (countWords(tributeText) > 150) {
+    videoFileUploadState.value = { loading: false, error: 'Tekst mag maximaal 150 woorden bevatten.', success: '' }
+    return
+  }
+
+  videoFileUploadState.value = { loading: true, error: '', success: '' }
+
+  try {
+    const uploadResult = await uploadToCloudinary(file, 'video')
+    await addContribution(room, {
+      type: 'video_file',
+      tributeText,
+      externalUrl: '',
+      mediaUrl: uploadResult.secure_url || '',
+      platform: 'none',
+      successMessage: 'Videobestand toegevoegd.'
+    })
+
+    newVideoFile.value = null
+    newVideoFileForm.value = { tributeText: '' }
+    videoFileUploadState.value = { loading: false, error: '', success: 'Video geüpload.' }
+  } catch (error) {
+    videoFileUploadState.value = {
+      loading: false,
+      error: error?.response?.data?.error || error?.message || 'Video uploaden mislukt.',
+      success: ''
+    }
+  }
+}
+
 async function addContribution(room, payload) {
   const roomId = room?._id
   if (!roomId) return
@@ -285,6 +424,11 @@ async function addContribution(room, payload) {
     return
   }
 
+  if ((payload.type === 'photo' || payload.type === 'video_file') && !payload.mediaUrl) {
+    contributionCreateState.value.error = 'Upload eerst een bestand voor foto en video uploads.'
+    return
+  }
+
   if (payload.type === 'music_url' && payload.platform !== 'youtube' && payload.platform !== 'spotify') {
     contributionCreateState.value.error = 'Gebruik een geldige YouTube of Spotify link voor muziek.'
     return
@@ -297,6 +441,7 @@ async function addContribution(room, payload) {
       type: payload.type,
       giverName,
       tributeText,
+      mediaUrl: payload.mediaUrl || '',
       externalUrl: payload.externalUrl || '',
       platform: payload.platform || 'none'
     })
@@ -782,6 +927,72 @@ function onHistoryAction() {
                   >
                     {{ contributionCreateState.loading ? 'Opslaan...' : 'Videolink toevoegen' }}
                   </button>
+                </div>
+              </form>
+
+              <form class="contribution-form" @submit.prevent="addPhotoFileContribution(room)">
+                <h4>Foto uploaden</h4>
+                <div class="contribution-giver">Van: <strong>{{ autoGiverName || '-' }}</strong></div>
+                <input
+                  :key="photoInputKey"
+                  type="file"
+                  accept="image/*"
+                  @change="handlePhotoFileChange"
+                />
+                <div v-if="newPhotoFile" class="contribution-giver">Bestand: <strong>{{ newPhotoFile.name }}</strong></div>
+                <textarea
+                  v-model="newPhotoFileForm.tributeText"
+                  rows="3"
+                  placeholder="Klein tekstje (max 150 woorden)"
+                />
+                <div class="contribution-form-meta">
+                  <span>{{ countWords(newPhotoFileForm.tributeText) }}/150 woorden</span>
+                  <button
+                    type="submit"
+                    class="primary-btn"
+                    :disabled="photoUploadState.loading"
+                  >
+                    {{ photoUploadState.loading ? 'Uploaden...' : 'Foto uploaden' }}
+                  </button>
+                </div>
+                <div v-if="photoUploadState.error" class="room-contribution-empty error">
+                  {{ photoUploadState.error }}
+                </div>
+                <div v-else-if="photoUploadState.success" class="room-contribution-empty success">
+                  {{ photoUploadState.success }}
+                </div>
+              </form>
+
+              <form class="contribution-form" @submit.prevent="addVideoFileContribution(room)">
+                <h4>Videobestand uploaden</h4>
+                <div class="contribution-giver">Van: <strong>{{ autoGiverName || '-' }}</strong></div>
+                <input
+                  :key="videoInputKey"
+                  type="file"
+                  accept="video/*"
+                  @change="handleVideoFileChange"
+                />
+                <div v-if="newVideoFile" class="contribution-giver">Bestand: <strong>{{ newVideoFile.name }}</strong></div>
+                <textarea
+                  v-model="newVideoFileForm.tributeText"
+                  rows="3"
+                  placeholder="Klein tekstje (max 150 woorden)"
+                />
+                <div class="contribution-form-meta">
+                  <span>{{ countWords(newVideoFileForm.tributeText) }}/150 woorden</span>
+                  <button
+                    type="submit"
+                    class="primary-btn"
+                    :disabled="videoFileUploadState.loading"
+                  >
+                    {{ videoFileUploadState.loading ? 'Uploaden...' : 'Video uploaden' }}
+                  </button>
+                </div>
+                <div v-if="videoFileUploadState.error" class="room-contribution-empty error">
+                  {{ videoFileUploadState.error }}
+                </div>
+                <div v-else-if="videoFileUploadState.success" class="room-contribution-empty success">
+                  {{ videoFileUploadState.success }}
                 </div>
               </form>
 
