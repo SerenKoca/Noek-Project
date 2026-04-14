@@ -63,6 +63,7 @@ const commentStateByItem = ref({})
 const roomMusicDraftUrl = ref('')
 const roomMusicDraftVolume = ref(35)
 const roomMusicState = ref({ loading: false, error: '', success: '' })
+const roomAppearanceDraft = ref({ floorColor: '#c0b496', wallColor: '#8f98a3' })
 const availableSounds = ref([])
 const roomCommentDraft = ref('')
 const roomCommentState = ref({ loading: false, error: '' })
@@ -106,6 +107,15 @@ const currentRoomSoundTitle = computed(() => {
   return decodeURIComponent(last).replace(/\.[^/.]+$/, '')
 })
 
+const DEFAULT_FLOOR_COLOR = '#c0b496'
+const DEFAULT_WALL_COLOR = '#8f98a3'
+
+function normalizeHexColor(value, fallback) {
+  const input = String(value || '').trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/.test(input)) return input
+  return fallback
+}
+
 async function loadAvailableSounds() {
   const res = await getSoundLibrary()
   availableSounds.value = Array.isArray(res.sounds) ? res.sounds : []
@@ -115,6 +125,14 @@ function syncRoomMusicDraft(room) {
   roomMusicDraftUrl.value = room?.ambience?.musicUrl || ''
   roomMusicDraftVolume.value = Math.round((room?.ambience?.volume ?? 0.35) * 100)
   roomMusicState.value = { loading: false, error: '', success: '' }
+}
+
+function syncRoomAppearanceDraft(room) {
+  const appearance = room?.sceneData?.appearance || {}
+  roomAppearanceDraft.value = {
+    floorColor: normalizeHexColor(appearance.floorColor, DEFAULT_FLOOR_COLOR),
+    wallColor: normalizeHexColor(appearance.wallColor, DEFAULT_WALL_COLOR)
+  }
 }
 
 function stopRoomAudio() {
@@ -700,6 +718,7 @@ async function openEditor(room = null) {
   // Set room data to be loaded when scene is ready
   const roomData = room?.sceneData ? JSON.parse(JSON.stringify(room.sceneData)) : null
   currentRoomData.value = roomData
+  syncRoomAppearanceDraft(room)
   console.log('Set currentRoomData.value to:', currentRoomData.value)
 }
 
@@ -710,6 +729,7 @@ function showHome() {
   saveStatusType.value = ''
   currentRoomData.value = null
   currentRoom.value = null
+  roomAppearanceDraft.value = { floorColor: DEFAULT_FLOOR_COLOR, wallColor: DEFAULT_WALL_COLOR }
   stopRoomAudio()
   activeContributionsRoomId.value = ''
   resetContributionDrafts()
@@ -865,6 +885,20 @@ async function onSelectRoomSound(sound) {
   }
 
   await onSaveRoomMusic()
+}
+
+function onApplyRoomColors(colors) {
+  roomAppearanceDraft.value = {
+    floorColor: normalizeHexColor(colors?.floorColor, DEFAULT_FLOOR_COLOR),
+    wallColor: normalizeHexColor(colors?.wallColor, DEFAULT_WALL_COLOR)
+  }
+
+  sceneCommand.value = {
+    type: 'apply-room-colors',
+    floorColor: roomAppearanceDraft.value.floorColor,
+    wallColor: roomAppearanceDraft.value.wallColor,
+    _requestId: Date.now()
+  }
 }
 
 function onSelected(info) {
@@ -1335,7 +1369,7 @@ function onHistoryAction() {
       />
 
       <EditorRoomName
-        :room-name="roomName.value"
+        :room-name="roomName"
         @update:roomName="handleRoomNameUpdate"
       />
 
@@ -1426,9 +1460,11 @@ function onHistoryAction() {
         <Sidebar
           class="editor-sidebar"
           :selected="selected"
+          :room-appearance="roomAppearanceDraft"
           @load-model="onLoadModel"
           @delete-selected="onDeleteSelected"
           @select-sound="onSelectRoomSound"
+          @apply-room-colors="onApplyRoomColors"
         />
 
         <div class="editor-scene-panel">

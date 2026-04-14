@@ -19,6 +19,10 @@ const subCategories = computed(() => {
     return ['Alle', 'Natuur', 'Instrumentaal', 'Overig']
   }
 
+  if (props.activeCategory === 'Kleuren') {
+    return ['Paletten', 'Neutraal', 'Aarde', 'Koel']
+  }
+
   if (props.activeCategory === 'Kamer') {
     return ['Alle', 'Persoonlijk', 'Decoratie']
   }

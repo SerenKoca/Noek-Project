@@ -5,15 +5,20 @@ import SidebarAssetsNav from './sidebar/SidebarAssetsNav.vue'
 import SidebarSubNav from './sidebar/SidebarSubNav.vue'
 import SidebarModelsPanel from './sidebar/SidebarModelsPanel.vue'
 import SidebarSoundsPanel from './sidebar/SidebarSoundsPanel.vue'
+import SidebarColorsPanel from './sidebar/SidebarColorsPanel.vue'
 
 const props = defineProps({
   selected: {
     type: Object,
     default: null
+  },
+  roomAppearance: {
+    type: Object,
+    default: () => ({})
   }
 })
 
-const emit = defineEmits(['load-model', 'delete-selected', 'select-sound'])
+const emit = defineEmits(['load-model', 'delete-selected', 'select-sound', 'apply-room-colors'])
 
 const loading = ref(false)
 const error = ref('')
@@ -23,6 +28,7 @@ const activeSubCategory = ref('Sofa\'s')
 
 const filteredModels = computed(() => models.value)
 const isSoundCategory = computed(() => activeCategory.value === 'Geluid')
+const isColorCategory = computed(() => activeCategory.value === 'Kleuren')
 
 function buildLoadPayload(model) {
   const resolvedTitle = model?.title || model?.name || model?.Title || 'Untitled model'
@@ -95,7 +101,16 @@ watch(activeCategory, (value) => {
     return
   }
 
+  if (value === 'Kleuren') {
+    activeSubCategory.value = 'Kleuren'
+    return
+  }
+
   if (activeSubCategory.value === 'Alle') {
+    activeSubCategory.value = 'Sofa\'s'
+  }
+
+  if (activeSubCategory.value === 'Paletten') {
     activeSubCategory.value = 'Sofa\'s'
   }
 })
@@ -103,13 +118,14 @@ watch(activeCategory, (value) => {
 
 <template>
   <aside class="editor-sidebar-shell">
-    <div class="editor-sidebar-grid">
+    <div class="editor-sidebar-grid" :class="{ 'is-colors': isColorCategory }">
       <SidebarAssetsNav
         :active-category="activeCategory"
         @update:active-category="activeCategory = $event"
       />
 
       <SidebarSubNav
+        v-if="!isColorCategory"
         :active-category="activeCategory"
         :active-sub-category="activeSubCategory"
         @update:active-sub-category="activeSubCategory = $event"
@@ -119,6 +135,13 @@ watch(activeCategory, (value) => {
         v-if="isSoundCategory"
         :active-sub-category="activeSubCategory"
         @select-sound="emit('select-sound', $event)"
+      />
+
+      <SidebarColorsPanel
+        v-else-if="isColorCategory"
+        :active-sub-category="activeSubCategory"
+        :room-appearance="props.roomAppearance"
+        @apply-colors="emit('apply-room-colors', $event)"
       />
 
       <SidebarModelsPanel

@@ -37,6 +37,14 @@ defineEmits(['update:activeCategory'])
         <span class="chip-icon">G</span>
         <span>Geluid</span>
       </button>
+      <button
+        class="editor-assets-btn"
+        :class="{ active: activeCategory === 'Kleuren' }"
+        @click="$emit('update:activeCategory', 'Kleuren')"
+      >
+        <span class="chip-icon">C</span>
+        <span>Kleuren</span>
+      </button>
     </div>
   </section>
 </template>

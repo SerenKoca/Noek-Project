@@ -269,6 +269,10 @@ body {
   height: 100%;
 }
 
+.editor-sidebar-grid.is-colors {
+  grid-template-columns: 94px 1fr;
+}
+
 .editor-assets-nav,
 .editor-sub-nav,
 .editor-models-panel {
@@ -459,6 +463,102 @@ body {
 .editor-sound-meta span {
   font-size: 0.72rem;
   color: var(--editor-text-soft);
+}
+
+.editor-colors-panel {
+  gap: 8px;
+}
+
+.editor-color-targets {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.editor-color-picker-row {
+  display: grid;
+  gap: 6px;
+}
+
+.editor-color-picker-row label {
+  display: grid;
+  gap: 5px;
+  font-size: 0.72rem;
+  color: var(--editor-text-soft);
+}
+
+.editor-color-picker-row input[type='color'] {
+  width: 100%;
+  height: 34px;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  padding: 2px;
+  background: #fff;
+  cursor: pointer;
+}
+
+.editor-color-preset-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.editor-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.editor-color-dot {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border: 1px solid rgba(16, 36, 56, 0.25);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.editor-color-dot.active {
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--editor-border-strong);
+}
+
+.editor-color-preset-item {
+  min-width: 0;
+}
+
+.editor-color-preset-btn {
+  width: 100%;
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--editor-tile);
+  color: var(--editor-text);
+  padding: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.editor-color-preset-btn:hover {
+  background: #fff;
+  border-color: var(--editor-border-strong);
+}
+
+.editor-color-swatch-pair {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.editor-color-swatch {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+  border: 1px solid rgba(16, 36, 56, 0.25);
 }
 
 .editor-model-card {

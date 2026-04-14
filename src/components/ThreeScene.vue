@@ -65,6 +65,8 @@ const ZOOM_RECENTER_STRENGTH = 0.5
 const FAR_RESET_BLEND_START = 0.08
 const ROOM_SIZE = 34
 const WALL_HEIGHT = 19
+const DEFAULT_FLOOR_COLOR = '#c0b496'
+const DEFAULT_WALL_COLOR = '#8f98a3'
 
 const FURNITURE_SLOTS = [
   { id: 'slot-sofa', position: new THREE.Vector3(10, 0, -12), rotationY: Math.PI },
@@ -74,6 +76,31 @@ const FURNITURE_SLOTS = [
 ]
 
 const slotStates = new Map()
+let floorMaterial = null
+let wallMaterial = null
+
+function toColorHex(value, fallback) {
+  const input = String(value || '').trim().toLowerCase()
+  if (/^#[0-9a-f]{6}$/.test(input)) return input
+  return fallback
+}
+
+function applyRoomColors({ floorColor, wallColor } = {}) {
+  const nextFloor = toColorHex(floorColor, DEFAULT_FLOOR_COLOR)
+  const nextWall = toColorHex(wallColor, DEFAULT_WALL_COLOR)
+
+  if (floorMaterial?.color) {
+    floorMaterial.color.set(nextFloor)
+    floorMaterial.needsUpdate = true
+  }
+
+  if (wallMaterial?.color) {
+    wallMaterial.color.set(nextWall)
+    wallMaterial.needsUpdate = true
+  }
+
+  return { floorColor: nextFloor, wallColor: nextWall }
+}
 
 
 function createScene() {
@@ -145,31 +172,31 @@ function createScene() {
 
   // Large room surfaces to keep borders out of view while zooming.
   const floorGeo = new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE)
-  const floorMat = new THREE.MeshStandardMaterial({
-    color: 0xc0b496,
+  floorMaterial = new THREE.MeshStandardMaterial({
+    color: DEFAULT_FLOOR_COLOR,
     roughness: 0.95,
     metalness: 0.0
   })
-  const floor = new THREE.Mesh(floorGeo, floorMat)
+  const floor = new THREE.Mesh(floorGeo, floorMaterial)
   floor.rotation.x = -Math.PI / 2
   floor.position.set(0, -0.001, 0)
   floor.receiveShadow = false
   scene.add(floor)
 
   // Back wall
-  const wallMat = new THREE.MeshStandardMaterial({
-    color: 0x8f98a3,
+  wallMaterial = new THREE.MeshStandardMaterial({
+    color: DEFAULT_WALL_COLOR,
     roughness: 0.92,
     metalness: 0.0,
     side: THREE.DoubleSide
   })
 
-  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMat)
+  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
   backWall.position.set(0, WALL_HEIGHT / 2, -ROOM_SIZE / 2)
   scene.add(backWall)
 
   // Right wall
-  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMat)
+  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
   rightWall.rotation.y = -Math.PI / 2
   rightWall.position.set(ROOM_SIZE / 2, WALL_HEIGHT / 2, 0)
   scene.add(rightWall)
@@ -558,6 +585,10 @@ function serializeRoom() {
       wallHeight: WALL_HEIGHT
     },
     furniture,
+    appearance: applyRoomColors({
+      floorColor: floorMaterial?.color?.getHexString ? `#${floorMaterial.color.getHexString()}` : DEFAULT_FLOOR_COLOR,
+      wallColor: wallMaterial?.color?.getHexString ? `#${wallMaterial.color.getHexString()}` : DEFAULT_WALL_COLOR
+    }),
     camera: {
       position: camera?.position?.toArray?.() || null,
       target: orbit?.target?.toArray?.() || null
@@ -574,12 +605,14 @@ async function loadRoom(sceneData) {
     console.log('No furniture data, resetting to default')
     // Reset to default state for new rooms
     resetSceneToDefault()
+    applyRoomColors()
     return
   }
 
   console.log('Loading furniture:', sceneData.furniture.length, 'items')
   // Reset scene to default state first
   resetSceneToDefault()
+  applyRoomColors(sceneData.appearance || {})
 
   // Load saved furniture
   for (const item of sceneData.furniture) {
@@ -629,17 +662,16 @@ async function loadRoom(sceneData) {
     }
   }
 
-  // Restore camera position if available
-  if (sceneData.camera) {
-    console.log('Loading camera position:', sceneData.camera)
-    if (sceneData.camera.position && camera) {
-      camera.position.fromArray(sceneData.camera.position)
-    }
-    if (sceneData.camera.target && orbit) {
-      orbit.target.fromArray(sceneData.camera.target)
-    }
-    if (orbit) orbit.update()
+  // Always start from the same entry camera when opening a room.
+  if (camera) {
+    camera.position.copy(START_CAMERA)
   }
+  if (orbit) {
+    orbit.target.copy(FIXED_TARGET)
+    orbit.update()
+  }
+  currentLookYaw = initialAzimuth
+  syncTargetToCurrentYaw()
 
   console.log('Room loading completed')
   deselect()
@@ -672,6 +704,7 @@ function resetSceneToDefault() {
   // Reinitialize default furniture
   console.log('Reinitializing default furniture')
   initializeFurnitureSlots()
+  applyRoomColors()
 }
 
 defineExpose({ serializeRoom, loadRoom })
@@ -879,6 +912,14 @@ watch(
     if (command.type === 'delete-selected' && selectedRoot && !selectedRoot.userData?.isSlotMarker) {
       const slotId = selectedRoot.userData?.slotId || ''
       if (slotId) removeFurnitureFromSlot(slotId)
+      return
+    }
+
+    if (command.type === 'apply-room-colors') {
+      applyRoomColors({
+        floorColor: command.floorColor,
+        wallColor: command.wallColor
+      })
     }
   }
 )
