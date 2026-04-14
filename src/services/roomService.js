@@ -33,3 +33,13 @@ export async function getRooms() {
   const response = await http.get('/rooms')
   return response.data
 }
+
+export async function getRoomContributions(roomId) {
+  const response = await http.get(`/rooms/${roomId}/contributions`)
+  return response.data
+}
+
+export async function createRoomContribution(roomId, payload) {
+  const response = await http.post(`/rooms/${roomId}/contributions`, payload)
+  return response.data
+}

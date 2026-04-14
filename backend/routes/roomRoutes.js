@@ -6,13 +6,17 @@ const {
   getRooms,
   getRoomById,
   updateRoom,
-  deleteRoom
+  deleteRoom,
+  getRoomContributions,
+  createRoomContribution
 } = require('../controllers/roomController');
 
 router.use(requireAuth);
 
 router.post('/', createRoom);
 router.get('/', getRooms);
+router.get('/:id/contributions', getRoomContributions);
+router.post('/:id/contributions', createRoomContribution);
 router.get('/:id', getRoomById);
 router.put('/:id', updateRoom);
 router.delete('/:id', deleteRoom);

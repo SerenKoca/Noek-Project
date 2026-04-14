@@ -1,4 +1,13 @@
 const Room = require('../models/Room');
+const RoomContribution = require('../models/RoomContribution');
+
+function countWords(value) {
+  return (value || '').trim().split(/\s+/).filter(Boolean).length;
+}
+
+async function findOwnedRoom(roomId, ownerId) {
+  return Room.findOne({ _id: roomId, ownerId });
+}
 
 exports.createRoom = async (req, res) => {
   try {
@@ -77,5 +86,68 @@ exports.deleteRoom = async (req, res) => {
   } catch (error) {
     console.error('deleteRoom error:', error);
     res.status(500).json({ error: 'Kon kamer niet verwijderen.' });
+  }
+};
+
+exports.getRoomContributions = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const items = await RoomContribution.find({ roomId: room._id, ownerId }).sort({ createdAt: -1 });
+    return res.json(items);
+  } catch (error) {
+    console.error('getRoomContributions error:', error);
+    return res.status(500).json({ error: 'Kon bijdragen niet ophalen.' });
+  }
+};
+
+exports.createRoomContribution = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const {
+      type,
+      giverName,
+      tributeText = '',
+      mediaUrl = '',
+      externalUrl = '',
+      platform = 'none'
+    } = req.body || {};
+
+    if (!type || !giverName?.trim()) {
+      return res.status(400).json({ error: 'Type en naam van gever zijn verplicht.' });
+    }
+
+    if (countWords(tributeText) > 150) {
+      return res.status(400).json({ error: 'Tekst mag maximaal 150 woorden bevatten.' });
+    }
+
+    const contribution = new RoomContribution({
+      roomId: room._id,
+      ownerId,
+      createdByUserId: ownerId,
+      type,
+      giverName: giverName.trim(),
+      tributeText: tributeText.trim(),
+      mediaUrl: mediaUrl.trim(),
+      externalUrl: externalUrl.trim(),
+      platform
+    });
+
+    await contribution.save();
+    return res.status(201).json(contribution);
+  } catch (error) {
+    console.error('createRoomContribution error:', error);
+    return res.status(500).json({ error: 'Kon bijdrage niet opslaan.' });
   }
 };
