@@ -64,3 +64,18 @@ export async function addRoomContributionComment(roomId, contributionId, payload
   )
   return response.data
 }
+
+export async function updateRoomMusic(roomId, payload) {
+  const response = await http.patch(`/rooms/${roomId}/music`, payload)
+  return response.data
+}
+
+export async function reactToRoom(roomId, reactionType) {
+  const response = await http.post(`/rooms/${roomId}/room-reactions`, { reactionType })
+  return response.data
+}
+
+export async function addRoomComment(roomId, payload) {
+  const response = await http.post(`/rooms/${roomId}/room-comments`, payload)
+  return response.data
+}

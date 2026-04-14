@@ -1,5 +1,9 @@
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+defineEmits(['update:activeSubCategory'])
+
+const props = defineProps({
   activeCategory: {
     type: String,
     required: true
@@ -10,7 +14,17 @@ defineProps({
   }
 })
 
-defineEmits(['update:activeSubCategory'])
+const subCategories = computed(() => {
+  if (props.activeCategory === 'Geluid') {
+    return ['Alle', 'Natuur', 'Instrumentaal', 'Overig']
+  }
+
+  if (props.activeCategory === 'Kamer') {
+    return ['Alle', 'Persoonlijk', 'Decoratie']
+  }
+
+  return ['Sofa\'s', 'Persoonlijk', 'Meubels', 'Decoratie']
+})
 </script>
 
 <template>
@@ -18,10 +32,15 @@ defineEmits(['update:activeSubCategory'])
     <div class="editor-sub-header">back</div>
     <div class="editor-sub-title">{{ activeCategory }}</div>
     <div class="editor-sub-list">
-      <button class="editor-sub-item" :class="{ active: activeSubCategory === 'Sofa\'s' }" @click="$emit('update:activeSubCategory', 'Sofa\'s')">Sofa's</button>
-      <button class="editor-sub-item" :class="{ active: activeSubCategory === 'Persoonlijk' }" @click="$emit('update:activeSubCategory', 'Persoonlijk')">Persoonlijk</button>
-      <button class="editor-sub-item" :class="{ active: activeSubCategory === 'Meubels' }" @click="$emit('update:activeSubCategory', 'Meubels')">Meubels</button>
-      <button class="editor-sub-item" :class="{ active: activeSubCategory === 'Decoratie' }" @click="$emit('update:activeSubCategory', 'Decoratie')">Decoratie</button>
+      <button
+        v-for="sub in subCategories"
+        :key="sub"
+        class="editor-sub-item"
+        :class="{ active: activeSubCategory === sub }"
+        @click="$emit('update:activeSubCategory', sub)"
+      >
+        {{ sub }}
+      </button>
     </div>
   </section>
 </template>

@@ -1,9 +1,10 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { fetchModels } from '../services/polyPizzaService'
 import SidebarAssetsNav from './sidebar/SidebarAssetsNav.vue'
 import SidebarSubNav from './sidebar/SidebarSubNav.vue'
 import SidebarModelsPanel from './sidebar/SidebarModelsPanel.vue'
+import SidebarSoundsPanel from './sidebar/SidebarSoundsPanel.vue'
 
 const props = defineProps({
   selected: {
@@ -12,7 +13,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['load-model', 'delete-selected'])
+const emit = defineEmits(['load-model', 'delete-selected', 'select-sound'])
 
 const loading = ref(false)
 const error = ref('')
@@ -21,6 +22,7 @@ const activeCategory = ref('Meubels')
 const activeSubCategory = ref('Sofa\'s')
 
 const filteredModels = computed(() => models.value)
+const isSoundCategory = computed(() => activeCategory.value === 'Geluid')
 
 function buildLoadPayload(model) {
   const resolvedTitle = model?.title || model?.name || model?.Title || 'Untitled model'
@@ -86,6 +88,17 @@ function deleteSelected() {
 onMounted(() => {
   loadFromApi()
 })
+
+watch(activeCategory, (value) => {
+  if (value === 'Geluid') {
+    activeSubCategory.value = 'Alle'
+    return
+  }
+
+  if (activeSubCategory.value === 'Alle') {
+    activeSubCategory.value = 'Sofa\'s'
+  }
+})
 </script>
 
 <template>
@@ -102,7 +115,14 @@ onMounted(() => {
         @update:active-sub-category="activeSubCategory = $event"
       />
 
+      <SidebarSoundsPanel
+        v-if="isSoundCategory"
+        :active-sub-category="activeSubCategory"
+        @select-sound="emit('select-sound', $event)"
+      />
+
       <SidebarModelsPanel
+        v-else
         :loading="loading"
         :error="error"
         :selected="props.selected"

@@ -10,7 +10,10 @@ const {
   getRoomContributions,
   createRoomContribution,
   reactToRoomContribution,
-  addRoomContributionComment
+  addRoomContributionComment,
+  updateRoomMusic,
+  reactToRoom,
+  addRoomComment
 } = require('../controllers/roomController');
 
 router.use(requireAuth);
@@ -21,6 +24,9 @@ router.get('/:id/contributions', getRoomContributions);
 router.post('/:id/contributions', createRoomContribution);
 router.post('/:id/contributions/:contributionId/reactions', reactToRoomContribution);
 router.post('/:id/contributions/:contributionId/comments', addRoomContributionComment);
+router.patch('/:id/music', updateRoomMusic);
+router.post('/:id/room-reactions', reactToRoom);
+router.post('/:id/room-comments', addRoomComment);
 router.get('/:id', getRoomById);
 router.put('/:id', updateRoom);
 router.delete('/:id', deleteRoom);

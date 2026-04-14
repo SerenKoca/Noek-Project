@@ -145,6 +145,102 @@ body {
   gap: 8px;
 }
 
+.editor-room-side-panel {
+  position: absolute;
+  top: 200px;
+  right: 16px;
+  z-index: 26;
+  width: min(360px, calc(100vw - 24px));
+  max-height: calc(100vh - 150px);
+  overflow: auto;
+  display: grid;
+  gap: 10px;
+}
+
+.editor-room-sound-bar {
+  position: absolute;
+  top: 86px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 24;
+  width: min(380px, calc(100vw - 28px));
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  background: rgba(246, 250, 255, 0.95);
+  padding: 8px 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.editor-room-sound-controls {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+}
+
+.editor-room-widget {
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  background: rgba(246, 250, 255, 0.95);
+  padding: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.editor-room-widget h4 {
+  margin: 0;
+}
+
+.editor-room-sound-title {
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--editor-text);
+}
+
+.editor-room-widget input[type='url'] {
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+
+.editor-room-range {
+  display: grid;
+  gap: 4px;
+  font-size: 0.92rem;
+}
+
+.editor-room-range.compact {
+  gap: 2px;
+  font-size: 0.8rem;
+}
+
+.editor-room-range.centered {
+  justify-items: center;
+}
+
+.editor-room-range.horizontal {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.editor-room-range-label {
+  color: var(--editor-text-soft);
+}
+
+.editor-room-range input[type='range'] {
+  width: 160px;
+}
+
+.compact-btn {
+  justify-self: center;
+  padding: 8px 10px;
+  font-size: 0.8rem;
+}
+
 .editor-content {
   position: absolute;
   inset: 0;
@@ -331,6 +427,38 @@ body {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
   overflow-y: auto;
+}
+
+.editor-sound-list {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 6px;
+  overflow-y: auto;
+}
+
+.editor-sound-item {
+  border: 1px solid var(--editor-border);
+  border-radius: 6px;
+  background: var(--editor-tile);
+  padding: 6px;
+  display: grid;
+  gap: 6px;
+}
+
+.editor-sound-meta {
+  display: grid;
+  gap: 2px;
+}
+
+.editor-sound-meta strong {
+  font-size: 0.82rem;
+}
+
+.editor-sound-meta span {
+  font-size: 0.72rem;
+  color: var(--editor-text-soft);
 }
 
 .editor-model-card {

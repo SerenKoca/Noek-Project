@@ -1,0 +1,14 @@
+[
+  {
+    "id": "vogels",
+    "title": "Vogels",
+    "url": "/sounds/vogels.mp3",
+    "category": "Vogels"
+  },
+  {
+    "id": "klassiek",
+    "title": "klassiek",
+    "url": "/sounds/klassiek.mp3",
+    "category": "Klassiek"
+  }
+]

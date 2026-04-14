@@ -15,8 +15,12 @@ import {
   getRoomContributions,
   createRoomContribution,
   reactToRoomContribution,
-  addRoomContributionComment
+  addRoomContributionComment,
+  updateRoomMusic,
+  reactToRoom,
+  addRoomComment
 } from './services/roomService.js'
+import { getSoundLibrary } from './services/soundLibraryService.js'
 import { loginAccount, registerAccount, getStoredAuth, clearAuth } from './services/authService.js'
 
 const view = ref('home')
@@ -56,6 +60,13 @@ const photoUploadState = ref({ loading: false, error: '', success: '' })
 const videoFileUploadState = ref({ loading: false, error: '', success: '' })
 const commentDrafts = ref({})
 const commentStateByItem = ref({})
+const roomMusicDraftUrl = ref('')
+const roomMusicDraftVolume = ref(35)
+const roomMusicState = ref({ loading: false, error: '', success: '' })
+const availableSounds = ref([])
+const roomCommentDraft = ref('')
+const roomCommentState = ref({ loading: false, error: '' })
+const audioPlayer = ref(null)
 const deleteRoomModal = ref({
   open: false,
   roomId: '',
@@ -84,6 +95,79 @@ const musicSpotifyEmbedUrl = computed(() => {
 const videoYoutubeEmbedUrl = computed(() => {
   return videoYoutubeVideoId.value ? `https://www.youtube.com/embed/${videoYoutubeVideoId.value}` : ''
 })
+const currentRoomSoundTitle = computed(() => {
+  const url = String(roomMusicDraftUrl.value || '').trim()
+  if (!url) return 'Geen geluid gekozen'
+
+  const fromLibrary = (availableSounds.value || []).find((sound) => sound.url === url)
+  if (fromLibrary?.title) return fromLibrary.title
+
+  const last = url.split('/').pop() || url
+  return decodeURIComponent(last).replace(/\.[^/.]+$/, '')
+})
+
+async function loadAvailableSounds() {
+  const res = await getSoundLibrary()
+  availableSounds.value = Array.isArray(res.sounds) ? res.sounds : []
+}
+
+function syncRoomMusicDraft(room) {
+  roomMusicDraftUrl.value = room?.ambience?.musicUrl || ''
+  roomMusicDraftVolume.value = Math.round((room?.ambience?.volume ?? 0.35) * 100)
+  roomMusicState.value = { loading: false, error: '', success: '' }
+}
+
+function stopRoomAudio() {
+  if (!audioPlayer.value) return
+  audioPlayer.value.pause()
+  audioPlayer.value.src = ''
+}
+
+function onRoomMusicVolumeInput() {
+  if (!audioPlayer.value) return
+  const volume = Math.min(1, Math.max(0, Number(roomMusicDraftVolume.value) / 100))
+  audioPlayer.value.volume = volume
+}
+
+async function startRoomAudioFromRoom(room) {
+  const musicUrl = String(room?.ambience?.musicUrl || '').trim()
+  if (!musicUrl) {
+    stopRoomAudio()
+    return
+  }
+
+  if (!audioPlayer.value) {
+    audioPlayer.value = new Audio()
+    audioPlayer.value.loop = true
+  }
+
+  const volume = Math.min(1, Math.max(0, Number(room?.ambience?.volume ?? 0.35)))
+  audioPlayer.value.volume = volume
+  audioPlayer.value.src = musicUrl
+
+  try {
+    await audioPlayer.value.play()
+  } catch {
+    roomMusicState.value = {
+      loading: false,
+      error: 'Auto-play geblokkeerd door browser. Klik op "Muziek toepassen".',
+      success: ''
+    }
+  }
+}
+
+function mergeRoomUpdate(updatedRoom) {
+  if (!updatedRoom?._id) return
+  currentRoom.value = updatedRoom
+  rooms.value = (rooms.value || []).map((room) => (room._id === updatedRoom._id ? updatedRoom : room))
+}
+
+function getUserRoomReaction(room) {
+  const userId = currentUserId.value
+  if (!userId) return ''
+  const entry = (room?.roomReactedUsers || []).find((row) => row?.userId === userId)
+  return entry?.reactionType || ''
+}
 
 function resetContributionDrafts() {
   newCandleForm.value = { tributeText: '' }
@@ -607,6 +691,10 @@ async function openEditor(room = null) {
 
   // Set current room for updates
   currentRoom.value = room
+  syncRoomMusicDraft(room)
+  roomCommentDraft.value = ''
+  roomCommentState.value = { loading: false, error: '' }
+  await startRoomAudioFromRoom(room)
 
   console.log('About to set currentRoomData, current value:', currentRoomData.value)
   // Set room data to be loaded when scene is ready
@@ -622,12 +710,14 @@ function showHome() {
   saveStatusType.value = ''
   currentRoomData.value = null
   currentRoom.value = null
+  stopRoomAudio()
   activeContributionsRoomId.value = ''
   resetContributionDrafts()
   contributionCreateState.value = { loading: false, error: '', success: '' }
 }
 
 onMounted(() => {
+  loadAvailableSounds()
   if (authState.value?.token) {
     loadRooms()
   }
@@ -683,9 +773,71 @@ function onLogout() {
   contributionCreateState.value = { loading: false, error: '', success: '' }
   currentRoom.value = null
   currentRoomData.value = null
+  stopRoomAudio()
   view.value = 'home'
   authStatus.value = 'Je bent uitgelogd.'
   authStatusType.value = 'success'
+}
+
+async function onSaveRoomMusic() {
+  const roomId = currentRoom.value?._id
+  if (!roomId) {
+    roomMusicState.value = { loading: false, error: 'Sla eerst je kamer op.', success: '' }
+    return
+  }
+
+  roomMusicState.value = { loading: true, error: '', success: '' }
+
+  try {
+    const updatedRoom = await updateRoomMusic(roomId, {
+      musicUrl: roomMusicDraftUrl.value,
+      volume: roomMusicDraftVolume.value / 100
+    })
+    mergeRoomUpdate(updatedRoom)
+    await startRoomAudioFromRoom(updatedRoom)
+    roomMusicState.value = { loading: false, error: '', success: 'Kamermuziek opgeslagen.' }
+  } catch (error) {
+    roomMusicState.value = {
+      loading: false,
+      error: error?.response?.data?.error || 'Kamermuziek opslaan mislukt.',
+      success: ''
+    }
+  }
+}
+
+async function reactOnRoom(reactionType) {
+  const roomId = currentRoom.value?._id
+  if (!roomId) return
+
+  try {
+    const updatedRoom = await reactToRoom(roomId, reactionType)
+    mergeRoomUpdate(updatedRoom)
+  } catch (error) {
+    console.error('Failed to react on room', error)
+  }
+}
+
+async function submitRoomComment() {
+  const roomId = currentRoom.value?._id
+  const text = roomCommentDraft.value.trim()
+  if (!roomId || !text) return
+
+  roomCommentState.value = { loading: true, error: '' }
+
+  try {
+    const updatedRoom = await addRoomComment(roomId, {
+      text,
+      displayName: autoGiverName.value || 'Gebruiker'
+    })
+    mergeRoomUpdate(updatedRoom)
+    roomCommentDraft.value = ''
+    roomCommentState.value = { loading: false, error: '' }
+  } catch (error) {
+    roomCommentState.value = {
+      loading: false,
+      error: error?.response?.data?.error || 'Kamerreactie opslaan mislukt.'
+    }
+  }
 }
 
 function onLoadModel(modelLike) {
@@ -695,6 +847,24 @@ function onLoadModel(modelLike) {
 
 function onDeleteSelected() {
   sceneCommand.value = { type: 'delete-selected', _requestId: Date.now() }
+}
+
+async function onSelectRoomSound(sound) {
+  const soundUrl = String(sound?.url || '').trim()
+  if (!soundUrl) return
+
+  roomMusicDraftUrl.value = soundUrl
+
+  if (!currentRoom.value?._id) {
+    roomMusicState.value = {
+      loading: false,
+      error: 'Sla eerst je kamer op, daarna kan je het geluid toepassen.',
+      success: ''
+    }
+    return
+  }
+
+  await onSaveRoomMusic()
 }
 
 function onSelected(info) {
@@ -1177,12 +1347,88 @@ function onHistoryAction() {
 
       <EditorHistoryControls @undo="onHistoryAction" @redo="onHistoryAction" />
 
+      <section class="editor-room-sound-bar">
+        <div class="editor-room-sound-title">{{ currentRoomSoundTitle }}</div>
+        <div class="editor-room-sound-controls">
+          <label class="editor-room-range compact centered horizontal">
+            <span class="editor-room-range-label">Volume</span>
+            <input v-model.number="roomMusicDraftVolume" type="range" min="0" max="100" step="1" @input="onRoomMusicVolumeInput" />
+            <span>{{ roomMusicDraftVolume }}%</span>
+          </label>
+          <button type="button" class="secondary-btn compact-btn" :disabled="roomMusicState.loading" @click="onSaveRoomMusic">
+            {{ roomMusicState.loading ? 'Opslaan...' : 'Toepassen' }}
+          </button>
+        </div>
+        <div v-if="roomMusicState.error" class="room-contribution-empty error">{{ roomMusicState.error }}</div>
+      </section>
+
+      <aside class="editor-room-side-panel">
+        <section class="editor-room-widget">
+          <h4>Reacties op deze kamer</h4>
+          <div class="item-reactions-row">
+            <button
+              type="button"
+              class="reaction-chip"
+              :class="{ active: getUserRoomReaction(currentRoom) === 'heart' }"
+              @click="reactOnRoom('heart')"
+            >
+              ❤️ {{ currentRoom?.roomReactions?.heartCount || 0 }}
+            </button>
+            <button
+              type="button"
+              class="reaction-chip"
+              :class="{ active: getUserRoomReaction(currentRoom) === 'support' }"
+              @click="reactOnRoom('support')"
+            >
+              🤍 {{ currentRoom?.roomReactions?.supportCount || 0 }}
+            </button>
+            <button
+              type="button"
+              class="reaction-chip"
+              :class="{ active: getUserRoomReaction(currentRoom) === 'candle' }"
+              @click="reactOnRoom('candle')"
+            >
+              🕯️ {{ currentRoom?.roomReactions?.candleCount || 0 }}
+            </button>
+          </div>
+
+          <form class="item-comment-form" @submit.prevent="submitRoomComment">
+            <input
+              v-model="roomCommentDraft"
+              type="text"
+              maxlength="500"
+              placeholder="Laat een reactie achter voor de hele kamer..."
+            />
+            <button type="submit" class="secondary-btn" :disabled="roomCommentState.loading">
+              {{ roomCommentState.loading ? 'Bezig...' : 'Plaats reactie' }}
+            </button>
+          </form>
+
+          <div v-if="roomCommentState.error" class="room-contribution-empty error">
+            {{ roomCommentState.error }}
+          </div>
+
+          <ul class="item-comments-items" v-if="(currentRoom?.roomComments || []).length">
+            <li
+              v-for="comment in currentRoom.roomComments"
+              :key="comment._id || comment.createdAt"
+              class="item-comment-entry"
+            >
+              <span class="item-comment-author">{{ comment.displayName || 'Gebruiker' }}:</span>
+              <span>{{ comment.text }}</span>
+            </li>
+          </ul>
+          <div v-else class="room-contribution-empty">Nog geen reacties op de kamer.</div>
+        </section>
+      </aside>
+
       <div class="editor-content">
         <Sidebar
           class="editor-sidebar"
           :selected="selected"
           @load-model="onLoadModel"
           @delete-selected="onDeleteSelected"
+          @select-sound="onSelectRoomSound"
         />
 
         <div class="editor-scene-panel">

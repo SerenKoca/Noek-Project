@@ -13,6 +13,17 @@ async function findOwnedContribution(roomId, ownerId, contributionId) {
   return RoomContribution.findOne({ _id: contributionId, roomId, ownerId });
 }
 
+function normalizeRoomReactionType(value) {
+  const fieldByType = {
+    heart: 'heartCount',
+    support: 'supportCount',
+    candle: 'candleCount'
+  };
+  const reactionType = (value || '').trim();
+  const reactionField = fieldByType[reactionType];
+  return { reactionType, reactionField };
+}
+
 exports.createRoom = async (req, res) => {
   try {
     const { name, userId, sceneData } = req.body;
@@ -263,5 +274,106 @@ exports.addRoomContributionComment = async (req, res) => {
   } catch (error) {
     console.error('addRoomContributionComment error:', error);
     return res.status(500).json({ error: 'Kon commentaar niet opslaan.' });
+  }
+};
+
+exports.updateRoomMusic = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const musicUrl = String(req.body?.musicUrl || '').trim();
+    const volumeRaw = Number(req.body?.volume);
+    const volume = Number.isFinite(volumeRaw) ? Math.min(1, Math.max(0, volumeRaw)) : 0.35;
+
+    room.ambience = {
+      musicUrl,
+      volume
+    };
+
+    await room.save();
+    return res.json(room);
+  } catch (error) {
+    console.error('updateRoomMusic error:', error);
+    return res.status(500).json({ error: 'Kon kamermuziek niet opslaan.' });
+  }
+};
+
+exports.reactToRoom = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const { reactionType, reactionField } = normalizeRoomReactionType(req.body?.reactionType);
+    if (!reactionField) {
+      return res.status(400).json({ error: 'Onbekend reactietype.' });
+    }
+
+    const userId = ownerId;
+    const existingIndex = (room.roomReactedUsers || []).findIndex((entry) => entry.userId === userId);
+    const existing = existingIndex >= 0 ? room.roomReactedUsers[existingIndex] : null;
+
+    if (existing?.reactionType === reactionType) {
+      room.roomReactions[reactionField] = Math.max(0, (room.roomReactions?.[reactionField] || 0) - 1);
+      room.roomReactedUsers.splice(existingIndex, 1);
+    } else {
+      if (existing?.reactionType) {
+        const oldField = `${existing.reactionType}Count`;
+        room.roomReactions[oldField] = Math.max(0, (room.roomReactions?.[oldField] || 0) - 1);
+        room.roomReactedUsers[existingIndex].reactionType = reactionType;
+      } else {
+        room.roomReactedUsers.push({ userId, reactionType });
+      }
+
+      room.roomReactions[reactionField] = (room.roomReactions?.[reactionField] || 0) + 1;
+    }
+
+    await room.save();
+    return res.json(room);
+  } catch (error) {
+    console.error('reactToRoom error:', error);
+    return res.status(500).json({ error: 'Kon kamerreactie niet opslaan.' });
+  }
+};
+
+exports.addRoomComment = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const text = (req.body?.text || '').trim();
+    const displayName = (req.body?.displayName || req.auth?.email || 'Gebruiker').trim();
+
+    if (!text) {
+      return res.status(400).json({ error: 'Commentaar mag niet leeg zijn.' });
+    }
+
+    if (text.length > 500) {
+      return res.status(400).json({ error: 'Commentaar mag maximaal 500 tekens bevatten.' });
+    }
+
+    room.roomComments.push({
+      userId: ownerId,
+      displayName,
+      text
+    });
+
+    await room.save();
+    return res.json(room);
+  } catch (error) {
+    console.error('addRoomComment error:', error);
+    return res.status(500).json({ error: 'Kon kamercommentaar niet opslaan.' });
   }
 };
