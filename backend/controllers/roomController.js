@@ -9,6 +9,10 @@ async function findOwnedRoom(roomId, ownerId) {
   return Room.findOne({ _id: roomId, ownerId });
 }
 
+async function findOwnedContribution(roomId, ownerId, contributionId) {
+  return RoomContribution.findOne({ _id: contributionId, roomId, ownerId });
+}
+
 exports.createRoom = async (req, res) => {
   try {
     const { name, userId, sceneData } = req.body;
@@ -149,5 +153,107 @@ exports.createRoomContribution = async (req, res) => {
   } catch (error) {
     console.error('createRoomContribution error:', error);
     return res.status(500).json({ error: 'Kon bijdrage niet opslaan.' });
+  }
+};
+
+exports.reactToRoomContribution = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const contribution = await findOwnedContribution(room._id, ownerId, req.params.contributionId);
+    if (!contribution) {
+      return res.status(404).json({ error: 'Bijdrage niet gevonden.' });
+    }
+
+    const reactionType = (req.body?.reactionType || '').trim();
+    const fieldByType = {
+      heart: 'heartCount',
+      support: 'supportCount',
+      candle: 'candleCount'
+    };
+    const reactionField = fieldByType[reactionType];
+
+    if (!reactionField) {
+      return res.status(400).json({ error: 'Onbekend reactietype.' });
+    }
+
+    const userId = ownerId;
+    const fieldByTypeReverse = {
+      heartCount: 'heart',
+      supportCount: 'support',
+      candleCount: 'candle'
+    };
+
+    const existingIndex = (contribution.reactedUsers || []).findIndex((entry) => entry.userId === userId);
+    const existing = existingIndex >= 0 ? contribution.reactedUsers[existingIndex] : null;
+
+    if (existing?.reactionType === reactionType) {
+      const current = contribution.reactions?.[reactionField] || 0;
+      contribution.reactions[reactionField] = Math.max(0, current - 1);
+      contribution.reactedUsers.splice(existingIndex, 1);
+    } else {
+      if (existing?.reactionType) {
+        const oldField = `${existing.reactionType}Count`;
+        if (fieldByTypeReverse[oldField]) {
+          contribution.reactions[oldField] = Math.max(0, (contribution.reactions?.[oldField] || 0) - 1);
+        }
+        contribution.reactedUsers[existingIndex].reactionType = reactionType;
+      } else {
+        contribution.reactedUsers.push({ userId, reactionType });
+      }
+
+      contribution.reactions[reactionField] = (contribution.reactions?.[reactionField] || 0) + 1;
+    }
+
+    await contribution.save();
+
+    return res.json(contribution);
+  } catch (error) {
+    console.error('reactToRoomContribution error:', error);
+    return res.status(500).json({ error: 'Kon reactie niet opslaan.' });
+  }
+};
+
+exports.addRoomContributionComment = async (req, res) => {
+  try {
+    const ownerId = req.auth?.userId;
+    const room = await findOwnedRoom(req.params.id, ownerId);
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' });
+    }
+
+    const contribution = await findOwnedContribution(room._id, ownerId, req.params.contributionId);
+    if (!contribution) {
+      return res.status(404).json({ error: 'Bijdrage niet gevonden.' });
+    }
+
+    const text = (req.body?.text || '').trim();
+    const displayName = (req.body?.displayName || req.auth?.email || 'Gebruiker').trim();
+
+    if (!text) {
+      return res.status(400).json({ error: 'Commentaar mag niet leeg zijn.' });
+    }
+
+    if (text.length > 500) {
+      return res.status(400).json({ error: 'Commentaar mag maximaal 500 tekens bevatten.' });
+    }
+
+    contribution.comments.push({
+      userId: ownerId,
+      displayName,
+      text
+    });
+    await contribution.save();
+
+    return res.json(contribution);
+  } catch (error) {
+    console.error('addRoomContributionComment error:', error);
+    return res.status(500).json({ error: 'Kon commentaar niet opslaan.' });
   }
 };

@@ -30,6 +30,22 @@ const commentSchema = new mongoose.Schema(
   { _id: true }
 );
 
+const reactionUserSchema = new mongoose.Schema(
+  {
+    userId: {
+      type: String,
+      required: true,
+      trim: true
+    },
+    reactionType: {
+      type: String,
+      enum: ['heart', 'support', 'candle'],
+      required: true
+    }
+  },
+  { _id: false }
+);
+
 const roomContributionSchema = new mongoose.Schema(
   {
     roomId: {
@@ -84,6 +100,10 @@ const roomContributionSchema = new mongoose.Schema(
       heartCount: { type: Number, default: 0, min: 0 },
       supportCount: { type: Number, default: 0, min: 0 },
       candleCount: { type: Number, default: 0, min: 0 }
+    },
+    reactedUsers: {
+      type: [reactionUserSchema],
+      default: []
     },
     comments: {
       type: [commentSchema],

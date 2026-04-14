@@ -7,7 +7,15 @@ import EditorRoomName from './components/EditorRoomName.vue'
 import EditorBrand from './components/EditorBrand.vue'
 import EditorHistoryControls from './components/EditorHistoryControls.vue'
 import SceneOverlays from './components/SceneOverlays.vue'
-import { saveRoom, updateRoom, getRooms, getRoomContributions, createRoomContribution } from './services/roomService.js'
+import {
+  saveRoom,
+  updateRoom,
+  getRooms,
+  getRoomContributions,
+  createRoomContribution,
+  reactToRoomContribution,
+  addRoomContributionComment
+} from './services/roomService.js'
 import { loginAccount, registerAccount, getStoredAuth, clearAuth } from './services/authService.js'
 
 const view = ref('home')
@@ -37,6 +45,9 @@ const newCandleForm = ref({ tributeText: '' })
 const newMusicUrlForm = ref({ externalUrl: '', tributeText: '' })
 const newVideoUrlForm = ref({ externalUrl: '', tributeText: '' })
 const contributionCreateState = ref({ loading: false, error: '', success: '' })
+const commentDrafts = ref({})
+const commentStateByItem = ref({})
+const currentUserId = computed(() => authState.value?.user?.id || '')
 const autoGiverName = computed(() => {
   const displayName = authState.value?.user?.displayName?.trim()
   return displayName || authState.value?.user?.email || ''
@@ -307,6 +318,69 @@ async function addContribution(room, payload) {
       loading: false,
       error: error?.response?.data?.error || 'Kon bijdrage niet opslaan.',
       success: ''
+    }
+  }
+}
+
+function mergeContributionItem(roomId, updatedItem) {
+  if (!roomId || !updatedItem?._id) return
+
+  const items = roomContributions.value[roomId] || []
+  const updated = items.map((item) => (item._id === updatedItem._id ? updatedItem : item))
+  roomContributions.value = {
+    ...roomContributions.value,
+    [roomId]: updated
+  }
+}
+
+async function reactOnContribution(roomId, contributionId, reactionType) {
+  try {
+    const updatedItem = await reactToRoomContribution(roomId, contributionId, reactionType)
+    mergeContributionItem(roomId, updatedItem)
+  } catch (error) {
+    console.error('Failed to react on contribution', error)
+  }
+}
+
+function getUserReaction(item) {
+  const userId = currentUserId.value
+  if (!userId) return ''
+
+  const entry = (item?.reactedUsers || []).find((row) => row?.userId === userId)
+  return entry?.reactionType || ''
+}
+
+async function submitContributionComment(roomId, contributionId) {
+  const text = (commentDrafts.value[contributionId] || '').trim()
+  if (!text) return
+
+  commentStateByItem.value = {
+    ...commentStateByItem.value,
+    [contributionId]: { loading: true, error: '' }
+  }
+
+  try {
+    const updatedItem = await addRoomContributionComment(roomId, contributionId, {
+      text,
+      displayName: autoGiverName.value || 'Gebruiker'
+    })
+
+    mergeContributionItem(roomId, updatedItem)
+    commentDrafts.value = {
+      ...commentDrafts.value,
+      [contributionId]: ''
+    }
+    commentStateByItem.value = {
+      ...commentStateByItem.value,
+      [contributionId]: { loading: false, error: '' }
+    }
+  } catch (error) {
+    commentStateByItem.value = {
+      ...commentStateByItem.value,
+      [contributionId]: {
+        loading: false,
+        error: error?.response?.data?.error || 'Commentaar opslaan mislukt.'
+      }
     }
   }
 }
@@ -732,11 +806,65 @@ function onHistoryAction() {
                   <div><strong>Media URL:</strong> {{ item.mediaUrl || '-' }}</div>
                   <div><strong>Externe URL:</strong> {{ item.externalUrl || '-' }}</div>
                   <div><strong>Platform:</strong> {{ item.platform || 'none' }}</div>
-                  <div>
+                  <div class="item-reactions-row">
                     <strong>Reacties:</strong>
-                    ❤️ {{ item.reactions?.heartCount || 0 }} | 🤍 {{ item.reactions?.supportCount || 0 }} | 🕯️ {{ item.reactions?.candleCount || 0 }}
+                    <button
+                      type="button"
+                      class="reaction-chip"
+                      :class="{ active: getUserReaction(item) === 'heart' }"
+                      @click="reactOnContribution(room._id, item._id, 'heart')"
+                    >
+                      ❤️ {{ item.reactions?.heartCount || 0 }}
+                    </button>
+                    <button
+                      type="button"
+                      class="reaction-chip"
+                      :class="{ active: getUserReaction(item) === 'support' }"
+                      @click="reactOnContribution(room._id, item._id, 'support')"
+                    >
+                      🤍 {{ item.reactions?.supportCount || 0 }}
+                    </button>
+                    <button
+                      type="button"
+                      class="reaction-chip"
+                      :class="{ active: getUserReaction(item) === 'candle' }"
+                      @click="reactOnContribution(room._id, item._id, 'candle')"
+                    >
+                      🕯️ {{ item.reactions?.candleCount || 0 }}
+                    </button>
                   </div>
-                  <div><strong>Comments:</strong> {{ item.comments?.length || 0 }}</div>
+
+                  <form class="item-comment-form" @submit.prevent="submitContributionComment(room._id, item._id)">
+                    <input
+                      v-model="commentDrafts[item._id]"
+                      type="text"
+                      maxlength="500"
+                      placeholder="Laat een reactie achter..."
+                    />
+                    <button
+                      type="submit"
+                      class="secondary-btn"
+                      :disabled="commentStateByItem[item._id]?.loading"
+                    >
+                      {{ commentStateByItem[item._id]?.loading ? 'Bezig...' : 'Plaats reactie' }}
+                    </button>
+                  </form>
+                  <div v-if="commentStateByItem[item._id]?.error" class="room-contribution-empty error">
+                    {{ commentStateByItem[item._id].error }}
+                  </div>
+
+                  <div class="item-comments-list">
+                    <strong>Comments ({{ item.comments?.length || 0 }}):</strong>
+                    <div v-if="!item.comments?.length" class="room-contribution-empty">
+                      Nog geen comments.
+                    </div>
+                    <ul v-else class="item-comments-items">
+                      <li v-for="comment in item.comments" :key="comment._id || comment.createdAt" class="item-comment-entry">
+                        <span class="item-comment-author">{{ comment.displayName || 'Gebruiker' }}:</span>
+                        <span>{{ comment.text }}</span>
+                      </li>
+                    </ul>
+                  </div>
                 </li>
               </ul>
             </div>

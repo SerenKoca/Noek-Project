@@ -807,6 +807,67 @@ body {
   gap: 4px;
 }
 
+.item-reactions-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.reaction-chip {
+  border: 1px solid var(--editor-border);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.18);
+  color: var(--editor-text);
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.reaction-chip:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.reaction-chip.active {
+  background: rgba(0, 120, 182, 0.24);
+  border-color: var(--editor-brand);
+}
+
+.item-comment-form {
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.item-comment-form input {
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--editor-text);
+  padding: 10px;
+  font: inherit;
+}
+
+.item-comments-list {
+  margin-top: 6px;
+}
+
+.item-comments-items {
+  margin: 8px 0 0;
+  padding-left: 16px;
+  display: grid;
+  gap: 4px;
+}
+
+.item-comment-entry {
+  line-height: 1.35;
+}
+
+.item-comment-author {
+  font-weight: 600;
+  margin-right: 6px;
+}
+
 .room-icon {
   font-size: 2rem;
   flex-shrink: 0;

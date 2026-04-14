@@ -43,3 +43,19 @@ export async function createRoomContribution(roomId, payload) {
   const response = await http.post(`/rooms/${roomId}/contributions`, payload)
   return response.data
 }
+
+export async function reactToRoomContribution(roomId, contributionId, reactionType) {
+  const response = await http.post(
+    `/rooms/${roomId}/contributions/${contributionId}/reactions`,
+    { reactionType }
+  )
+  return response.data
+}
+
+export async function addRoomContributionComment(roomId, contributionId, payload) {
+  const response = await http.post(
+    `/rooms/${roomId}/contributions/${contributionId}/comments`,
+    payload
+  )
+  return response.data
+}
