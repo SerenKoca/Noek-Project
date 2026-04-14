@@ -10,6 +10,7 @@ import SceneOverlays from './components/SceneOverlays.vue'
 import {
   saveRoom,
   updateRoom,
+  deleteRoom,
   getRooms,
   getRoomContributions,
   createRoomContribution,
@@ -55,6 +56,14 @@ const photoUploadState = ref({ loading: false, error: '', success: '' })
 const videoFileUploadState = ref({ loading: false, error: '', success: '' })
 const commentDrafts = ref({})
 const commentStateByItem = ref({})
+const deleteRoomModal = ref({
+  open: false,
+  roomId: '',
+  roomName: '',
+  typedName: '',
+  loading: false,
+  error: ''
+})
 const currentUserId = computed(() => authState.value?.user?.id || '')
 const autoGiverName = computed(() => {
   const displayName = authState.value?.user?.displayName?.trim()
@@ -234,6 +243,62 @@ async function loadRooms() {
   } catch (error) {
     console.error('Failed to load rooms', error)
     rooms.value = []
+  }
+}
+
+function onDeleteRoom(room) {
+  if (!room?._id) return
+
+  deleteRoomModal.value = {
+    open: true,
+    roomId: room._id,
+    roomName: String(room.name || '').trim(),
+    typedName: '',
+    loading: false,
+    error: ''
+  }
+}
+
+function closeDeleteRoomModal() {
+  deleteRoomModal.value = {
+    open: false,
+    roomId: '',
+    roomName: '',
+    typedName: '',
+    loading: false,
+    error: ''
+  }
+}
+
+async function confirmDeleteRoomFromModal() {
+  const roomId = deleteRoomModal.value.roomId
+  const roomName = deleteRoomModal.value.roomName
+  const typedName = (deleteRoomModal.value.typedName || '').trim()
+
+  if (!roomId || !roomName) return
+
+  if (typedName !== roomName) {
+    deleteRoomModal.value.error = 'Naam komt niet exact overeen.'
+    return
+  }
+
+  deleteRoomModal.value.loading = true
+  deleteRoomModal.value.error = ''
+
+  try {
+    await deleteRoom(roomId)
+
+    if (activeContributionsRoomId.value === roomId) {
+      activeContributionsRoomId.value = ''
+      contributionLoadState.value = { loadingRoomId: '', error: '' }
+    }
+
+    closeDeleteRoomModal()
+    await loadRooms()
+  } catch (error) {
+    console.error('Failed to delete room', error)
+    deleteRoomModal.value.loading = false
+    deleteRoomModal.value.error = error?.response?.data?.error || 'Kamer verwijderen mislukt.'
   }
 }
 
@@ -721,7 +786,7 @@ function onHistoryAction() {
 </script>
 
 <template>
-  <div class="editor-page">
+  <div class="editor-page" :class="{ 'is-home': view === 'home', 'is-editor': view !== 'home' }">
     <div v-if="view === 'home'" class="home-page">
       <div class="home-header">
         <h1>🏠 Noek Kamer Editor</h1>
@@ -797,6 +862,9 @@ function onHistoryAction() {
             <div class="room-actions-row">
               <button type="button" class="secondary-btn" @click="toggleRoomContributions(room)">
                 {{ activeContributionsRoomId === room._id ? 'Verberg bestanden' : 'Toon bestanden + attributen' }}
+              </button>
+              <button type="button" class="danger-btn" @click="onDeleteRoom(room)">
+                Verwijder kamer
               </button>
             </div>
 
@@ -1135,6 +1203,33 @@ function onHistoryAction() {
             :selected-anchor="selectedAnchor"
             @delete-selected="onDeleteSelected"
           />
+        </div>
+      </div>
+    </div>
+
+    <div v-if="deleteRoomModal.open" class="modal-backdrop" @click.self="closeDeleteRoomModal">
+      <div class="modal-card" role="dialog" aria-modal="true" aria-label="Kamer verwijderen bevestigen">
+        <h3>Kamer verwijderen</h3>
+        <p>
+          Typ exact deze kamernaam om te bevestigen:
+          <strong>{{ deleteRoomModal.roomName }}</strong>
+        </p>
+        <input
+          v-model="deleteRoomModal.typedName"
+          type="text"
+          :placeholder="deleteRoomModal.roomName"
+          autocomplete="off"
+        />
+        <div v-if="deleteRoomModal.error" class="room-contribution-empty error">
+          {{ deleteRoomModal.error }}
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="secondary-btn" :disabled="deleteRoomModal.loading" @click="closeDeleteRoomModal">
+            Annuleren
+          </button>
+          <button type="button" class="danger-btn" :disabled="deleteRoomModal.loading" @click="confirmDeleteRoomFromModal">
+            {{ deleteRoomModal.loading ? 'Verwijderen...' : 'Definitief verwijderen' }}
+          </button>
         </div>
       </div>
     </div>

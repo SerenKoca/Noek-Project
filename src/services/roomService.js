@@ -29,6 +29,11 @@ export async function updateRoom(roomId, roomData) {
   return response.data
 }
 
+export async function deleteRoom(roomId) {
+  const response = await http.delete(`/rooms/${roomId}`)
+  return response.data
+}
+
 export async function getRooms() {
   const response = await http.get('/rooms')
   return response.data

@@ -48,6 +48,14 @@ body {
   box-sizing: border-box;
 }
 
+.editor-page.is-home {
+  height: auto;
+}
+
+.editor-page.is-editor {
+  height: 100vh;
+}
+
 .editor-shell {
   position: relative;
   width: 100%;
@@ -633,6 +641,65 @@ body {
 
 .secondary-btn:hover {
   background: var(--editor-btn-hover);
+}
+
+.danger-btn {
+  padding: 12px 16px;
+  border: 1px solid #d6a770;
+  border-radius: 8px;
+  background: #fff3e3;
+  color: #9d5d1d;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.danger-btn:hover {
+  background: #ffe9c8;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(8, 14, 22, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+
+.modal-card {
+  width: min(520px, 100%);
+  border: 1px solid var(--editor-border);
+  border-radius: 12px;
+  background: #f9fcff;
+  color: var(--editor-text);
+  padding: 16px;
+  display: grid;
+  gap: 10px;
+}
+
+.modal-card h3 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.modal-card p {
+  margin: 0;
+}
+
+.modal-card input {
+  border: 1px solid var(--editor-border);
+  border-radius: 8px;
+  padding: 10px;
+  font: inherit;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }
 
 .room-list {
