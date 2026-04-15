@@ -1,0 +1,9 @@
+/* Settings page specific overrides */
+.settings-page-v2 .settings-left-v2,
+.settings-page-v2 .settings-right-v2 {
+  min-height: 220px;
+}
+
+.settings-page-v2 .room-contribution-item {
+  background: rgba(255, 255, 255, 0.74);
+}

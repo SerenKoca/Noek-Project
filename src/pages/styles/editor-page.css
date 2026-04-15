@@ -1,0 +1,8 @@
+/* Editor page specific overrides */
+.editor-shell .editor-room-side-panel {
+  scrollbar-width: thin;
+}
+
+.editor-shell .editor-room-sound-bar {
+  box-shadow: 0 10px 30px rgba(24, 58, 98, 0.08);
+}

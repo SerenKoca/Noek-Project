@@ -890,17 +890,10 @@ watch(
 watch(
   [() => props.roomData, sceneReady],
   async ([newRoomData, ready]) => {
-    console.log('🔥 Room data/scene ready watcher triggered:', { newRoomData, ready })
-    if (!ready || !newRoomData) {
-      if (!ready) console.log('🔥 Scene not ready yet')
-      if (!newRoomData) console.log('🔥 No room data')
-      return
-    }
-    console.log('🔥 Loading room data...')
+    if (!ready || !newRoomData) return
     // Wait for next tick to ensure scene is ready
     await nextTick()
     await loadRoom(newRoomData)
-    console.log('🔥 Room loading completed')
   },
   { immediate: true }
 )
