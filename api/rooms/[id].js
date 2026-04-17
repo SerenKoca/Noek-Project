@@ -50,14 +50,22 @@ export default async function handler(req, res) {
     try {
       const { name, sceneData } = parseBody(req)
 
-      if (!name || !sceneData) {
-        res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' })
+      const updates = {}
+      if (typeof name === 'string' && name.trim()) {
+        updates.name = name.trim()
+      }
+      if (sceneData) {
+        updates.sceneData = sceneData
+      }
+
+      if (!Object.keys(updates).length) {
+        res.status(400).json({ error: 'Minstens naam of sceneData is verplicht.' })
         return
       }
 
       const room = await Room.findOneAndUpdate(
         { _id: id, ownerId: auth.userId },
-        { name, sceneData },
+        updates,
         { new: true, runValidators: true }
       )
 

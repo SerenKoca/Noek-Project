@@ -33,6 +33,11 @@ exports.createRoom = async (req, res) => {
       return res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' });
     }
 
+    const existingRoomCount = await Room.countDocuments({ ownerId });
+    if (existingRoomCount >= 2) {
+      return res.status(403).json({ error: 'Elk account mag maar 2 kamers hebben.' });
+    }
+
     const room = new Room({ name, userId: userId || null, ownerId, sceneData });
     await room.save();
 
@@ -70,13 +75,21 @@ exports.updateRoom = async (req, res) => {
   try {
     const { name, sceneData } = req.body;
 
-    if (!name || !sceneData) {
-      return res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' });
+    const updates = {};
+    if (typeof name === 'string' && name.trim()) {
+      updates.name = name.trim();
+    }
+    if (sceneData) {
+      updates.sceneData = sceneData;
+    }
+
+    if (!Object.keys(updates).length) {
+      return res.status(400).json({ error: 'Minstens naam of sceneData is verplicht.' });
     }
 
     const room = await Room.findOneAndUpdate(
       { _id: req.params.id, ownerId: req.auth?.userId },
-      { name, sceneData },
+      updates,
       { new: true, runValidators: true }
     );
 

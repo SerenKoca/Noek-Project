@@ -5,10 +5,23 @@ const props = defineProps({
     default: 'Naam kamer'
   }
 })
+
+const emit = defineEmits(['update:roomName'])
+
+function onInput(event) {
+  emit('update:roomName', event?.target?.value || '')
+}
 </script>
 
 <template>
   <div class="editor-room-name">
-    <span class="editor-room-name-text">{{ props.roomName || 'Naam kamer' }}</span>
+    <input
+      class="editor-room-name-input"
+      type="text"
+      maxlength="80"
+      :value="props.roomName || ''"
+      placeholder="Naam kamer"
+      @input="onInput"
+    />
   </div>
 </template>

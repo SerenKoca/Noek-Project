@@ -48,6 +48,12 @@ export default async function handler(req, res) {
         return
       }
 
+      const existingRoomCount = await Room.countDocuments({ ownerId: auth.userId })
+      if (existingRoomCount >= 2) {
+        res.status(403).json({ error: 'Elk account mag maar 2 kamers hebben.' })
+        return
+      }
+
       const room = new Room({
         name,
         userId: userId || null,

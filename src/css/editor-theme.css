@@ -115,6 +115,20 @@ body {
   line-height: 1;
 }
 
+.editor-room-name-input {
+  width: min(280px, 38vw);
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: #4f5f73;
+  font-size: 14px;
+  text-align: center;
+}
+
+.editor-room-name-input::placeholder {
+  color: #91a0b1;
+}
+
 .editor-brand {
   position: absolute;
   top: 14px;

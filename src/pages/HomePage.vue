@@ -16,6 +16,10 @@ onMounted(async () => {
 })
 
 async function openEditorRoute(room) {
+  if (!room && state.rooms.value.length >= 2) {
+    return
+  }
+
   await state.openEditor(room || null)
   if (room?._id) {
     await router.push(`/rooms/${room._id}/editor`)
@@ -56,10 +60,22 @@ async function logout() {
             <p>Klik op een kamer om te openen, of ga via instellingen naar alle bijdragen.</p>
           </div>
           <div class="home-actions">
-            <button type="button" class="primary-btn" @click="openEditorRoute(null)">Nieuwe kamer</button>
+            <button
+              type="button"
+              class="primary-btn"
+              :disabled="state.rooms.value.length >= 2"
+              :title="state.rooms.value.length >= 2 ? 'Elk account mag maar 2 kamers hebben.' : ''"
+              @click="openEditorRoute(null)"
+            >
+              Nieuwe kamer
+            </button>
             <button type="button" class="secondary-btn" @click="state.loadRooms">Ververs</button>
           </div>
         </div>
+
+        <p v-if="state.rooms.value.length >= 2" class="room-contribution-empty error">
+          Elk account mag maar 2 kamers hebben.
+        </p>
 
         <div v-if="state.rooms.value.length === 0" class="room-empty">
           <div class="empty-icon">📭</div>
