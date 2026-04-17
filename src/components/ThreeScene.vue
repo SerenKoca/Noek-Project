@@ -553,29 +553,26 @@ function serializeRoom() {
   const furniture = []
 
   for (const [slotId, slot] of slotStates.entries()) {
-    const root = slot?.root
-    if (!root || root.userData?.isSlotMarker) continue
-
-    // Check if this slot has non-default state
-    const isCustomModel = root.userData?.url !== null
-    const hasCustomPosition = !root.position.equals(slot.position)
-    const hasCustomRotation = Math.abs(root.rotation.y - slot.rotationY) > 0.001
-    const hasCustomScale = !root.scale.equals(new THREE.Vector3(4, 4, 4)) // Default scale
-
-    if (!isCustomModel && !hasCustomPosition && !hasCustomRotation && !hasCustomScale) {
-      // Skip default slots
+    if (slot?.marker) {
+      furniture.push({
+        slotId,
+        isEmpty: true
+      })
       continue
     }
 
-    const item = {
+    const root = slot?.root
+    if (!root || root.userData?.isSlotMarker) continue
+
+    furniture.push({
       slotId,
       title: root.userData?.title || '',
       url: root.userData?.url || null,
       position: root.position.toArray(),
       rotationY: root.rotation.y,
-      scale: root.scale.toArray()
-    }
-    furniture.push(item)
+      scale: root.scale.toArray(),
+      isEmpty: false
+    })
   }
 
   const result = {
@@ -595,37 +592,35 @@ function serializeRoom() {
     }
   }
 
-  console.log('Serializing room:', result)
   return result
 }
 
 async function loadRoom(sceneData) {
-  console.log('Loading room data:', sceneData)
-  if (!sceneData || !sceneData.furniture) {
-    console.log('No furniture data, resetting to default')
+  if (!sceneData || !Array.isArray(sceneData.furniture)) {
     // Reset to default state for new rooms
     resetSceneToDefault()
     applyRoomColors()
     return
   }
 
-  console.log('Loading furniture:', sceneData.furniture.length, 'items')
   // Reset scene to default state first
   resetSceneToDefault()
   applyRoomColors(sceneData.appearance || {})
 
   // Load saved furniture
   for (const item of sceneData.furniture) {
-    console.log('Processing furniture item:', item)
     const slotId = item.slotId
     const slot = slotStates.get(slotId)
     if (!slot) {
-      console.log('Slot not found for', slotId)
+      continue
+    }
+
+    if (item.isEmpty) {
+      removeFurnitureFromSlot(slotId)
       continue
     }
 
     if (item.url) {
-      console.log('Loading custom model for', slotId, 'from', item.url)
       // Load custom model
       try {
         // Fix URL if it's relative
@@ -633,15 +628,13 @@ async function loadRoom(sceneData) {
         if (fixedUrl.startsWith('/poly-static/')) {
           fixedUrl = 'http://localhost:5000/api' + fixedUrl
         }
-        console.log('Fixed URL:', fixedUrl)
-        
+
         await loadModelAsset({
           url: fixedUrl,
           title: item.title || 'Loaded model',
           id: item.id || `loaded-${Date.now()}`,
           replaceRoot: { slotId }
         })
-        console.log('Successfully loaded custom model for', slotId)
       } catch (error) {
         console.error('Failed to load saved model:', error)
         // Fallback to default furniture
@@ -649,16 +642,12 @@ async function loadRoom(sceneData) {
         assignRootToSlot(defaultRoot, slotId)
       }
     } else {
-      console.log('Using default furniture for', slotId, 'with transformations')
       // Use default furniture but apply saved transformations
       const defaultRoot = createDefaultFurnitureForSlot(slot)
-      console.log('Before transformations - position:', defaultRoot.position.toArray(), 'rotationY:', defaultRoot.rotation.y, 'scale:', defaultRoot.scale.toArray())
       if (item.position) defaultRoot.position.fromArray(item.position)
       if (item.rotationY !== undefined) defaultRoot.rotation.y = item.rotationY
       if (item.scale) defaultRoot.scale.fromArray(item.scale)
-      console.log('After transformations - position:', defaultRoot.position.toArray(), 'rotationY:', defaultRoot.rotation.y, 'scale:', defaultRoot.scale.toArray())
       assignRootToSlot(defaultRoot, slotId)
-      console.log('Assigned default furniture to', slotId)
     }
   }
 
@@ -673,17 +662,14 @@ async function loadRoom(sceneData) {
   currentLookYaw = initialAzimuth
   syncTargetToCurrentYaw()
 
-  console.log('Room loading completed')
   deselect()
 }
 
 function resetSceneToDefault() {
-  console.log('Resetting scene to default state')
   // Remove all current objects
   for (const slot of FURNITURE_SLOTS) {
     const slotState = slotStates.get(slot.id)
     if (slotState?.root) {
-      console.log('Removing root from slot:', slot.id)
       removeRoot(slotState.root)
       slotState.root = null
     }
@@ -702,7 +688,6 @@ function resetSceneToDefault() {
   }
 
   // Reinitialize default furniture
-  console.log('Reinitializing default furniture')
   initializeFurnitureSlots()
   applyRoomColors()
 }
