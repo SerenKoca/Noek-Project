@@ -5,6 +5,8 @@ import HomePage from '../pages/HomePage.vue'
 import RoomSettingsPage from '../pages/RoomSettingsPage.vue'
 import EditorPage from '../pages/EditorPage.vue'
 
+const APP_TITLE = 'Noek'
+
 function hasToken() {
   return Boolean(getStoredAuth()?.token)
 }
@@ -27,31 +29,40 @@ const router = createRouter({
     {
       path: '/login',
       name: 'login',
-      component: AuthPage
+      component: AuthPage,
+      meta: { title: 'Inloggen' }
     },
     {
       path: '/home',
       name: 'home',
       component: HomePage,
-      beforeEnter: requireAuth
+      beforeEnter: requireAuth,
+      meta: { title: 'Home' }
     },
     {
       path: '/rooms/:id/settings',
       name: 'room-settings',
       component: RoomSettingsPage,
-      beforeEnter: requireAuth
+      beforeEnter: requireAuth,
+      meta: { title: 'Kamer instellingen' }
     },
     {
       path: '/rooms/:id/editor',
       name: 'room-editor',
       component: EditorPage,
-      beforeEnter: requireAuth
+      beforeEnter: requireAuth,
+      meta: { title: 'Kamer editor' }
     },
     {
       path: '/:pathMatch(.*)*',
       redirect: '/'
     }
   ]
+})
+
+router.afterEach((to) => {
+  const routeTitle = typeof to.meta?.title === 'string' ? to.meta.title.trim() : ''
+  document.title = routeTitle ? `${routeTitle} | ${APP_TITLE}` : APP_TITLE
 })
 
 export default router
