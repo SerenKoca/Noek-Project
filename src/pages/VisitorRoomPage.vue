@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import {
   addPublicRoomComment,
+  addPublicRoomContributionComment,
   createPublicRoomContribution,
   getPublicRoom,
   getPublicRoomContributions,
@@ -24,6 +25,8 @@ const loading = ref(true)
 const error = ref('')
 const submitState = ref({ loading: false, error: '', success: '' })
 const profileHint = ref('')
+const commentDrafts = ref({})
+const commentStateByItem = ref({})
 
 const auth = ref(getStoredAuth())
 const isLoggedIn = computed(() => Boolean(auth.value?.token))
@@ -59,6 +62,10 @@ function isImageUrl(url) {
 
 function isVideoUrl(url) {
   return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(url || '').trim())
+}
+
+function isAudioUrl(url) {
+  return /\.(mp3|wav|ogg|m4a|aac|flac)(\?.*)?$/i.test(String(url || '').trim())
 }
 
 function extractYouTubeVideoId(rawUrl) {
@@ -111,6 +118,16 @@ function getSpotifyEmbedUrl(rawUrl) {
   }
 
   return ''
+}
+
+function resolveMusicPlatform(rawUrl) {
+  const input = String(rawUrl || '').trim()
+  if (!input) return 'none'
+
+  if (getSpotifyEmbedUrl(input)) return 'spotify'
+  if (getYouTubeEmbedUrl(input)) return 'youtube'
+  if (isAudioUrl(input)) return 'none'
+  return 'none'
 }
 
 function readStoredVisitorName() {
@@ -237,7 +254,12 @@ async function addContribution() {
       tributeText: tributeText.value,
       externalUrl: externalUrl.value,
       mediaUrl: nextMediaUrl,
-      platform: type.value === 'music_url' ? 'spotify' : type.value === 'video_url' ? 'youtube' : 'none'
+      platform:
+        type.value === 'music_url'
+          ? resolveMusicPlatform(externalUrl.value)
+          : type.value === 'video_url'
+            ? (getYouTubeEmbedUrl(externalUrl.value) ? 'youtube' : 'none')
+            : 'none'
     })
     tributeText.value = ''
     externalUrl.value = ''
@@ -283,6 +305,41 @@ async function toggleContributionReaction(contributionId, kind) {
     contributions.value = contributions.value.map((row) => (row._id === updated._id ? updated : row))
   } catch {
     // ignore in UI for now
+  }
+}
+
+async function submitContributionComment(contributionId) {
+  const text = String(commentDrafts.value[contributionId] || '').trim()
+  if (!text) return
+
+  commentStateByItem.value = {
+    ...commentStateByItem.value,
+    [contributionId]: { loading: true, error: '' }
+  }
+
+  try {
+    const updated = await addPublicRoomContributionComment(roomId.value, contributionId, {
+      text,
+      displayName: visitorName.value
+    })
+
+    contributions.value = contributions.value.map((row) => (row._id === updated._id ? updated : row))
+    commentDrafts.value = {
+      ...commentDrafts.value,
+      [contributionId]: ''
+    }
+    commentStateByItem.value = {
+      ...commentStateByItem.value,
+      [contributionId]: { loading: false, error: '' }
+    }
+  } catch (err) {
+    commentStateByItem.value = {
+      ...commentStateByItem.value,
+      [contributionId]: {
+        loading: false,
+        error: err?.response?.data?.error || 'Commentaar plaatsen mislukt.'
+      }
+    }
   }
 }
 </script>
@@ -406,7 +463,8 @@ async function toggleContributionReaction(contributionId, kind) {
               <div><strong>Type:</strong> {{ item.type }}</div>
               <div><strong>Naam:</strong> {{ item.giverName }}</div>
               <div><strong>Tekst:</strong> {{ item.tributeText || '-' }}</div>
-              <div><strong>Link:</strong> {{ item.externalUrl || item.mediaUrl || '-' }}</div>
+              <div><strong>Media URL:</strong> {{ item.mediaUrl || '-' }}</div>
+              <div><strong>Externe URL:</strong> {{ item.externalUrl || '-' }}</div>
 
               <div v-if="item.mediaUrl" class="contribution-preview">
                 <img v-if="item.type === 'photo' || isImageUrl(item.mediaUrl)" :src="item.mediaUrl" alt="Foto bijdrage" class="contribution-preview-image" />
@@ -439,8 +497,25 @@ async function toggleContributionReaction(contributionId, kind) {
                   referrerpolicy="strict-origin-when-cross-origin"
                   allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
                 />
+                <iframe
+                  v-else-if="item.type === 'music_url' && getYouTubeEmbedUrl(item.externalUrl)"
+                  class="contribution-preview-embed"
+                  :src="getYouTubeEmbedUrl(item.externalUrl)"
+                  title="Muziek bijdrage"
+                  loading="lazy"
+                  referrerpolicy="strict-origin-when-cross-origin"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                  allowfullscreen
+                />
+                <video
+                  v-else-if="item.type === 'video_url' && isVideoUrl(item.externalUrl)"
+                  :src="item.externalUrl"
+                  controls
+                  preload="metadata"
+                  class="contribution-preview-video"
+                />
                 <audio
-                  v-else-if="item.type === 'music_url'"
+                  v-else-if="item.type === 'music_url' && isAudioUrl(item.externalUrl)"
                   class="contribution-preview-audio"
                   :src="item.externalUrl"
                   controls
@@ -452,6 +527,32 @@ async function toggleContributionReaction(contributionId, kind) {
                 <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">❤️ {{ item.reactions?.heartCount || 0 }}</button>
                 <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">🤍 {{ item.reactions?.supportCount || 0 }}</button>
                 <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">🕯️ {{ item.reactions?.candleCount || 0 }}</button>
+              </div>
+
+              <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
+                <input
+                  v-model="commentDrafts[item._id]"
+                  type="text"
+                  maxlength="500"
+                  placeholder="Laat een reactie achter op deze bijdrage"
+                />
+                <button type="submit" class="secondary-btn" :disabled="commentStateByItem[item._id]?.loading">
+                  {{ commentStateByItem[item._id]?.loading ? 'Bezig...' : 'Plaats reactie' }}
+                </button>
+              </form>
+              <div v-if="commentStateByItem[item._id]?.error" class="room-contribution-empty error">
+                {{ commentStateByItem[item._id].error }}
+              </div>
+
+              <div class="item-comments-list">
+                <strong>Comments ({{ item.comments?.length || 0 }}):</strong>
+                <div v-if="!item.comments?.length" class="room-contribution-empty">Nog geen comments.</div>
+                <ul v-else class="item-comments-items">
+                  <li v-for="comment in item.comments" :key="comment._id || comment.createdAt" class="item-comment-entry">
+                    <span class="item-comment-author">{{ comment.displayName || 'Bezoeker' }}:</span>
+                    <span>{{ comment.text }}</span>
+                  </li>
+                </ul>
               </div>
             </li>
           </ul>
