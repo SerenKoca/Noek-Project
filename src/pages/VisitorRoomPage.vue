@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import {
@@ -14,6 +14,7 @@ import {
 import { getStoredAuth } from '../services/authService.js'
 
 const VISITOR_NAME_STORAGE = 'noek_visitor_name'
+const VISITOR_ENTRY_STORAGE = 'noek_visitor_entry_seen'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,8 +26,12 @@ const loading = ref(true)
 const error = ref('')
 const submitState = ref({ loading: false, error: '', success: '' })
 const profileHint = ref('')
+const hasEnteredRoom = ref(false)
+const introLoading = ref(false)
 const commentDrafts = ref({})
 const commentStateByItem = ref({})
+const audioPlayer = ref(null)
+const roomMusicState = ref({ loading: false, error: '', playing: false })
 
 const auth = ref(getStoredAuth())
 const isLoggedIn = computed(() => Boolean(auth.value?.token))
@@ -130,9 +135,74 @@ function resolveMusicPlatform(rawUrl) {
   return 'none'
 }
 
+function stopRoomAudio() {
+  if (!audioPlayer.value) return
+  audioPlayer.value.pause()
+  audioPlayer.value.src = ''
+  roomMusicState.value = { loading: false, error: '', playing: false }
+}
+
+async function startRoomAudioFromRoom(room) {
+  const musicUrl = String(room?.ambience?.musicUrl || '').trim()
+  if (!musicUrl) {
+    stopRoomAudio()
+    return
+  }
+
+  if (!audioPlayer.value) {
+    audioPlayer.value = new Audio()
+    audioPlayer.value.loop = true
+  }
+
+  const volume = Math.min(1, Math.max(0, Number(room?.ambience?.volume ?? 0.35)))
+  audioPlayer.value.volume = volume
+  audioPlayer.value.src = musicUrl
+  roomMusicState.value = { loading: true, error: '', playing: false }
+
+  try {
+    await audioPlayer.value.play()
+    roomMusicState.value = { loading: false, error: '', playing: true }
+  } catch {
+    roomMusicState.value = {
+      loading: false,
+      error: 'Geluid kon niet automatisch starten. Klik op de knop om het af te spelen.',
+      playing: false
+    }
+  }
+}
+
+async function enableRoomSound() {
+  await startRoomAudioFromRoom(room.value)
+}
+
 function readStoredVisitorName() {
   if (typeof window === 'undefined') return ''
   return String(window.localStorage.getItem(VISITOR_NAME_STORAGE) || '').trim()
+}
+
+function readStoredEntryState(roomIdValue) {
+  if (typeof window === 'undefined' || !roomIdValue) return false
+
+  try {
+    const raw = window.localStorage.getItem(VISITOR_ENTRY_STORAGE)
+    const parsed = raw ? JSON.parse(raw) : {}
+    return Boolean(parsed?.[roomIdValue])
+  } catch {
+    return false
+  }
+}
+
+function persistEntryState(roomIdValue) {
+  if (typeof window === 'undefined' || !roomIdValue) return
+
+  try {
+    const raw = window.localStorage.getItem(VISITOR_ENTRY_STORAGE)
+    const parsed = raw ? JSON.parse(raw) : {}
+    parsed[roomIdValue] = true
+    window.localStorage.setItem(VISITOR_ENTRY_STORAGE, JSON.stringify(parsed))
+  } catch {
+    window.localStorage.setItem(VISITOR_ENTRY_STORAGE, JSON.stringify({ [roomIdValue]: true }))
+  }
 }
 
 function persistVisitorName(value) {
@@ -158,6 +228,10 @@ function ensureVisitorNameInitialized() {
   persistVisitorName(visitorName.value)
 }
 
+function ensureVisitorEntryState() {
+  hasEnteredRoom.value = readStoredEntryState(roomId.value)
+}
+
 function applyVisitorName() {
   const trimmed = String(visitorName.value || '').trim()
   if (!trimmed) {
@@ -180,6 +254,19 @@ async function openProfile() {
   }
 
   await router.push('/profile')
+}
+
+async function enterRoom() {
+  introLoading.value = true
+  persistEntryState(roomId.value)
+  hasEnteredRoom.value = true
+
+  try {
+    await loadAll()
+    await startRoomAudioFromRoom(room.value)
+  } finally {
+    introLoading.value = false
+  }
 }
 
 function onMediaFileChange(event) {
@@ -230,8 +317,28 @@ async function loadAll() {
   }
 }
 
-onMounted(loadAll)
+onMounted(ensureVisitorEntryState)
 onMounted(ensureVisitorNameInitialized)
+
+onMounted(() => {
+  if (!hasEnteredRoom.value) return
+  if (room.value) {
+    startRoomAudioFromRoom(room.value)
+  }
+})
+
+onMounted(async () => {
+  if (hasEnteredRoom.value) {
+    await loadAll()
+    await startRoomAudioFromRoom(room.value)
+  } else {
+    loading.value = false
+  }
+})
+
+onBeforeUnmount(() => {
+  stopRoomAudio()
+})
 
 async function addContribution() {
   submitState.value = { loading: true, error: '', success: '' }
@@ -357,13 +464,32 @@ async function submitContributionComment(contributionId) {
         </div>
       </header>
 
-      <section class="visitor-room-hero" v-if="room">
+      <section v-if="!hasEnteredRoom" class="visitor-entry-screen">
+        <div class="visitor-entry-card">
+          <img class="visitor-entry-logo" src="/favicon.ico" alt="Noek" />
+          <p class="visitor-entry-copy">
+            Je betreedt {{ room?.name || 'de digitale herdenkingsruimte' }}.
+            Waar herinneringen blijven voortleven.
+          </p>
+          <button type="button" class="primary-btn visitor-entry-btn" :disabled="introLoading" @click="enterRoom">
+            {{ introLoading ? 'Herinneringen worden geladen ...' : 'Stap binnen' }}
+          </button>
+        </div>
+      </section>
+
+      <section class="visitor-room-hero" v-if="room && hasEnteredRoom">
         <div class="visitor-room-hero-copy">
           <span class="role-badge visitor-room-badge">bezoeker</span>
           <h3>Welkom in deze kamer</h3>
           <p>
             Je kan de kamer bekijken, bijdragen toevoegen en reageren zonder editorrechten.
           </p>
+          <div class="visitor-room-sound-status" v-if="roomMusicState.loading || roomMusicState.playing || roomMusicState.error">
+            <span v-if="roomMusicState.loading">Geluid laden...</span>
+            <span v-else-if="roomMusicState.playing">Geluid van de kamer speelt af</span>
+            <button v-else-if="roomMusicState.error" type="button" class="secondary-btn" @click="enableRoomSound">Geluid afspelen</button>
+          </div>
+          <p v-if="roomMusicState.error" class="visitor-room-note">{{ roomMusicState.error }}</p>
         </div>
         <div class="visitor-room-stats">
           <div class="visitor-room-stat">
@@ -381,7 +507,7 @@ async function submitContributionComment(contributionId) {
         </div>
       </section>
 
-      <section class="visitor-identity-panel" v-if="!loading && !error">
+      <section class="visitor-identity-panel" v-if="!loading && !error && hasEnteredRoom">
         <div class="visitor-identity-left">
           <h3>Jouw bezoekersnaam</h3>
           <p>Deze naam tonen we bij je reacties en bijdragen in deze kamer.</p>
@@ -407,13 +533,13 @@ async function submitContributionComment(contributionId) {
         </div>
       </section>
 
-      <section class="visitor-room-scene-shell" v-if="room">
+      <section class="visitor-room-scene-shell" v-if="room && hasEnteredRoom">
         <div class="editor-scene-panel visitor-room-scene-panel">
           <ThreeScene class="editor-scene visitor-room-scene" :room-data="roomSceneData" />
         </div>
       </section>
 
-      <section class="settings-content-v2" v-if="!loading && !error && room">
+      <section class="settings-content-v2" v-if="!loading && !error && room && hasEnteredRoom">
         <div class="settings-left-v2">
           <h3>Bijdrage plaatsen</h3>
           <p class="visitor-room-note">Foto/video uploaden werkt hier zoals in de editor: kies bestand of gebruik een URL.</p>
@@ -559,8 +685,8 @@ async function submitContributionComment(contributionId) {
         </div>
       </section>
 
-      <div v-else-if="loading" class="room-empty"><h3>Kamer laden...</h3></div>
-      <div v-else class="room-contribution-empty error">{{ error }}</div>
+      <div v-else-if="loading && hasEnteredRoom" class="room-empty"><h3>Kamer laden...</h3></div>
+      <div v-else-if="error && hasEnteredRoom" class="room-contribution-empty error">{{ error }}</div>
     </div>
   </div>
 </template>
@@ -618,6 +744,71 @@ async function submitContributionComment(contributionId) {
 }
 
 .visitor-identity-left p,
+
+.visitor-entry-screen {
+  min-height: 62vh;
+  display: grid;
+  place-items: center;
+  padding: 28px 18px 40px;
+}
+
+.visitor-entry-card {
+  width: min(560px, 100%);
+  min-height: 420px;
+  border-radius: 24px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96) 0%, rgba(245, 250, 255, 0.96) 72%, rgba(212, 232, 248, 0.98) 100%);
+  box-shadow: 0 28px 60px rgba(30, 56, 90, 0.14);
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 18px;
+  padding: 40px 28px;
+  position: relative;
+  overflow: hidden;
+}
+
+.visitor-entry-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 20% 82%, rgba(61, 100, 145, 0.18), transparent 28%), radial-gradient(circle at 82% 24%, rgba(233, 177, 37, 0.12), transparent 18%);
+  pointer-events: none;
+}
+
+.visitor-entry-logo {
+  width: 86px;
+  height: 86px;
+  object-fit: contain;
+  position: relative;
+  z-index: 1;
+}
+
+.visitor-entry-copy {
+  margin: 0;
+  text-align: center;
+  font-size: 1.02rem;
+  line-height: 1.55;
+  max-width: 34ch;
+  color: #1b2a36;
+  position: relative;
+  z-index: 1;
+}
+
+.visitor-entry-btn {
+  min-width: 200px;
+  position: relative;
+  z-index: 1;
+}
+
+.visitor-room-sound-status {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  color: #1b2a36;
+  font-weight: 600;
+}
 .visitor-identity-note {
   margin: 0;
   color: #5b6470;
@@ -676,6 +867,11 @@ async function submitContributionComment(contributionId) {
 
   .visitor-identity-input-row {
     flex-direction: column;
+  }
+
+  .visitor-entry-card {
+    min-height: 360px;
+    padding: 32px 18px;
   }
 }
 </style>
