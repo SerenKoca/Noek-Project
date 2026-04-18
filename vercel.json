@@ -2,6 +2,14 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/api/rooms",
+      "destination": "/api/rooms-handler"
+    },
+    {
+      "source": "/api/rooms/:path*",
+      "destination": "/api/rooms-handler?path=:path*"
+    },
+    {
       "source": "/api/public/:path*",
       "destination": "/api/public-handler?path=:path*"
     },
