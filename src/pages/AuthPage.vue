@@ -9,14 +9,16 @@ const state = useNoekState()
 onMounted(async () => {
   await state.bootstrap()
   if (state.authState.value?.token) {
-    await router.replace('/home')
+    const next = state.authState.value?.user?.role === 'editor' ? '/home' : '/profile'
+    await router.replace(next)
   }
 })
 
 async function submitAuth() {
   await state.onAuthSubmit()
   if (state.authState.value?.token) {
-    await router.replace('/home')
+    const next = state.authState.value?.user?.role === 'editor' ? '/home' : '/profile'
+    await router.replace(next)
   }
 }
 </script>
@@ -52,6 +54,24 @@ async function submitAuth() {
           <label v-if="state.authMode.value === 'register'" class="auth-field-v2">
             <span>Naam</span>
             <input v-model="state.authDisplayName.value" type="text" placeholder="voor- en achternaam" autocomplete="nickname" />
+          </label>
+
+          <label v-if="state.authMode.value === 'register'" class="auth-field-v2">
+            <span>Accounttype</span>
+            <select v-model="state.authRegisterRole.value">
+              <option value="editor">Editor</option>
+              <option value="visitor">Bezoeker</option>
+            </select>
+          </label>
+
+          <label v-if="state.authMode.value === 'register' && state.authRegisterRole.value === 'editor'" class="auth-field-v2">
+            <span>Registratiecode</span>
+            <input
+              v-model="state.authRegistrationCode.value"
+              type="text"
+              placeholder="voer je code in"
+              autocomplete="off"
+            />
           </label>
 
           <button type="submit" class="auth-submit-v2">

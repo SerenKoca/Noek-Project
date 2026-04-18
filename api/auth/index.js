@@ -3,6 +3,8 @@ import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { createToken } from '../../src/server/lib/auth.js'
 import { User } from '../../src/server/models/User.js'
 
+const TEMP_EDITOR_REGISTRATION_CODE = '0000'
+
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
 }
@@ -19,7 +21,8 @@ function sanitizeUser(user) {
   return {
     id: user._id,
     email: user.email,
-    displayName: user.displayName
+    displayName: user.displayName,
+    role: user.role || 'editor'
   }
 }
 
@@ -67,7 +70,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { action, email, password, displayName } = parseBody(req)
+    const { action, email, password, displayName, registrationCode, registerRole } = parseBody(req)
     const normalizedEmail = String(email || '').trim().toLowerCase()
     const rawPassword = String(password || '')
 
@@ -97,9 +100,19 @@ export default async function handler(req, res) {
     }
 
     if (action === 'register') {
+      const role = String(registerRole || 'editor').trim().toLowerCase() === 'visitor' ? 'visitor' : 'editor'
+
       if (rawPassword.length < 8) {
         res.status(400).json({ error: 'Wachtwoord moet minstens 8 tekens hebben.' })
         return
+      }
+
+      if (role === 'editor') {
+        const code = String(registrationCode || '').trim()
+        if (code !== TEMP_EDITOR_REGISTRATION_CODE) {
+          res.status(403).json({ error: 'Ongeldige registratiecode.' })
+          return
+        }
       }
 
       const name = String(displayName || '').trim() || normalizedEmail.split('@')[0]
@@ -119,7 +132,8 @@ export default async function handler(req, res) {
       const user = await User.create({
         email: normalizedEmail,
         passwordHash,
-        displayName: name
+        displayName: name,
+        role
       })
 
       console.log('AUTH_DIAGNOSTIC register success', buildDiagnostics(req, {
@@ -128,7 +142,7 @@ export default async function handler(req, res) {
         emailDomain: normalizedEmail.split('@')[1] || null
       }))
 
-      const token = createToken({ userId: String(user._id), email: user.email })
+      const token = createToken({ userId: String(user._id), email: user.email, role: user.role || 'editor' })
 
       res.status(201).json({
         token,
@@ -167,7 +181,7 @@ export default async function handler(req, res) {
         emailDomain: normalizedEmail.split('@')[1] || null
       }))
 
-      const token = createToken({ userId: String(user._id), email: user.email })
+      const token = createToken({ userId: String(user._id), email: user.email, role: user.role || 'editor' })
 
       res.status(200).json({
         token,

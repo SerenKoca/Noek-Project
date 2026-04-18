@@ -1406,6 +1406,21 @@ body {
   font-weight: 600;
 }
 
+.role-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid #8aa5bf;
+  background: #e7f0fa;
+  color: #1b4f79;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
 .home-main-v2 {
   padding: 24px;
   max-width: 1280px;
@@ -1497,6 +1512,31 @@ body {
   color: #143f67;
 }
 
+.visitor-room-scene-shell {
+  padding: 0 24px 18px;
+  max-width: 1280px;
+  margin: 0 auto;
+}
+
+.visitor-room-scene-panel {
+  position: relative;
+  min-height: 56vh;
+  height: min(72vh, 780px);
+  border: 1px solid #c8d6e6;
+  border-radius: 16px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.75);
+  box-shadow: 0 8px 25px rgba(62, 95, 133, 0.1);
+}
+
+.visitor-room-scene-panel .editor-scene-panel::before {
+  inset: 3% 2% 2%;
+}
+
+.visitor-room-scene {
+  min-height: 56vh;
+}
+
 .fallback-view-v2 {
   display: grid;
   place-items: center;
@@ -1520,6 +1560,15 @@ body {
   .home-main-header-v2 {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .visitor-room-scene-shell {
+    padding: 0 12px 18px;
+  }
+
+  .visitor-room-scene-panel {
+    min-height: 50vh;
+    height: min(60vh, 680px);
   }
 }
 
@@ -1547,6 +1596,15 @@ body {
 
   .settings-header-v2 {
     flex-direction: column;
+  }
+
+  .visitor-room-scene-shell {
+    padding: 0 12px 12px;
+  }
+
+  .visitor-room-scene-panel {
+    min-height: 42vh;
+    height: 46vh;
   }
 
   .settings-header-v2 .secondary-btn,

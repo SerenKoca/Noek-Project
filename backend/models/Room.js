@@ -57,6 +57,11 @@ const roomSchema = new mongoose.Schema({
     default: null,
     index: true
   },
+  isPublic: {
+    type: Boolean,
+    default: true,
+    index: true
+  },
   sceneData: {
     type: Object,
     required: true

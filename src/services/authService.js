@@ -42,12 +42,14 @@ export function clearAuth() {
   window.localStorage.removeItem(AUTH_STORAGE_KEY)
 }
 
-export async function registerAccount({ email, password, displayName }) {
+export async function registerAccount({ email, password, displayName, registrationCode, registerRole }) {
   const response = await http.post('/auth', {
     action: 'register',
     email,
     password,
-    displayName
+    displayName,
+    registrationCode,
+    registerRole
   })
   storeAuth(response.data)
   return response.data

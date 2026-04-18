@@ -20,6 +20,11 @@ export default async function handler(req, res) {
   const auth = requireAuth(req, res)
   if (!auth) return
 
+  if (auth.role !== 'editor') {
+    res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' })
+    return
+  }
+
   try {
     await connectToDatabase()
   } catch (error) {

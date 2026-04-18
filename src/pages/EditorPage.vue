@@ -44,6 +44,32 @@ async function backToHome() {
   state.showHome()
   await router.push('/home')
 }
+
+function buildVisitUrl(roomId) {
+  const base = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${base}/visit/${roomId}`
+}
+
+async function shareCurrentRoom() {
+  const roomId = state.currentRoom.value?._id || String(route.params.id || '')
+  if (!roomId || roomId === 'new') {
+    window.alert('Sla de kamer eerst op voor je een deelbare link kan maken.')
+    return
+  }
+
+  const visitUrl = buildVisitUrl(roomId)
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(visitUrl)
+      window.alert('Publieke link gekopieerd.')
+      return
+    }
+  } catch {
+    // fallback below
+  }
+
+  window.prompt('Kopieer deze link', visitUrl)
+}
 </script>
 
 <template>
@@ -57,7 +83,7 @@ async function backToHome() {
         @settings="state.onToolbarAction"
         @home="state.onToolbarAction"
         @save="state.onSave"
-        @share="state.onToolbarAction"
+        @share="shareCurrentRoom"
       />
 
       <EditorRoomName

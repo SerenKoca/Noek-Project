@@ -20,6 +20,8 @@ const authState = ref(getStoredAuth())
 const authEmail = ref('')
 const authPassword = ref('')
 const authDisplayName = ref('')
+const authRegistrationCode = ref('')
+const authRegisterRole = ref('editor')
 const authMode = ref('login')
 const authStatus = ref('')
 const authStatusType = ref('')
@@ -729,6 +731,8 @@ async function onAuthSubmit() {
   const email = authEmail.value.trim()
   const password = authPassword.value
   const displayName = authDisplayName.value.trim()
+  const registrationCode = authRegistrationCode.value.trim()
+  const registerRole = authRegisterRole.value === 'visitor' ? 'visitor' : 'editor'
 
   if (!email || !password) {
     authStatus.value = 'Email en wachtwoord zijn verplicht.'
@@ -742,19 +746,31 @@ async function onAuthSubmit() {
     return
   }
 
+  if (authMode.value === 'register' && registerRole === 'editor' && !registrationCode) {
+    authStatus.value = 'Registratiecode is verplicht.'
+    authStatusType.value = 'error'
+    return
+  }
+
   authStatus.value = authMode.value === 'register' ? 'Account aanmaken...' : 'Inloggen...'
   authStatusType.value = 'loading'
 
   try {
     const result = authMode.value === 'register'
-      ? await registerAccount({ email, password, displayName })
+      ? await registerAccount({ email, password, displayName, registrationCode, registerRole })
       : await loginAccount({ email, password })
 
     authState.value = result
     authPassword.value = ''
+    authRegistrationCode.value = ''
+    authRegisterRole.value = 'editor'
     authStatus.value = `Welkom ${result?.user?.displayName || result?.user?.email || ''}`
     authStatusType.value = 'success'
-    await loadRooms()
+    if (result?.user?.role === 'editor') {
+      await loadRooms()
+    } else {
+      rooms.value = []
+    }
   } catch (error) {
     authStatus.value = error?.response?.data?.error || 'Authenticatie mislukt.'
     authStatusType.value = 'error'
@@ -984,6 +1000,8 @@ export function useNoekState() {
     authEmail,
     authPassword,
     authDisplayName,
+    authRegistrationCode,
+    authRegisterRole,
     authMode,
     authStatus,
     authStatusType,

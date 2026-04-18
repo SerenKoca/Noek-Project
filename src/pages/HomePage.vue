@@ -37,6 +37,32 @@ async function logout() {
   state.onLogout()
   await router.replace('/login')
 }
+
+async function openProfile() {
+  await router.push('/profile')
+}
+
+function buildVisitUrl(roomId) {
+  const base = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${base}/visit/${roomId}`
+}
+
+async function copyVisitLink(room) {
+  if (!room?._id) return
+  const visitUrl = buildVisitUrl(room._id)
+
+  try {
+    if (navigator?.clipboard?.writeText) {
+      await navigator.clipboard.writeText(visitUrl)
+    } else {
+      window.prompt('Kopieer deze link', visitUrl)
+      return
+    }
+    window.alert('Publieke link gekopieerd.')
+  } catch {
+    window.prompt('Kopieer deze link', visitUrl)
+  }
+}
 </script>
 
 <template>
@@ -49,6 +75,8 @@ async function logout() {
         </div>
         <div class="home-user-v2">
           <span>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
+          <span class="role-badge">{{ state.authState.value?.user?.role || 'editor' }}</span>
+          <button type="button" class="secondary-btn" @click="openProfile">Profiel</button>
           <button type="button" class="secondary-btn" @click="logout">Uitloggen</button>
         </div>
       </header>
@@ -96,6 +124,7 @@ async function logout() {
             <div class="room-actions-row room-actions-row-v2">
               <button type="button" class="secondary-btn" @click="openSettingsRoute(room)">Instellingen</button>
               <button type="button" class="primary-btn" @click="openEditorRoute(room)">Open kamer</button>
+              <button type="button" class="secondary-btn" @click="copyVisitLink(room)">Kopieer link</button>
               <button type="button" class="danger-btn" @click="state.onDeleteRoom(room)">Verwijder</button>
             </div>
           </article>

@@ -18,6 +18,12 @@ const userSchema = new mongoose.Schema(
       required: true,
       trim: true,
       maxlength: 80
+    },
+    role: {
+      type: String,
+      enum: ['editor', 'visitor'],
+      default: 'editor',
+      index: true
     }
   },
   {

@@ -2,11 +2,14 @@ const bcrypt = require('bcryptjs')
 const User = require('../models/User')
 const { createToken } = require('../lib/auth')
 
+const TEMP_EDITOR_REGISTRATION_CODE = '0000'
+
 function sanitizeUser(user) {
   return {
     id: user._id,
     email: user.email,
-    displayName: user.displayName
+    displayName: user.displayName,
+    role: user.role || 'editor'
   }
 }
 
@@ -16,7 +19,7 @@ function isValidEmail(value) {
 
 exports.authHandler = async (req, res) => {
   try {
-    const { action, email, password, displayName } = req.body || {}
+    const { action, email, password, displayName, registrationCode, registerRole } = req.body || {}
     const normalizedEmail = String(email || '').trim().toLowerCase()
     const rawPassword = String(password || '')
 
@@ -31,9 +34,19 @@ exports.authHandler = async (req, res) => {
     }
 
     if (action === 'register') {
+      const role = String(registerRole || 'editor').trim().toLowerCase() === 'visitor' ? 'visitor' : 'editor'
+
       if (rawPassword.length < 8) {
         res.status(400).json({ error: 'Wachtwoord moet minstens 8 tekens hebben.' })
         return
+      }
+
+      if (role === 'editor') {
+        const code = String(registrationCode || '').trim()
+        if (code !== TEMP_EDITOR_REGISTRATION_CODE) {
+          res.status(403).json({ error: 'Ongeldige registratiecode.' })
+          return
+        }
       }
 
       const name = String(displayName || '').trim() || normalizedEmail.split('@')[0]
@@ -48,10 +61,11 @@ exports.authHandler = async (req, res) => {
       const user = await User.create({
         email: normalizedEmail,
         passwordHash,
-        displayName: name
+        displayName: name,
+        role
       })
 
-      const token = createToken({ userId: String(user._id), email: user.email })
+      const token = createToken({ userId: String(user._id), email: user.email, role: user.role || 'editor' })
       res.status(201).json({ token, user: sanitizeUser(user) })
       return
     }
@@ -69,7 +83,7 @@ exports.authHandler = async (req, res) => {
         return
       }
 
-      const token = createToken({ userId: String(user._id), email: user.email })
+      const token = createToken({ userId: String(user._id), email: user.email, role: user.role || 'editor' })
       res.status(200).json({ token, user: sanitizeUser(user) })
       return
     }

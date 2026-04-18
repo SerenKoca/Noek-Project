@@ -26,6 +26,10 @@ function normalizeRoomReactionType(value) {
 
 exports.createRoom = async (req, res) => {
   try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
+    }
+
     const { name, userId, sceneData } = req.body;
     const ownerId = req.auth?.userId;
 
@@ -50,6 +54,10 @@ exports.createRoom = async (req, res) => {
 
 exports.getRooms = async (req, res) => {
   try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
+    }
+
     const rooms = await Room.find({ ownerId: req.auth?.userId }).sort({ createdAt: -1 });
     res.json(rooms);
   } catch (error) {
@@ -60,6 +68,10 @@ exports.getRooms = async (req, res) => {
 
 exports.getRoomById = async (req, res) => {
   try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
+    }
+
     const room = await Room.findOne({ _id: req.params.id, ownerId: req.auth?.userId });
     if (!room) {
       return res.status(404).json({ error: 'Kamer niet gevonden.' });
@@ -73,6 +85,10 @@ exports.getRoomById = async (req, res) => {
 
 exports.updateRoom = async (req, res) => {
   try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
+    }
+
     const { name, sceneData } = req.body;
 
     const updates = {};
@@ -106,6 +122,10 @@ exports.updateRoom = async (req, res) => {
 
 exports.deleteRoom = async (req, res) => {
   try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
+    }
+
     const room = await Room.findOneAndDelete({ _id: req.params.id, ownerId: req.auth?.userId });
     if (!room) {
       return res.status(404).json({ error: 'Kamer niet gevonden.' });

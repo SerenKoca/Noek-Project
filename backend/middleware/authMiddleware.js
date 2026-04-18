@@ -16,7 +16,8 @@ function requireAuth(req, res, next) {
 
     req.auth = {
       userId: decoded.userId,
-      email: decoded.email || ''
+      email: decoded.email || '',
+      role: decoded.role || 'editor'
     }
 
     next()

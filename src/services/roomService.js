@@ -79,3 +79,8 @@ export async function addRoomComment(roomId, payload) {
   const response = await http.post(`/rooms/${roomId}/room-comments`, payload)
   return response.data
 }
+
+export async function getMyContributions() {
+  const response = await http.get('/me/contributions')
+  return response.data
+}

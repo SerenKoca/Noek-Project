@@ -20,7 +20,8 @@ export function requireAuth(req, res) {
 
     req.auth = {
       userId: decoded.userId,
-      email: decoded.email || ''
+      email: decoded.email || '',
+      role: decoded.role || 'editor'
     }
 
     return req.auth
