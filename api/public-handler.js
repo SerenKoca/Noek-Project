@@ -327,6 +327,11 @@ export default async function handler(req, res) {
 		res.status(404).json({ error: 'Route niet gevonden.' })
 	} catch (error) {
 		console.error('public-handler error:', error)
-		res.status(500).json({ error: 'A server error has occurred' })
+		if (error?.message === 'Missing MONGO_URI') {
+			res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+			return
+		}
+
+		res.status(500).json({ error: 'A server error has occurred', code: 'PUBLIC_HANDLER_ERROR' })
 	}
 }
