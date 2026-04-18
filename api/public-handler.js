@@ -23,6 +23,20 @@ function normalizePathSegments(value) {
 	return []
 }
 
+function resolveRoomRequestPath(segments) {
+	if (segments[0] === 'rooms') {
+		return {
+			roomId: segments[1] || '',
+			action: segments.slice(2)
+		}
+	}
+
+	return {
+		roomId: segments[0] || '',
+		action: segments.slice(1)
+	}
+}
+
 function resolveActorId(req, body, auth) {
 	if (auth?.userId) return `user:${auth.userId}`
 	const key = String(body.visitorKey || req.headers['x-visitor-key'] || '').trim()
@@ -44,7 +58,7 @@ export default async function handler(req, res) {
 		await connectToDatabase()
 
 		const segments = normalizePathSegments(req.query.path)
-		const roomId = segments[0]
+		const { roomId, action } = resolveRoomRequestPath(segments)
 
 		if (!roomId) {
 			res.status(400).json({ error: 'Kamer-ID ontbreekt.' })
@@ -56,8 +70,6 @@ export default async function handler(req, res) {
 			res.status(404).json({ error: 'Publieke kamer niet gevonden.' })
 			return
 		}
-
-		const action = segments.slice(1)
 
 		if (action.length === 0) {
 			if (req.method !== 'GET') {
