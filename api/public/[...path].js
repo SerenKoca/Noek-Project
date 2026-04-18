@@ -1,7 +1,7 @@
-import Room from '../../../backend/models/Room.js'
-import RoomContribution from '../../../backend/models/RoomContribution.js'
-import { connectToDatabase } from '../../../src/server/lib/mongodb.js'
-import { getOptionalAuth } from '../../../src/server/middleware/optionalAuth.js'
+import Room from '../../backend/models/Room.js'
+import RoomContribution from '../../backend/models/RoomContribution.js'
+import { connectToDatabase } from '../../src/server/lib/mongodb.js'
+import { getOptionalAuth } from '../../src/server/middleware/optionalAuth.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
