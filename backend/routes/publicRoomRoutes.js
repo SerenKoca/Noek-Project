@@ -41,6 +41,10 @@ async function findPublicRoom(roomId) {
   })
 }
 
+function resolveOwnerId(room) {
+  return String(room?.ownerId || room?.userId || '').trim()
+}
+
 router.get('/rooms/:id', async (req, res) => {
   try {
     const room = await findPublicRoom(req.params.id)
@@ -72,7 +76,9 @@ router.get('/rooms/:id/contributions', async (req, res) => {
       return
     }
 
-    const items = await RoomContribution.find({ roomId: room._id, ownerId: room.ownerId }).sort({ createdAt: -1 })
+    const ownerId = resolveOwnerId(room)
+
+    const items = await RoomContribution.find({ roomId: room._id, ownerId }).sort({ createdAt: -1 })
     res.json(items)
   } catch (error) {
     console.error('getPublicRoomContributions error:', error)
@@ -87,6 +93,8 @@ router.post('/rooms/:id/contributions', async (req, res) => {
       res.status(404).json({ error: 'Publieke kamer niet gevonden.' })
       return
     }
+
+    const ownerId = resolveOwnerId(room)
 
     const auth = getOptionalAuth(req)
     const {
@@ -122,7 +130,7 @@ router.post('/rooms/:id/contributions', async (req, res) => {
 
     const item = new RoomContribution({
       roomId: room._id,
-      ownerId: room.ownerId,
+      ownerId,
       createdByUserId: auth?.userId || '',
       type,
       giverName: normalizedGiverName,
@@ -156,7 +164,9 @@ router.post('/rooms/:id/contributions/:contributionId/reactions', async (req, re
       return
     }
 
-    const item = await RoomContribution.findOne({ _id: req.params.contributionId, roomId: room._id, ownerId: room.ownerId })
+    const ownerId = resolveOwnerId(room)
+
+    const item = await RoomContribution.findOne({ _id: req.params.contributionId, roomId: room._id, ownerId })
     if (!item) {
       res.status(404).json({ error: 'Bijdrage niet gevonden.' })
       return
@@ -211,7 +221,9 @@ router.post('/rooms/:id/contributions/:contributionId/comments', async (req, res
       return
     }
 
-    const item = await RoomContribution.findOne({ _id: req.params.contributionId, roomId: room._id, ownerId: room.ownerId })
+    const ownerId = resolveOwnerId(room)
+
+    const item = await RoomContribution.findOne({ _id: req.params.contributionId, roomId: room._id, ownerId })
     if (!item) {
       res.status(404).json({ error: 'Bijdrage niet gevonden.' })
       return

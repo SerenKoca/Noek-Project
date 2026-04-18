@@ -51,6 +51,10 @@ async function findPublicRoom(roomId) {
 	})
 }
 
+function resolveOwnerId(room) {
+	return String(room?.ownerId || room?.userId || '').trim()
+}
+
 export default async function handler(req, res) {
 	setJsonHeaders(res)
 
@@ -70,6 +74,8 @@ export default async function handler(req, res) {
 			res.status(404).json({ error: 'Publieke kamer niet gevonden.' })
 			return
 		}
+
+		const ownerId = resolveOwnerId(room)
 
 		if (action.length === 0) {
 			if (req.method !== 'GET') {
@@ -94,7 +100,7 @@ export default async function handler(req, res) {
 
 		if (resource === 'contributions' && !contributionId) {
 			if (req.method === 'GET') {
-				const items = await RoomContribution.find({ roomId: room._id, ownerId: room.ownerId }).sort({ createdAt: -1 })
+				const items = await RoomContribution.find({ roomId: room._id, ownerId }).sort({ createdAt: -1 })
 				res.status(200).json(items)
 				return
 			}
@@ -134,7 +140,7 @@ export default async function handler(req, res) {
 
 				const item = new RoomContribution({
 					roomId: room._id,
-					ownerId: room.ownerId,
+					ownerId,
 					createdByUserId: auth?.userId || '',
 					type,
 					giverName: normalizedGiverName,
@@ -170,7 +176,7 @@ export default async function handler(req, res) {
 				return
 			}
 
-			const item = await RoomContribution.findOne({ _id: contributionId, roomId: room._id, ownerId: room.ownerId })
+			const item = await RoomContribution.findOne({ _id: contributionId, roomId: room._id, ownerId })
 			if (!item) {
 				res.status(404).json({ error: 'Bijdrage niet gevonden.' })
 				return
@@ -220,7 +226,7 @@ export default async function handler(req, res) {
 			}
 
 			const auth = getOptionalAuth(req)
-			const item = await RoomContribution.findOne({ _id: contributionId, roomId: room._id, ownerId: room.ownerId })
+			const item = await RoomContribution.findOne({ _id: contributionId, roomId: room._id, ownerId })
 			if (!item) {
 				res.status(404).json({ error: 'Bijdrage niet gevonden.' })
 				return

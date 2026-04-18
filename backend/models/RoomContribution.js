@@ -56,12 +56,12 @@ const roomContributionSchema = new mongoose.Schema(
     },
     ownerId: {
       type: String,
-      required: true,
+      default: '',
       index: true
     },
     createdByUserId: {
       type: String,
-      required: true
+      default: ''
     },
     type: {
       type: String,
