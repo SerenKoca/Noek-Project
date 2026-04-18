@@ -29,6 +29,12 @@ const mediaUrl = ref('')
 const roomCommentText = ref('')
 const mediaFile = ref(null)
 const roomSceneData = computed(() => room.value?.sceneData || null)
+const roomReactionTotal = computed(() => {
+  const reactions = room.value?.roomReactions || {}
+  return Number(reactions.heartCount || 0) + Number(reactions.supportCount || 0) + Number(reactions.candleCount || 0)
+})
+
+const roomContributionCount = computed(() => Array.isArray(contributions.value) ? contributions.value.length : 0)
 
 function onMediaFileChange(event) {
   mediaFile.value = event?.target?.files?.[0] || null
@@ -154,8 +160,35 @@ async function toggleContributionReaction(contributionId, kind) {
         <div class="settings-header-center-v2">
           <div class="settings-step-v2">Publieke kamer</div>
           <h2>{{ room?.name || 'Kamer bekijken' }}</h2>
+          <p class="visitor-room-subtitle">
+            Bekijk de kamer, voeg een herinnering toe of reageer op wat anderen al hebben gedeeld.
+          </p>
         </div>
       </header>
+
+      <section class="visitor-room-hero" v-if="room">
+        <div class="visitor-room-hero-copy">
+          <span class="role-badge visitor-room-badge">bezoeker</span>
+          <h3>Welkom in deze kamer</h3>
+          <p>
+            Je kan de kamer bekijken, bijdragen toevoegen en reageren zonder editorrechten.
+          </p>
+        </div>
+        <div class="visitor-room-stats">
+          <div class="visitor-room-stat">
+            <strong>{{ roomContributionCount }}</strong>
+            <span>Bijdragen</span>
+          </div>
+          <div class="visitor-room-stat">
+            <strong>{{ roomReactionTotal }}</strong>
+            <span>Reacties</span>
+          </div>
+          <div class="visitor-room-stat">
+            <strong>{{ room?.roomComments?.length || 0 }}</strong>
+            <span>Kamerreacties</span>
+          </div>
+        </div>
+      </section>
 
       <section class="visitor-room-scene-shell" v-if="room">
         <div class="editor-scene-panel visitor-room-scene-panel">
@@ -166,6 +199,7 @@ async function toggleContributionReaction(contributionId, kind) {
       <section class="settings-content-v2" v-if="!loading && !error && room">
         <div class="settings-left-v2">
           <h3>Bijdrage plaatsen</h3>
+          <p class="visitor-room-note">Foto of video bestand uploaden kan ook, zolang je er een bestand bij kiest.</p>
           <label class="auth-field-v2">
             <span>Jouw naam</span>
             <input v-model="giverName" type="text" placeholder="Je naam" />

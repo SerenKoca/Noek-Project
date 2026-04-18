@@ -1488,6 +1488,82 @@ body {
   font-size: 1.8rem;
 }
 
+.visitor-room-subtitle {
+  margin: 6px 0 0;
+  color: #4a6886;
+  font-size: 0.98rem;
+}
+
+.visitor-room-hero {
+  max-width: 1280px;
+  margin: 0 auto 18px;
+  padding: 0 24px;
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(260px, 0.8fr);
+  gap: 14px;
+}
+
+.visitor-room-hero-copy,
+.visitor-room-stats {
+  border: 1px solid #c8d6e6;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow: 0 8px 25px rgba(62, 95, 133, 0.08);
+}
+
+.visitor-room-hero-copy {
+  padding: 18px 20px;
+  display: grid;
+  gap: 8px;
+}
+
+.visitor-room-hero-copy h3 {
+  margin: 0;
+  color: #123a62;
+  font-size: 1.35rem;
+}
+
+.visitor-room-hero-copy p {
+  margin: 0;
+  color: #4a6886;
+  line-height: 1.55;
+}
+
+.visitor-room-badge {
+  width: fit-content;
+}
+
+.visitor-room-stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0;
+  overflow: hidden;
+}
+
+.visitor-room-stat {
+  padding: 18px 14px;
+  text-align: center;
+}
+
+.visitor-room-stat + .visitor-room-stat {
+  border-left: 1px solid #d7e2ee;
+}
+
+.visitor-room-stat strong {
+  display: block;
+  color: #123a62;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.visitor-room-stat span {
+  display: block;
+  margin-top: 6px;
+  color: #51708d;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
 .settings-content-v2 {
   display: grid;
   grid-template-columns: minmax(300px, 420px) 1fr;
@@ -1537,6 +1613,12 @@ body {
   min-height: 56vh;
 }
 
+.visitor-room-note {
+  margin: 0;
+  color: #5a768f;
+  font-size: 0.93rem;
+}
+
 .fallback-view-v2 {
   display: grid;
   place-items: center;
@@ -1560,6 +1642,15 @@ body {
   .home-main-header-v2 {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .visitor-room-hero {
+    padding: 0 12px;
+    grid-template-columns: 1fr;
+  }
+
+  .visitor-room-stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .visitor-room-scene-shell {
@@ -1596,6 +1687,28 @@ body {
 
   .settings-header-v2 {
     flex-direction: column;
+  }
+
+  .visitor-room-subtitle {
+    font-size: 0.92rem;
+  }
+
+  .visitor-room-hero {
+    padding: 0 12px;
+    gap: 10px;
+  }
+
+  .visitor-room-hero-copy {
+    padding: 16px;
+  }
+
+  .visitor-room-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .visitor-room-stat + .visitor-room-stat {
+    border-left: 0;
+    border-top: 1px solid #d7e2ee;
   }
 
   .visitor-room-scene-shell {
