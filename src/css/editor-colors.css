@@ -1,0 +1,30 @@
+/*
+  Editor Color Tokens
+  Pas enkel deze variabelen aan om de editor-kleuren te wijzigen.
+*/
+:root {
+  --editor-bg-page: #1f2024;
+  --editor-bg-shell-top: #f6f7f8;
+  --editor-bg-shell-mid: #eff4fa;
+  --editor-bg-shell-bottom: #9fc0e1;
+
+  --editor-panel: #d4e0ee;
+  --editor-panel-soft: #e8eff8;
+  --editor-panel-strong: #0f568f;
+  --editor-tile: #f3f6fa;
+
+  --editor-border: #cad7e5;
+  --editor-border-strong: #9ab0c6;
+
+  --editor-text: #102438;
+  --editor-text-soft: #526b83;
+  --editor-brand: #0078b6;
+
+  --editor-btn: #e6edf7;
+  --editor-btn-hover: #dce7f4;
+  --editor-btn-active: #f9fafc;
+
+  --editor-danger-bg: #fff3e3;
+  --editor-danger-border: #d6a770;
+  --editor-danger-text: #9d5d1d;
+}
