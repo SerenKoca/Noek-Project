@@ -669,16 +669,20 @@ onBeforeUnmount(() => {
   --visitor-border: color-mix(in srgb, var(--editor-panel-strong) 24%, transparent);
   --visitor-btn-text: #ffffff;
   min-height: 100vh;
-  background: linear-gradient(180deg, #ffffff 0%, var(--visitor-soft) 58%, var(--visitor-soft-2) 100%);
+  background: linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 58%, var(--editor-bg-shell-bottom) 100%);
   color: var(--visitor-ink);
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 .visitor-entry-wrap {
-  min-height: 100vh;
+  height: 100%;
   display: grid;
   place-items: center;
   padding: 24px;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .visitor-entry-card {
@@ -708,13 +712,19 @@ onBeforeUnmount(() => {
 
 .visitor-shell {
   min-height: 100vh;
+  position: relative;
   display: grid;
-  grid-template-rows: auto 1fr auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 12px;
   padding: 24px 24px 16px;
+  box-sizing: border-box;
+  overflow: visible;
 }
 
 .visitor-topbar {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -734,6 +744,7 @@ onBeforeUnmount(() => {
 
 .visitor-name-btn,
 .visitor-user-btn {
+  pointer-events: auto;
   border: 1px solid var(--visitor-border);
   background: var(--visitor-card);
   border-radius: 999px;
@@ -754,14 +765,19 @@ onBeforeUnmount(() => {
 }
 
 .visitor-stage {
-  position: relative;
-  display: grid;
-  place-items: center;
+  position: absolute;
+  inset: 0;
+  min-height: 100%;
+  height: 100%;
+  z-index: 1;
+  overflow: hidden;
 }
 
 .visitor-scene-frame {
-  width: min(940px, 100%);
-  height: min(58vh, 620px);
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
 }
 
 .visitor-scene {
@@ -785,6 +801,9 @@ onBeforeUnmount(() => {
 }
 
 .visitor-footer {
+  position: relative;
+  z-index: 2;
+  pointer-events: none;
   display: grid;
   grid-template-columns: auto 1fr auto;
   gap: 16px;
@@ -792,6 +811,7 @@ onBeforeUnmount(() => {
 }
 
 .visitor-pill-btn {
+  pointer-events: auto;
   border: 0;
   background: linear-gradient(90deg, var(--visitor-color-dark), var(--visitor-color-light));
   color: var(--visitor-btn-text);
@@ -802,6 +822,7 @@ onBeforeUnmount(() => {
 }
 
 .visitor-action-bar {
+  pointer-events: auto;
   display: flex;
   justify-content: center;
   gap: 12px;
@@ -825,6 +846,7 @@ onBeforeUnmount(() => {
 }
 
 .visitor-brand-card {
+  pointer-events: auto;
   border: 1px solid var(--visitor-border);
   border-radius: 10px;
   background: var(--visitor-card);
@@ -850,7 +872,7 @@ onBeforeUnmount(() => {
   border: 1px solid var(--visitor-border);
   border-radius: 14px;
   box-shadow: 0 24px 56px rgba(11, 63, 116, 0.2);
-  z-index: 40;
+  z-index: 50;
 }
 
 .visitor-panel-head {
