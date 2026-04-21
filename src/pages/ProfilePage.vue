@@ -27,9 +27,20 @@ onMounted(async () => {
   }
 })
 
-async function goHomeForEditor() {
-  if (state.authState.value?.user?.role === 'editor') {
+async function goRoleDashboard() {
+  const role = state.authState.value?.user?.role
+  if (role === 'editor') {
     await router.push('/home')
+    return
+  }
+
+  if (role === 'funeral_director') {
+    await router.push('/director')
+    return
+  }
+
+  if (role === 'admin') {
+    await router.push('/admin')
   }
 }
 
@@ -105,7 +116,14 @@ function getSpotifyEmbedUrl(rawUrl) {
         <div class="home-user-v2">
           <span>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
           <span class="role-badge">{{ state.authState.value?.user?.role || 'visitor' }}</span>
-          <button v-if="state.authState.value?.user?.role === 'editor'" type="button" class="secondary-btn" @click="goHomeForEditor">Editor home</button>
+          <button
+            v-if="['editor', 'funeral_director', 'admin'].includes(state.authState.value?.user?.role)"
+            type="button"
+            class="secondary-btn"
+            @click="goRoleDashboard"
+          >
+            Dashboard
+          </button>
           <button type="button" class="secondary-btn" @click="state.onLogout(); router.replace('/login')">Uitloggen</button>
         </div>
       </header>

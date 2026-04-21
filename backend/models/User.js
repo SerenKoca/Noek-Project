@@ -21,8 +21,14 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['editor', 'visitor'],
+      enum: ['admin', 'funeral_director', 'editor', 'visitor'],
       default: 'editor',
+      index: true
+    },
+    funeralDirectorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: null,
       index: true
     }
   },

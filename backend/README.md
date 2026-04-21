@@ -11,6 +11,19 @@ Deze backend slaat Noek-kamers op in MongoDB.
 5. Stel `JWT_SECRET` in
 6. Start de server met `npm run dev`
 
+## Eerste admin account seeden
+
+1. Vul in `.env`:
+  - `ADMIN_SEED_EMAIL`
+  - `ADMIN_SEED_PASSWORD`
+  - `ADMIN_SEED_DISPLAY_NAME` (optioneel)
+2. Run: `npm run seed:admin`
+3. Login met dit account via de normale loginflow.
+
+Optioneel:
+- Zet `ADMIN_SEED_RESET_PASSWORD=true` om een bestaand admin wachtwoord te resetten tijdens seeden.
+- Gebruik `ADMIN_REGISTRATION_CODE` als je ook admin self-registration via `/auth` wil toestaan.
+
 ## API endpoints
 
 - `POST /auth` - login/register

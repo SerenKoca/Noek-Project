@@ -6,10 +6,17 @@ import { useNoekState } from '../composables/useNoekState.js'
 const router = useRouter()
 const state = useNoekState()
 
+function getRouteByRole(role) {
+  if (role === 'admin') return '/admin'
+  if (role === 'funeral_director') return '/director'
+  if (role === 'editor') return '/home'
+  return '/profile'
+}
+
 onMounted(async () => {
   await state.bootstrap()
   if (state.authState.value?.token) {
-    const next = state.authState.value?.user?.role === 'editor' ? '/home' : '/profile'
+    const next = getRouteByRole(state.authState.value?.user?.role)
     await router.replace(next)
   }
 })
@@ -17,7 +24,7 @@ onMounted(async () => {
 async function submitAuth() {
   await state.onAuthSubmit()
   if (state.authState.value?.token) {
-    const next = state.authState.value?.user?.role === 'editor' ? '/home' : '/profile'
+    const next = getRouteByRole(state.authState.value?.user?.role)
     await router.replace(next)
   }
 }
@@ -85,6 +92,10 @@ async function submitAuth() {
           >
             {{ state.authMode.value === 'register' ? 'Ik heb al een account' : 'Nog geen account? Registreren' }}
           </button>
+
+          <p v-if="state.authMode.value === 'login'" class="auth-info-inline">
+            Login mogelijk voor: admin, uitvaartondernemer, editor en bezoeker.
+          </p>
 
           <div v-if="state.authStatus.value" class="auth-status-v2" :class="state.authStatusType.value">{{ state.authStatus.value }}</div>
         </form>

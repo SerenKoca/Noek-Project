@@ -26,6 +26,25 @@ function requireAuth(req, res, next) {
   }
 }
 
+function requireRole(roles) {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles]
+
+  return (req, res, next) => {
+    if (!req.auth?.role) {
+      res.status(401).json({ error: 'Login vereist.' })
+      return
+    }
+
+    if (!allowedRoles.includes(req.auth.role)) {
+      res.status(403).json({ error: 'Geen toegang voor deze rol.' })
+      return
+    }
+
+    next()
+  }
+}
+
 module.exports = {
-  requireAuth
+  requireAuth,
+  requireRole
 }

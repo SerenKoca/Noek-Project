@@ -6,3 +6,9 @@
 .auth-page-v2 .auth-card-v2 {
   backdrop-filter: blur(1px);
 }
+
+.auth-page-v2 .auth-info-inline {
+  margin: 0;
+  color: #5c6470;
+  font-size: 0.9rem;
+}

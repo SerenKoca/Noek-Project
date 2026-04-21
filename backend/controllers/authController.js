@@ -1,20 +1,54 @@
 const bcrypt = require('bcryptjs')
 const User = require('../models/User')
+const EditorRegistrationCode = require('../models/EditorRegistrationCode')
 const { createToken } = require('../lib/auth')
 
-const TEMP_EDITOR_REGISTRATION_CODE = '0000'
+const ALLOWED_REGISTER_ROLES = ['editor', 'visitor', 'admin']
 
 function sanitizeUser(user) {
   return {
     id: user._id,
     email: user.email,
     displayName: user.displayName,
-    role: user.role || 'editor'
+    role: user.role || 'editor',
+    funeralDirectorId: user.funeralDirectorId || null
   }
 }
 
 function isValidEmail(value) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+}
+
+function normalizeRegisterRole(value) {
+  const normalized = String(value || 'editor').trim().toLowerCase()
+  if (!ALLOWED_REGISTER_ROLES.includes(normalized)) return 'editor'
+  return normalized
+}
+
+async function consumeEditorRegistrationCode(rawCode, userId) {
+  const code = String(rawCode || '').trim().toUpperCase()
+  if (!code) {
+    return { ok: false, status: 400, error: 'Registratiecode is verplicht.' }
+  }
+
+  const item = await EditorRegistrationCode.findOne({ code })
+  if (!item) {
+    return { ok: false, status: 403, error: 'Ongeldige registratiecode.' }
+  }
+
+  if (item.usedAt || item.usedByUserId) {
+    return { ok: false, status: 403, error: 'Registratiecode is al gebruikt.' }
+  }
+
+  if (item.expiresAt && item.expiresAt.getTime() < Date.now()) {
+    return { ok: false, status: 403, error: 'Registratiecode is verlopen.' }
+  }
+
+  item.usedByUserId = userId
+  item.usedAt = new Date()
+  await item.save()
+
+  return { ok: true, directorId: item.createdByDirectorId }
 }
 
 exports.authHandler = async (req, res) => {
@@ -34,19 +68,24 @@ exports.authHandler = async (req, res) => {
     }
 
     if (action === 'register') {
-      const role = String(registerRole || 'editor').trim().toLowerCase() === 'visitor' ? 'visitor' : 'editor'
+      const role = normalizeRegisterRole(registerRole)
 
       if (rawPassword.length < 8) {
         res.status(400).json({ error: 'Wachtwoord moet minstens 8 tekens hebben.' })
         return
       }
 
-      if (role === 'editor') {
-        const code = String(registrationCode || '').trim()
-        if (code !== TEMP_EDITOR_REGISTRATION_CODE) {
-          res.status(403).json({ error: 'Ongeldige registratiecode.' })
+      if (role === 'admin') {
+        const adminCode = String(process.env.ADMIN_REGISTRATION_CODE || '').trim()
+        if (!adminCode || String(registrationCode || '').trim() !== adminCode) {
+          res.status(403).json({ error: 'Admin registratiecode is ongeldig.' })
           return
         }
+      }
+
+      if (role === 'funeral_director') {
+        res.status(403).json({ error: 'Uitvaartondernemers worden aangemaakt door een admin.' })
+        return
       }
 
       const name = String(displayName || '').trim() || normalizedEmail.split('@')[0]
@@ -58,12 +97,47 @@ exports.authHandler = async (req, res) => {
       }
 
       const passwordHash = await bcrypt.hash(rawPassword, 10)
-      const user = await User.create({
+      const userData = {
         email: normalizedEmail,
         passwordHash,
         displayName: name,
         role
+      }
+
+      if (role === 'editor') {
+        const code = String(registrationCode || '').trim().toUpperCase()
+        const matchingCode = await EditorRegistrationCode.findOne({ code })
+
+        if (!matchingCode) {
+          res.status(403).json({ error: 'Ongeldige registratiecode.' })
+          return
+        }
+
+        if (matchingCode.usedAt || matchingCode.usedByUserId) {
+          res.status(403).json({ error: 'Registratiecode is al gebruikt.' })
+          return
+        }
+
+        if (matchingCode.expiresAt && matchingCode.expiresAt.getTime() < Date.now()) {
+          res.status(403).json({ error: 'Registratiecode is verlopen.' })
+          return
+        }
+
+        userData.funeralDirectorId = matchingCode.createdByDirectorId
+      }
+
+      const user = await User.create({
+        ...userData
       })
+
+      if (role === 'editor') {
+        const consumeResult = await consumeEditorRegistrationCode(registrationCode, user._id)
+        if (!consumeResult.ok) {
+          await User.deleteOne({ _id: user._id })
+          res.status(consumeResult.status).json({ error: consumeResult.error })
+          return
+        }
+      }
 
       const token = createToken({ userId: String(user._id), email: user.email, role: user.role || 'editor' })
       res.status(201).json({ token, user: sanitizeUser(user) })

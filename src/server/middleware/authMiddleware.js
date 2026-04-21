@@ -30,3 +30,19 @@ export function requireAuth(req, res) {
     return null
   }
 }
+
+export function requireRole(auth, res, roles) {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles]
+
+  if (!auth?.role) {
+    res.status(401).json({ error: 'Login vereist.' })
+    return false
+  }
+
+  if (!allowedRoles.includes(auth.role)) {
+    res.status(403).json({ error: 'Geen toegang voor deze rol.' })
+    return false
+  }
+
+  return true
+}

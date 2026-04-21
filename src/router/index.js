@@ -6,6 +6,8 @@ import RoomSettingsPage from '../pages/RoomSettingsPage.vue'
 import EditorPage from '../pages/EditorPage.vue'
 import ProfilePage from '../pages/ProfilePage.vue'
 import VisitorRoomPage from '../pages/VisitorRoomPage.vue'
+import AdminPage from '../pages/AdminPage.vue'
+import DirectorPage from '../pages/DirectorPage.vue'
 
 const APP_TITLE = 'Noek'
 
@@ -15,6 +17,17 @@ function hasToken() {
 
 function isEditor() {
   return getStoredAuth()?.user?.role === 'editor'
+}
+
+function getCurrentRole() {
+  return getStoredAuth()?.user?.role || 'visitor'
+}
+
+function getDefaultRouteForRole(role) {
+  if (role === 'admin') return '/admin'
+  if (role === 'funeral_director') return '/director'
+  if (role === 'editor') return '/home'
+  return '/profile'
 }
 
 function requireAuth(to, from, next) {
@@ -39,12 +52,31 @@ function requireEditor(to, from, next) {
   next()
 }
 
+function requireRole(roles) {
+  const allowedRoles = Array.isArray(roles) ? roles : [roles]
+
+  return (to, from, next) => {
+    if (!hasToken()) {
+      next('/login')
+      return
+    }
+
+    const role = getCurrentRole()
+    if (!allowedRoles.includes(role)) {
+      next(getDefaultRouteForRole(role))
+      return
+    }
+
+    next()
+  }
+}
+
 const router = createRouter({
   history: createWebHistory(),
   routes: [
     {
       path: '/',
-      redirect: () => (hasToken() ? (isEditor() ? '/home' : '/profile') : '/login')
+      redirect: () => (hasToken() ? getDefaultRouteForRole(getCurrentRole()) : '/login')
     },
     {
       path: '/login',
@@ -79,6 +111,20 @@ const router = createRouter({
       component: ProfilePage,
       beforeEnter: requireAuth,
       meta: { title: 'Profiel' }
+    },
+    {
+      path: '/admin',
+      name: 'admin',
+      component: AdminPage,
+      beforeEnter: requireRole('admin'),
+      meta: { title: 'Admin' }
+    },
+    {
+      path: '/director',
+      name: 'director',
+      component: DirectorPage,
+      beforeEnter: requireRole('funeral_director'),
+      meta: { title: 'Uitvaartondernemer' }
     },
     {
       path: '/visit/:id',

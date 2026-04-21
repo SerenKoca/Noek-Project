@@ -6,6 +6,8 @@ const roomRoutes = require('./routes/roomRoutes');
 const authRoutes = require('./routes/authRoutes');
 const publicRoomRoutes = require('./routes/publicRoomRoutes');
 const meRoutes = require('./routes/meRoutes');
+const adminRoutes = require('./routes/adminRoutes');
+const directorRoutes = require('./routes/directorRoutes');
 
 const app = express();
 const primaryMongoUri = process.env.MONGO_URI;
@@ -54,6 +56,8 @@ app.use('/rooms', roomRoutes);
 app.use('/auth', authRoutes);
 app.use('/public', publicRoomRoutes);
 app.use('/me', meRoutes);
+app.use('/admin', adminRoutes);
+app.use('/director', directorRoutes);
 
 // Proxy voor poly-static assets (Poly Pizza)
 app.use('/api/poly-static', async (req, res, next) => {
