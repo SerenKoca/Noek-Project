@@ -7,6 +7,16 @@ function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
 }
 
+function buildDiagnostics(req, extra = {}) {
+  return {
+    route: '/api/admin/funeral-directors',
+    method: req.method,
+    hasMongoUri: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI || process.env.MONGO_URL || process.env.DATABASE_URL),
+    hasJwtSecret: Boolean(process.env.JWT_SECRET),
+    ...extra
+  }
+}
+
 function parseBody(req) {
   if (!req.body) return {}
   if (typeof req.body === 'string') return JSON.parse(req.body)
@@ -35,8 +45,16 @@ export default async function handler(req, res) {
   try {
     await connectToDatabase()
   } catch (error) {
-    console.error('MongoDB connection error:', error)
-    res.status(500).json({ error: 'Databaseverbinding mislukt.' })
+    console.error('ADMIN_FUNERAL_DIRECTORS_DIAGNOSTIC connectToDatabase failed', buildDiagnostics(req, {
+      stage: 'connectToDatabase',
+      errorMessage: error?.message,
+      errorName: error?.name
+    }))
+    if (error?.message === 'Missing MONGO_URI') {
+      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+      return
+    }
+    res.status(500).json({ error: 'Databaseverbinding mislukt.', code: 'MONGO_CONNECTION_FAILED' })
     return
   }
 
@@ -45,8 +63,12 @@ export default async function handler(req, res) {
       const users = await User.find({ role: 'funeral_director' }).sort({ createdAt: -1 })
       res.status(200).json(users.map(sanitizeUser))
     } catch (error) {
-      console.error('listFuneralDirectors error:', error)
-      res.status(500).json({ error: 'Kon uitvaartondernemers niet ophalen.' })
+      console.error('ADMIN_FUNERAL_DIRECTORS_DIAGNOSTIC list failed', buildDiagnostics(req, {
+        stage: 'listFuneralDirectors',
+        errorMessage: error?.message,
+        errorName: error?.name
+      }))
+      res.status(500).json({ error: 'Kon uitvaartondernemers niet ophalen.', code: 'LIST_FUNERAL_DIRECTORS_FAILED' })
     }
     return
   }
@@ -83,8 +105,12 @@ export default async function handler(req, res) {
 
       res.status(201).json(sanitizeUser(user))
     } catch (error) {
-      console.error('createFuneralDirector error:', error)
-      res.status(500).json({ error: 'Kon uitvaartondernemer niet aanmaken.' })
+      console.error('ADMIN_FUNERAL_DIRECTORS_DIAGNOSTIC create failed', buildDiagnostics(req, {
+        stage: 'createFuneralDirector',
+        errorMessage: error?.message,
+        errorName: error?.name
+      }))
+      res.status(500).json({ error: 'Kon uitvaartondernemer niet aanmaken.', code: 'CREATE_FUNERAL_DIRECTOR_FAILED' })
     }
     return
   }

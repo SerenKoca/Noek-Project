@@ -22,7 +22,17 @@ export async function connectToDatabase() {
   }
 
   if (!cached.promise) {
-    cached.promise = mongoose.connect(mongoUri).then((mongooseInstance) => mongooseInstance)
+    cached.promise = mongoose
+      .connect(mongoUri, {
+        maxPoolSize: 10,
+        serverSelectionTimeoutMS: 10000
+      })
+      .then((mongooseInstance) => mongooseInstance)
+      .catch((error) => {
+        cached.promise = null
+        cached.conn = null
+        throw error
+      })
   }
 
   cached.conn = await cached.promise

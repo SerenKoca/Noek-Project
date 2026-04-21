@@ -7,6 +7,16 @@ function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
 }
 
+function buildDiagnostics(req, extra = {}) {
+  return {
+    route: '/api/director/editor-codes',
+    method: req.method,
+    hasMongoUri: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI || process.env.MONGO_URL || process.env.DATABASE_URL),
+    hasJwtSecret: Boolean(process.env.JWT_SECRET),
+    ...extra
+  }
+}
+
 function parseBody(req) {
   if (!req.body) return {}
   if (typeof req.body === 'string') return JSON.parse(req.body)
@@ -45,8 +55,16 @@ export default async function handler(req, res) {
   try {
     await connectToDatabase()
   } catch (error) {
-    console.error('MongoDB connection error:', error)
-    res.status(500).json({ error: 'Databaseverbinding mislukt.' })
+    console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC connectToDatabase failed', buildDiagnostics(req, {
+      stage: 'connectToDatabase',
+      errorMessage: error?.message,
+      errorName: error?.name
+    }))
+    if (error?.message === 'Missing MONGO_URI') {
+      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+      return
+    }
+    res.status(500).json({ error: 'Databaseverbinding mislukt.', code: 'MONGO_CONNECTION_FAILED' })
     return
   }
 
@@ -64,8 +82,13 @@ export default async function handler(req, res) {
         }))
       )
     } catch (error) {
-      console.error('listMyEditorCodes error:', error)
-      res.status(500).json({ error: 'Kon registratiecodes niet ophalen.' })
+      console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC list failed', buildDiagnostics(req, {
+        stage: 'listMyEditorCodes',
+        userId: auth.userId,
+        errorMessage: error?.message,
+        errorName: error?.name
+      }))
+      res.status(500).json({ error: 'Kon registratiecodes niet ophalen.', code: 'LIST_EDITOR_CODES_FAILED' })
     }
     return
   }
@@ -92,8 +115,13 @@ export default async function handler(req, res) {
         createdAt: item.createdAt
       })
     } catch (error) {
-      console.error('generateEditorCode error:', error)
-      res.status(500).json({ error: 'Kon registratiecode niet aanmaken.' })
+      console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC create failed', buildDiagnostics(req, {
+        stage: 'generateEditorCode',
+        userId: auth.userId,
+        errorMessage: error?.message,
+        errorName: error?.name
+      }))
+      res.status(500).json({ error: 'Kon registratiecode niet aanmaken.', code: 'GENERATE_EDITOR_CODE_FAILED' })
     }
     return
   }

@@ -6,6 +6,16 @@ function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
 }
 
+function buildDiagnostics(req, extra = {}) {
+  return {
+    route: '/api/director/editors',
+    method: req.method,
+    hasMongoUri: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI || process.env.MONGO_URL || process.env.DATABASE_URL),
+    hasJwtSecret: Boolean(process.env.JWT_SECRET),
+    ...extra
+  }
+}
+
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
@@ -22,8 +32,16 @@ export default async function handler(req, res) {
   try {
     await connectToDatabase()
   } catch (error) {
-    console.error('MongoDB connection error:', error)
-    res.status(500).json({ error: 'Databaseverbinding mislukt.' })
+    console.error('DIRECTOR_EDITORS_DIAGNOSTIC connectToDatabase failed', buildDiagnostics(req, {
+      stage: 'connectToDatabase',
+      errorMessage: error?.message,
+      errorName: error?.name
+    }))
+    if (error?.message === 'Missing MONGO_URI') {
+      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+      return
+    }
+    res.status(500).json({ error: 'Databaseverbinding mislukt.', code: 'MONGO_CONNECTION_FAILED' })
     return
   }
 
@@ -39,7 +57,12 @@ export default async function handler(req, res) {
       }))
     )
   } catch (error) {
-    console.error('listMyEditors error:', error)
-    res.status(500).json({ error: 'Kon klanten niet ophalen.' })
+    console.error('DIRECTOR_EDITORS_DIAGNOSTIC listMyEditors failed', buildDiagnostics(req, {
+      stage: 'listMyEditors',
+      userId: auth.userId,
+      errorMessage: error?.message,
+      errorName: error?.name
+    }))
+    res.status(500).json({ error: 'Kon klanten niet ophalen.', code: 'LIST_MY_EDITORS_FAILED' })
   }
 }
