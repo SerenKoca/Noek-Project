@@ -1,7 +1,3 @@
-import { connectToDatabase } from '../../../../src/server/lib/mongodb.js'
-import { User } from '../../../../src/server/models/User.js'
-import { requireAuth, requireRole } from '../../../../src/server/middleware/authMiddleware.js'
-
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
 }
@@ -19,6 +15,16 @@ function buildDiagnostics(req, extra = {}) {
 export default async function handler(req, res) {
   try {
     setJsonHeaders(res)
+
+    const [mongoModule, userModule, authModule] = await Promise.all([
+      import('../../../../src/server/lib/mongodb.js'),
+      import('../../../../src/server/models/User.js'),
+      import('../../../../src/server/middleware/authMiddleware.js')
+    ])
+
+    const { connectToDatabase } = mongoModule
+    const { User } = userModule
+    const { requireAuth, requireRole } = authModule
 
     const auth = requireAuth(req, res)
     if (!auth) return

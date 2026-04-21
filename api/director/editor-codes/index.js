@@ -1,7 +1,4 @@
 import crypto from 'crypto'
-import { connectToDatabase } from '../../../../src/server/lib/mongodb.js'
-import { EditorRegistrationCode } from '../../../../src/server/models/EditorRegistrationCode.js'
-import { requireAuth, requireRole } from '../../../../src/server/middleware/authMiddleware.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
@@ -35,10 +32,10 @@ function randomCode(length = 8) {
   return out
 }
 
-async function generateUniqueCode() {
+async function generateUniqueCode(EditorRegistrationCodeModel) {
   for (let attempt = 0; attempt < 8; attempt += 1) {
     const code = randomCode(8)
-    const exists = await EditorRegistrationCode.findOne({ code })
+    const exists = await EditorRegistrationCodeModel.findOne({ code })
     if (!exists) return code
   }
 
@@ -48,6 +45,16 @@ async function generateUniqueCode() {
 export default async function handler(req, res) {
   try {
     setJsonHeaders(res)
+
+    const [mongoModule, editorCodeModule, authModule] = await Promise.all([
+      import('../../../../src/server/lib/mongodb.js'),
+      import('../../../../src/server/models/EditorRegistrationCode.js'),
+      import('../../../../src/server/middleware/authMiddleware.js')
+    ])
+
+    const { connectToDatabase } = mongoModule
+    const { EditorRegistrationCode } = editorCodeModule
+    const { requireAuth, requireRole } = authModule
 
     const auth = requireAuth(req, res)
     if (!auth) return
@@ -107,7 +114,7 @@ export default async function handler(req, res) {
         const expiresInDaysRaw = Number(parseBody(req).expiresInDays)
         const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.max(1, Math.min(365, Math.round(expiresInDaysRaw))) : 30
 
-        const code = await generateUniqueCode()
+        const code = await generateUniqueCode(EditorRegistrationCode)
         const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
 
         const item = await EditorRegistrationCode.create({
