@@ -36,9 +36,9 @@ export default async function handler(req, res) {
 
     const [bcryptModule, mongoModule, userModule, authModule] = await Promise.all([
       import('bcryptjs'),
-      import('../../../../src/server/lib/mongodb.js'),
-      import('../../../../src/server/models/User.js'),
-      import('../../../../src/server/middleware/authMiddleware.js')
+      import('../../../src/server/lib/mongodb.js'),
+      import('../../../src/server/models/User.js'),
+      import('../../../src/server/middleware/authMiddleware.js')
     ])
 
     const bcrypt = bcryptModule.default

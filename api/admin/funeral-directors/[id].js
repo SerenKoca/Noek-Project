@@ -1,6 +1,6 @@
-import { connectToDatabase } from '../../../../src/server/lib/mongodb.js'
-import { User } from '../../../../src/server/models/User.js'
-import { requireAuth, requireRole } from '../../../../src/server/middleware/authMiddleware.js'
+import { connectToDatabase } from '../../../src/server/lib/mongodb.js'
+import { User } from '../../../src/server/models/User.js'
+import { requireAuth, requireRole } from '../../../src/server/middleware/authMiddleware.js'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')

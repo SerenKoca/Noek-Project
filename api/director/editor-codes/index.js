@@ -47,9 +47,9 @@ export default async function handler(req, res) {
     setJsonHeaders(res)
 
     const [mongoModule, editorCodeModule, authModule] = await Promise.all([
-      import('../../../../src/server/lib/mongodb.js'),
-      import('../../../../src/server/models/EditorRegistrationCode.js'),
-      import('../../../../src/server/middleware/authMiddleware.js')
+      import('../../../src/server/lib/mongodb.js'),
+      import('../../../src/server/models/EditorRegistrationCode.js'),
+      import('../../../src/server/middleware/authMiddleware.js')
     ])
 
     const { connectToDatabase } = mongoModule
