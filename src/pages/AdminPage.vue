@@ -19,9 +19,17 @@ const form = ref({
 
 function formatApiError(err, fallback) {
   const data = err?.response?.data || {}
-  const message = data.error || fallback
-  const code = data.code ? ` (${data.code})` : ''
-  const details = data.details ? ` - ${data.details}` : ''
+  const message = typeof data.error === 'string'
+    ? data.error
+    : data.error
+      ? JSON.stringify(data.error)
+      : fallback
+  const code = data.code ? ` (${String(data.code)})` : ''
+  const details = typeof data.details === 'string'
+    ? ` - ${data.details}`
+    : data.details
+      ? ` - ${JSON.stringify(data.details)}`
+      : ''
   return `${message}${code}${details}`
 }
 
