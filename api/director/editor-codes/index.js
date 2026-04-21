@@ -46,98 +46,116 @@ async function generateUniqueCode() {
 }
 
 export default async function handler(req, res) {
-  setJsonHeaders(res)
-
-  const auth = requireAuth(req, res)
-  if (!auth) return
-  if (!requireRole(auth, res, 'funeral_director')) return
-
   try {
-    await connectToDatabase()
-  } catch (error) {
-    console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC connectToDatabase failed', buildDiagnostics(req, {
-      stage: 'connectToDatabase',
-      errorMessage: error?.message,
-      errorName: error?.name
-    }))
-    if (error?.message === 'Missing MONGO_URI') {
-      res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+    setJsonHeaders(res)
+
+    const auth = requireAuth(req, res)
+    if (!auth) return
+    if (!requireRole(auth, res, 'funeral_director')) return
+
+    try {
+      await connectToDatabase()
+    } catch (error) {
+      console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC connectToDatabase failed', buildDiagnostics(req, {
+        stage: 'connectToDatabase',
+        errorMessage: error?.message,
+        errorName: error?.name
+      }))
+      if (error?.message === 'Missing MONGO_URI') {
+        res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
+        return
+      }
+      res.status(500).json({
+        error: 'Databaseverbinding mislukt.',
+        code: 'MONGO_CONNECTION_FAILED',
+        details: error?.message || 'Unknown database error'
+      })
       return
     }
-    res.status(500).json({
-      error: 'Databaseverbinding mislukt.',
-      code: 'MONGO_CONNECTION_FAILED',
-      details: error?.message || 'Unknown database error'
-    })
-    return
-  }
 
-  if (req.method === 'GET') {
-    try {
-      const items = await EditorRegistrationCode.find({ createdByDirectorId: auth.userId }).sort({ createdAt: -1 })
-      res.status(200).json(
-        items.map((item) => ({
+    if (req.method === 'GET') {
+      try {
+        const items = await EditorRegistrationCode.find({ createdByDirectorId: auth.userId }).sort({ createdAt: -1 })
+        res.status(200).json(
+          items.map((item) => ({
+            id: item._id,
+            code: item.code,
+            expiresAt: item.expiresAt,
+            usedAt: item.usedAt,
+            usedByUserId: item.usedByUserId || null,
+            createdAt: item.createdAt
+          }))
+        )
+      } catch (error) {
+        console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC list failed', buildDiagnostics(req, {
+          stage: 'listMyEditorCodes',
+          userId: auth.userId,
+          errorMessage: error?.message,
+          errorName: error?.name
+        }))
+        res.status(500).json({
+          error: 'Kon registratiecodes niet ophalen.',
+          code: 'LIST_EDITOR_CODES_FAILED',
+          details: error?.message || 'Unknown list error'
+        })
+      }
+      return
+    }
+
+    if (req.method === 'POST') {
+      try {
+        const expiresInDaysRaw = Number(parseBody(req).expiresInDays)
+        const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.max(1, Math.min(365, Math.round(expiresInDaysRaw))) : 30
+
+        const code = await generateUniqueCode()
+        const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
+
+        const item = await EditorRegistrationCode.create({
+          code,
+          createdByDirectorId: auth.userId,
+          expiresAt
+        })
+
+        res.status(201).json({
           id: item._id,
           code: item.code,
           expiresAt: item.expiresAt,
           usedAt: item.usedAt,
-          usedByUserId: item.usedByUserId || null,
           createdAt: item.createdAt
+        })
+      } catch (error) {
+        console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC create failed', buildDiagnostics(req, {
+          stage: 'generateEditorCode',
+          userId: auth.userId,
+          errorMessage: error?.message,
+          errorName: error?.name
         }))
-      )
-    } catch (error) {
-      console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC list failed', buildDiagnostics(req, {
-        stage: 'listMyEditorCodes',
-        userId: auth.userId,
-        errorMessage: error?.message,
-        errorName: error?.name
-      }))
+        res.status(500).json({
+          error: 'Kon registratiecode niet aanmaken.',
+          code: 'GENERATE_EDITOR_CODE_FAILED',
+          details: error?.message || 'Unknown create error'
+        })
+      }
+      return
+    }
+
+    res.setHeader('Allow', ['GET', 'POST'])
+    res.status(405).json({ error: 'Method Not Allowed' })
+  } catch (error) {
+    console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC unhandled crash', buildDiagnostics(req, {
+      stage: 'handler',
+      errorMessage: error?.message,
+      errorName: error?.name,
+      stack: error?.stack
+    }))
+
+    if (!res.headersSent) {
+      setJsonHeaders(res)
       res.status(500).json({
-        error: 'Kon registratiecodes niet ophalen.',
-        code: 'LIST_EDITOR_CODES_FAILED',
-        details: error?.message || 'Unknown list error'
+        error: 'Onverwachte serverfout.',
+        code: 'DIRECTOR_EDITOR_CODES_HANDLER_CRASH',
+        details: error?.message || 'Unhandled serverless error'
       })
     }
-    return
   }
-
-  if (req.method === 'POST') {
-    try {
-      const expiresInDaysRaw = Number(parseBody(req).expiresInDays)
-      const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.max(1, Math.min(365, Math.round(expiresInDaysRaw))) : 30
-
-      const code = await generateUniqueCode()
-      const expiresAt = new Date(Date.now() + expiresInDays * 24 * 60 * 60 * 1000)
-
-      const item = await EditorRegistrationCode.create({
-        code,
-        createdByDirectorId: auth.userId,
-        expiresAt
-      })
-
-      res.status(201).json({
-        id: item._id,
-        code: item.code,
-        expiresAt: item.expiresAt,
-        usedAt: item.usedAt,
-        createdAt: item.createdAt
-      })
-    } catch (error) {
-      console.error('DIRECTOR_EDITOR_CODES_DIAGNOSTIC create failed', buildDiagnostics(req, {
-        stage: 'generateEditorCode',
-        userId: auth.userId,
-        errorMessage: error?.message,
-        errorName: error?.name
-      }))
-      res.status(500).json({
-        error: 'Kon registratiecode niet aanmaken.',
-        code: 'GENERATE_EDITOR_CODE_FAILED',
-        details: error?.message || 'Unknown create error'
-      })
-    }
-    return
-  }
-
-  res.setHeader('Allow', ['GET', 'POST'])
-  res.status(405).json({ error: 'Method Not Allowed' })
 }
