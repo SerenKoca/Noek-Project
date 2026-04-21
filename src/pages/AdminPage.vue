@@ -24,7 +24,9 @@ async function loadDirectors() {
   try {
     directors.value = await getFuneralDirectors()
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Kon uitvaartondernemers niet laden.'
+    const message = err?.response?.data?.error || 'Kon uitvaartondernemers niet laden.'
+    const code = err?.response?.data?.code
+    error.value = code ? `${message} (${code})` : message
   } finally {
     loading.value = false
   }
@@ -61,7 +63,9 @@ async function submitCreateDirector() {
     status.value = 'Uitvaartondernemer aangemaakt.'
     await loadDirectors()
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Aanmaken mislukt.'
+    const message = err?.response?.data?.error || 'Aanmaken mislukt.'
+    const code = err?.response?.data?.code
+    error.value = code ? `${message} (${code})` : message
   }
 }
 
@@ -77,7 +81,9 @@ async function removeDirector(item) {
     status.value = 'Uitvaartondernemer verwijderd.'
     await loadDirectors()
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Verwijderen mislukt.'
+    const message = err?.response?.data?.error || 'Verwijderen mislukt.'
+    const code = err?.response?.data?.code
+    error.value = code ? `${message} (${code})` : message
   }
 }
 

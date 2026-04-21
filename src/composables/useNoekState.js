@@ -337,6 +337,11 @@ async function loadRooms() {
     return
   }
 
+  if (authState.value?.user?.role !== 'editor') {
+    rooms.value = []
+    return
+  }
+
   try {
     rooms.value = await getRooms()
   } catch (error) {
@@ -984,8 +989,10 @@ async function bootstrap() {
   initialized = true
 
   await loadAvailableSounds()
-  if (authState.value?.token) {
+  if (authState.value?.token && authState.value?.user?.role === 'editor') {
     await loadRooms()
+  } else {
+    rooms.value = []
   }
 }
 

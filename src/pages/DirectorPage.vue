@@ -23,7 +23,9 @@ async function loadDirectorData() {
     editors.value = editorList
     codes.value = codeList
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Kon gegevens niet laden.'
+    const message = err?.response?.data?.error || 'Kon gegevens niet laden.'
+    const code = err?.response?.data?.code
+    error.value = code ? `${message} (${code})` : message
   } finally {
     loading.value = false
   }
@@ -54,7 +56,9 @@ async function createCode() {
     success.value = `Nieuwe code: ${item.code}`
     await loadDirectorData()
   } catch (err) {
-    error.value = err?.response?.data?.error || 'Code genereren mislukt.'
+    const message = err?.response?.data?.error || 'Code genereren mislukt.'
+    const code = err?.response?.data?.code
+    error.value = code ? `${message} (${code})` : message
   }
 }
 
