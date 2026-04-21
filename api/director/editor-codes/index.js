@@ -64,7 +64,11 @@ export default async function handler(req, res) {
       res.status(500).json({ error: 'Serverconfiguratie mist MONGO_URI.', code: 'MISSING_MONGO_URI' })
       return
     }
-    res.status(500).json({ error: 'Databaseverbinding mislukt.', code: 'MONGO_CONNECTION_FAILED' })
+    res.status(500).json({
+      error: 'Databaseverbinding mislukt.',
+      code: 'MONGO_CONNECTION_FAILED',
+      details: error?.message || 'Unknown database error'
+    })
     return
   }
 
@@ -88,7 +92,11 @@ export default async function handler(req, res) {
         errorMessage: error?.message,
         errorName: error?.name
       }))
-      res.status(500).json({ error: 'Kon registratiecodes niet ophalen.', code: 'LIST_EDITOR_CODES_FAILED' })
+      res.status(500).json({
+        error: 'Kon registratiecodes niet ophalen.',
+        code: 'LIST_EDITOR_CODES_FAILED',
+        details: error?.message || 'Unknown list error'
+      })
     }
     return
   }
@@ -121,7 +129,11 @@ export default async function handler(req, res) {
         errorMessage: error?.message,
         errorName: error?.name
       }))
-      res.status(500).json({ error: 'Kon registratiecode niet aanmaken.', code: 'GENERATE_EDITOR_CODE_FAILED' })
+      res.status(500).json({
+        error: 'Kon registratiecode niet aanmaken.',
+        code: 'GENERATE_EDITOR_CODE_FAILED',
+        details: error?.message || 'Unknown create error'
+      })
     }
     return
   }

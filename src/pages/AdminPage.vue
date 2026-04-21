@@ -17,6 +17,14 @@ const form = ref({
   password: ''
 })
 
+function formatApiError(err, fallback) {
+  const data = err?.response?.data || {}
+  const message = data.error || fallback
+  const code = data.code ? ` (${data.code})` : ''
+  const details = data.details ? ` - ${data.details}` : ''
+  return `${message}${code}${details}`
+}
+
 async function loadDirectors() {
   loading.value = true
   error.value = ''
@@ -24,9 +32,7 @@ async function loadDirectors() {
   try {
     directors.value = await getFuneralDirectors()
   } catch (err) {
-    const message = err?.response?.data?.error || 'Kon uitvaartondernemers niet laden.'
-    const code = err?.response?.data?.code
-    error.value = code ? `${message} (${code})` : message
+    error.value = formatApiError(err, 'Kon uitvaartondernemers niet laden.')
   } finally {
     loading.value = false
   }
@@ -63,9 +69,7 @@ async function submitCreateDirector() {
     status.value = 'Uitvaartondernemer aangemaakt.'
     await loadDirectors()
   } catch (err) {
-    const message = err?.response?.data?.error || 'Aanmaken mislukt.'
-    const code = err?.response?.data?.code
-    error.value = code ? `${message} (${code})` : message
+    error.value = formatApiError(err, 'Aanmaken mislukt.')
   }
 }
 
@@ -81,9 +85,7 @@ async function removeDirector(item) {
     status.value = 'Uitvaartondernemer verwijderd.'
     await loadDirectors()
   } catch (err) {
-    const message = err?.response?.data?.error || 'Verwijderen mislukt.'
-    const code = err?.response?.data?.code
-    error.value = code ? `${message} (${code})` : message
+    error.value = formatApiError(err, 'Verwijderen mislukt.')
   }
 }
 

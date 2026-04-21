@@ -14,6 +14,14 @@ const editors = ref([])
 const codes = ref([])
 const codeLifetimeDays = ref(30)
 
+function formatApiError(err, fallback) {
+  const data = err?.response?.data || {}
+  const message = data.error || fallback
+  const code = data.code ? ` (${data.code})` : ''
+  const details = data.details ? ` - ${data.details}` : ''
+  return `${message}${code}${details}`
+}
+
 async function loadDirectorData() {
   loading.value = true
   error.value = ''
@@ -23,9 +31,7 @@ async function loadDirectorData() {
     editors.value = editorList
     codes.value = codeList
   } catch (err) {
-    const message = err?.response?.data?.error || 'Kon gegevens niet laden.'
-    const code = err?.response?.data?.code
-    error.value = code ? `${message} (${code})` : message
+    error.value = formatApiError(err, 'Kon gegevens niet laden.')
   } finally {
     loading.value = false
   }
@@ -56,9 +62,7 @@ async function createCode() {
     success.value = `Nieuwe code: ${item.code}`
     await loadDirectorData()
   } catch (err) {
-    const message = err?.response?.data?.error || 'Code genereren mislukt.'
-    const code = err?.response?.data?.code
-    error.value = code ? `${message} (${code})` : message
+    error.value = formatApiError(err, 'Code genereren mislukt.')
   }
 }
 
