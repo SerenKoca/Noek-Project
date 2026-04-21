@@ -1,9 +1,47 @@
 const express = require('express')
 const Room = require('../models/Room')
 const RoomContribution = require('../models/RoomContribution')
+const User = require('../models/User')
 const { readBearerToken, verifyToken } = require('../lib/auth')
 
 const router = express.Router()
+
+const DEFAULT_BRAND_DARK = '#1e2b37'
+const DEFAULT_BRAND_LIGHT = '#d7e1eb'
+
+function normalizeHexColor(input, fallback) {
+  const value = String(input || '').trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(value) ? value : fallback
+}
+
+function buildBrandingResponse(director) {
+  return {
+    logoUrl: String(director?.brandLogoUrl || '').trim(),
+    darkColor: normalizeHexColor(director?.brandDarkColor, DEFAULT_BRAND_DARK),
+    lightColor: normalizeHexColor(director?.brandLightColor, DEFAULT_BRAND_LIGHT),
+    directorName: String(director?.displayName || '').trim()
+  }
+}
+
+async function resolveRoomBranding(room) {
+  const ownerId = resolveOwnerId(room)
+  if (!ownerId) return buildBrandingResponse(null)
+
+  const owner = await User.findById(ownerId).select({ role: 1, funeralDirectorId: 1 })
+  if (!owner) return buildBrandingResponse(null)
+
+  if (owner.role === 'funeral_director') {
+    const director = await User.findById(owner._id).select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+    return buildBrandingResponse(director)
+  }
+
+  if (!owner.funeralDirectorId) return buildBrandingResponse(null)
+
+  const director = await User.findOne({ _id: owner.funeralDirectorId, role: 'funeral_director' })
+    .select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+
+  return buildBrandingResponse(director)
+}
 
 function getOptionalAuth(req) {
   const token = readBearerToken(req)
@@ -53,11 +91,14 @@ router.get('/rooms/:id', async (req, res) => {
       return
     }
 
+    const branding = await resolveRoomBranding(room)
+
     res.json({
       _id: room._id,
       name: room.name,
       sceneData: room.sceneData,
       ambience: room.ambience,
+      branding,
       roomReactions: room.roomReactions,
       roomComments: room.roomComments,
       createdAt: room.createdAt

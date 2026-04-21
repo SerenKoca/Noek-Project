@@ -14,9 +14,12 @@ import {
 } from '../services/roomService.js'
 import { getSoundLibrary } from '../services/soundLibraryService.js'
 import { loginAccount, registerAccount, getStoredAuth, clearAuth } from '../services/authService.js'
+import { getMyBranding } from '../services/brandingService.js'
+import { applyBrandingTheme, getDefaultBranding } from '../services/brandTheme.js'
 
 const rooms = ref([])
 const authState = ref(getStoredAuth())
+const brandingState = ref(getDefaultBranding())
 const authEmail = ref('')
 const authPassword = ref('')
 const authDisplayName = ref('')
@@ -105,6 +108,25 @@ const currentRoomSoundTitle = computed(() => {
 const DEFAULT_FLOOR_COLOR = '#c0b496'
 const DEFAULT_WALL_COLOR = '#8f98a3'
 let initialized = false
+
+function applyCurrentBranding(branding) {
+  brandingState.value = applyBrandingTheme(branding)
+}
+
+async function loadBranding() {
+  const role = authState.value?.user?.role || ''
+  if (!authState.value?.token || !['editor', 'funeral_director', 'visitor'].includes(role)) {
+    applyCurrentBranding(getDefaultBranding())
+    return
+  }
+
+  try {
+    const branding = await getMyBranding()
+    applyCurrentBranding(branding)
+  } catch {
+    applyCurrentBranding(getDefaultBranding())
+  }
+}
 
 function normalizeHexColor(value, fallback) {
   const input = String(value || '').trim().toLowerCase()
@@ -771,6 +793,7 @@ async function onAuthSubmit() {
     authRegisterRole.value = 'editor'
     authStatus.value = `Welkom ${result?.user?.displayName || result?.user?.email || ''}`
     authStatusType.value = 'success'
+    await loadBranding()
     if (result?.user?.role === 'editor') {
       await loadRooms()
     } else {
@@ -794,6 +817,7 @@ function onLogout() {
   currentRoom.value = null
   currentRoomData.value = null
   settingsRoom.value = null
+  applyCurrentBranding(getDefaultBranding())
   stopRoomAudio()
   authStatus.value = 'Je bent uitgelogd.'
   authStatusType.value = 'success'
@@ -988,6 +1012,7 @@ async function bootstrap() {
   if (initialized) return
   initialized = true
 
+  await loadBranding()
   await loadAvailableSounds()
   if (authState.value?.token && authState.value?.user?.role === 'editor') {
     await loadRooms()
@@ -1003,6 +1028,7 @@ function getRoomById(roomId) {
 export function useNoekState() {
   return {
     rooms,
+    brandingState,
     authState,
     authEmail,
     authPassword,

@@ -25,12 +25,7 @@ function formatApiError(err, fallback) {
       ? JSON.stringify(data.error)
       : fallback
   const code = data.code ? ` (${String(data.code)})` : ''
-  const details = typeof data.details === 'string'
-    ? ` - ${data.details}`
-    : data.details
-      ? ` - ${JSON.stringify(data.details)}`
-      : ''
-  return `${message}${code}${details}`
+  return `${message}${code}`
 }
 
 async function loadDirectors() {

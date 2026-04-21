@@ -30,6 +30,26 @@ const userSchema = new mongoose.Schema(
       ref: 'User',
       default: null,
       index: true
+    },
+    brandLogoUrl: {
+      type: String,
+      default: '',
+      trim: true,
+      maxlength: 2048
+    },
+    brandDarkColor: {
+      type: String,
+      default: '#1e2b37',
+      trim: true,
+      lowercase: true,
+      maxlength: 7
+    },
+    brandLightColor: {
+      type: String,
+      default: '#d7e1eb',
+      trim: true,
+      lowercase: true,
+      maxlength: 7
     }
   },
   {

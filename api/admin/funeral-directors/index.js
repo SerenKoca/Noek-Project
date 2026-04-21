@@ -64,8 +64,7 @@ export default async function handler(req, res) {
       }
       res.status(500).json({
         error: 'Databaseverbinding mislukt.',
-        code: 'MONGO_CONNECTION_FAILED',
-        details: error?.message || 'Unknown database error'
+        code: 'MONGO_CONNECTION_FAILED'
       })
       return
     }
@@ -82,8 +81,7 @@ export default async function handler(req, res) {
         }))
         res.status(500).json({
           error: 'Kon uitvaartondernemers niet ophalen.',
-          code: 'LIST_FUNERAL_DIRECTORS_FAILED',
-          details: error?.message || 'Unknown list error'
+          code: 'LIST_FUNERAL_DIRECTORS_FAILED'
         })
       }
       return
@@ -128,8 +126,7 @@ export default async function handler(req, res) {
         }))
         res.status(500).json({
           error: 'Kon uitvaartondernemer niet aanmaken.',
-          code: 'CREATE_FUNERAL_DIRECTOR_FAILED',
-          details: error?.message || 'Unknown create error'
+          code: 'CREATE_FUNERAL_DIRECTOR_FAILED'
         })
       }
       return
@@ -149,8 +146,7 @@ export default async function handler(req, res) {
       setJsonHeaders(res)
       res.status(500).json({
         error: 'Onverwachte serverfout.',
-        code: 'ADMIN_HANDLER_CRASH',
-        details: error?.message || 'Unhandled serverless error'
+        code: 'ADMIN_HANDLER_CRASH'
       })
     }
   }

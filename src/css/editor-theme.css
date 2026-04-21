@@ -843,7 +843,7 @@ body {
 }
 
 .primary-btn:hover {
-  background: #0066b6;
+  background: var(--editor-primary-hover, #0066b6);
   transform: translateY(-1px);
 }
 
@@ -1696,4 +1696,101 @@ body {
   .settings-header-v2 .primary-btn {
     width: 100%;
   }
+}
+
+/* Tenant branding overrides for legacy hardcoded blue sections */
+.auth-page-v2 {
+  background:
+    radial-gradient(circle at 15% 80%, color-mix(in srgb, var(--editor-panel) 55%, transparent) 0%, transparent 48%),
+    linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 48%, var(--editor-bg-shell-bottom) 100%);
+}
+
+.auth-card-v2,
+.room-card-v2,
+.visitor-room-hero-copy,
+.visitor-room-stats,
+.settings-left-v2,
+.settings-right-v2,
+.visitor-room-scene-panel,
+.modal-card {
+  border-color: var(--editor-border);
+  background: color-mix(in srgb, white 86%, var(--editor-panel) 14%);
+}
+
+.auth-hero-v2 {
+  background: linear-gradient(180deg, color-mix(in srgb, white 82%, var(--editor-panel) 18%), color-mix(in srgb, white 72%, var(--editor-panel) 28%));
+  border-right-color: var(--editor-border);
+}
+
+.auth-logo-v2,
+.auth-switch-v2,
+.home-brand-v2 strong,
+.home-brand-v2 span,
+.home-user-v2 span,
+.home-main-header-v2 h2,
+.home-main-header-v2 p,
+.settings-step-v2,
+.settings-header-center-v2 h2,
+.visitor-room-subtitle,
+.visitor-room-hero-copy h3,
+.visitor-room-hero-copy p,
+.visitor-room-stat strong,
+.visitor-room-stat span,
+.settings-left-v2 h3,
+.settings-right-v2 h3,
+.visitor-room-note,
+.auth-hero-v2 h1,
+.auth-hero-v2 p,
+.auth-field-v2 span,
+.auth-field-v2 input,
+.home-main-v2,
+.home-page-v2,
+.settings-page-v2 {
+  color: var(--editor-text);
+}
+
+.auth-field-v2 input,
+.modal-card input,
+.auth-row input {
+  border-color: var(--editor-border);
+  background: color-mix(in srgb, white 78%, var(--editor-panel) 22%);
+}
+
+.home-page-v2,
+.settings-page-v2 {
+  background:
+    radial-gradient(circle at 10% 100%, color-mix(in srgb, var(--editor-panel) 45%, transparent) 0%, transparent 36%),
+    linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 100%);
+}
+
+.home-topbar-v2 {
+  background: color-mix(in srgb, var(--editor-panel) 80%, white 20%);
+  border-bottom-color: var(--editor-border);
+}
+
+.role-badge {
+  border-color: var(--editor-border-strong);
+  background: color-mix(in srgb, var(--editor-panel) 78%, white 22%);
+  color: var(--editor-text);
+}
+
+.primary-btn,
+.auth-submit-v2 {
+  color: var(--editor-btn-text, #ffffff);
+  background: linear-gradient(90deg, var(--editor-brand), var(--editor-primary-hover, var(--editor-brand)));
+}
+
+.secondary-btn {
+  color: var(--editor-text);
+  background: var(--editor-btn);
+  border-color: var(--editor-border);
+}
+
+.visitor-room-stat + .visitor-room-stat,
+.visitor-room-stat + .visitor-room-stat {
+  border-color: var(--editor-border);
+}
+
+.room-card-v2 {
+  box-shadow: 0 8px 25px color-mix(in srgb, var(--editor-brand) 22%, transparent);
 }

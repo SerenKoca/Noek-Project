@@ -74,8 +74,7 @@ export default async function handler(req, res) {
       }
       res.status(500).json({
         error: 'Databaseverbinding mislukt.',
-        code: 'MONGO_CONNECTION_FAILED',
-        details: error?.message || 'Unknown database error'
+        code: 'MONGO_CONNECTION_FAILED'
       })
       return
     }
@@ -102,8 +101,7 @@ export default async function handler(req, res) {
         }))
         res.status(500).json({
           error: 'Kon registratiecodes niet ophalen.',
-          code: 'LIST_EDITOR_CODES_FAILED',
-          details: error?.message || 'Unknown list error'
+          code: 'LIST_EDITOR_CODES_FAILED'
         })
       }
       return
@@ -139,8 +137,7 @@ export default async function handler(req, res) {
         }))
         res.status(500).json({
           error: 'Kon registratiecode niet aanmaken.',
-          code: 'GENERATE_EDITOR_CODE_FAILED',
-          details: error?.message || 'Unknown create error'
+          code: 'GENERATE_EDITOR_CODE_FAILED'
         })
       }
       return
@@ -160,8 +157,7 @@ export default async function handler(req, res) {
       setJsonHeaders(res)
       res.status(500).json({
         error: 'Onverwachte serverfout.',
-        code: 'DIRECTOR_EDITOR_CODES_HANDLER_CRASH',
-        details: error?.message || 'Unhandled serverless error'
+        code: 'DIRECTOR_EDITOR_CODES_HANDLER_CRASH'
       })
     }
   }

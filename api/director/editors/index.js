@@ -50,8 +50,7 @@ export default async function handler(req, res) {
       }
       res.status(500).json({
         error: 'Databaseverbinding mislukt.',
-        code: 'MONGO_CONNECTION_FAILED',
-        details: error?.message || 'Unknown database error'
+        code: 'MONGO_CONNECTION_FAILED'
       })
       return
     }
@@ -76,8 +75,7 @@ export default async function handler(req, res) {
       }))
       res.status(500).json({
         error: 'Kon klanten niet ophalen.',
-        code: 'LIST_MY_EDITORS_FAILED',
-        details: error?.message || 'Unknown list error'
+        code: 'LIST_MY_EDITORS_FAILED'
       })
     }
   } catch (error) {
@@ -92,8 +90,7 @@ export default async function handler(req, res) {
       setJsonHeaders(res)
       res.status(500).json({
         error: 'Onverwachte serverfout.',
-        code: 'DIRECTOR_EDITORS_HANDLER_CRASH',
-        details: error?.message || 'Unhandled serverless error'
+        code: 'DIRECTOR_EDITORS_HANDLER_CRASH'
       })
     }
   }

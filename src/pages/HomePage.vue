@@ -70,7 +70,13 @@ async function copyVisitLink(room) {
     <div class="home-page-v2">
       <header class="home-topbar-v2">
         <div class="home-brand-v2">
-          <strong>Thibaut DELA</strong>
+          <img
+            v-if="state.brandingState.value?.logoUrl"
+            :src="state.brandingState.value.logoUrl"
+            alt="Brand logo"
+            style="height: 40px; max-width: 180px; object-fit: contain;"
+          />
+          <strong v-else>{{ state.brandingState.value?.directorName || 'Noek' }}</strong>
           <span>Uitvaartzorg</span>
         </div>
         <div class="home-user-v2">

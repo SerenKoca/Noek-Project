@@ -12,10 +12,10 @@ import {
   reactToPublicRoomContribution
 } from '../services/visitorService.js'
 import { getStoredAuth } from '../services/authService.js'
+import { applyBrandingTheme, normalizeBranding } from '../services/brandTheme.js'
 
 const VISITOR_NAME_STORAGE = 'noek_visitor_name'
 const VISITOR_ENTRY_STORAGE = 'noek_visitor_entry_seen'
-const VISITOR_BRAND_STORAGE = 'noek_visitor_brand'
 
 const route = useRoute()
 const router = useRouter()
@@ -54,6 +54,7 @@ const mediaFile = ref(null)
 
 const logoTitle = ref('Thibaut DELA')
 const logoSubtitle = ref('Uitvaartzorg')
+const brandLogoUrl = ref('')
 
 const roomSceneData = computed(() => room.value?.sceneData || null)
 
@@ -120,24 +121,12 @@ function persistVisitorName(value) {
   window.localStorage.setItem(VISITOR_NAME_STORAGE, trimmed)
 }
 
-function loadBrandSettings() {
-  if (typeof window === 'undefined') return
-  try {
-    const parsed = JSON.parse(window.localStorage.getItem(VISITOR_BRAND_STORAGE) || '{}')
-    logoTitle.value = String(parsed?.logoTitle || logoTitle.value).trim() || 'Thibaut DELA'
-    logoSubtitle.value = String(parsed?.logoSubtitle || logoSubtitle.value).trim() || 'Uitvaartzorg'
-  } catch {
-    // keep defaults
-  }
-}
-
-function persistBrandSettings() {
-  if (typeof window === 'undefined') return
-  const payload = {
-    logoTitle: String(logoTitle.value || '').trim() || 'Thibaut DELA',
-    logoSubtitle: String(logoSubtitle.value || '').trim() || 'Uitvaartzorg'
-  }
-  window.localStorage.setItem(VISITOR_BRAND_STORAGE, JSON.stringify(payload))
+function applyRoomBranding(roomData) {
+  const normalized = normalizeBranding(roomData?.branding || {})
+  logoTitle.value = normalized.directorName || 'Noek'
+  logoSubtitle.value = 'Uitvaartzorg'
+  brandLogoUrl.value = normalized.logoUrl
+  applyBrandingTheme(normalized)
 }
 
 function applyVisitorName() {
@@ -157,7 +146,6 @@ function ensureVisitorBootState() {
     persistVisitorName(visitorName.value)
   }
 
-  loadBrandSettings()
 }
 
 function isImageUrl(url) {
@@ -294,6 +282,7 @@ async function loadAll() {
       getPublicRoomContributions(roomId.value)
     ])
     room.value = roomData
+    applyRoomBranding(roomData)
     contributions.value = Array.isArray(items) ? items : []
   } catch (err) {
     error.value = err?.response?.data?.error || 'Kon kamer niet laden.'
@@ -463,13 +452,13 @@ onMounted(async () => {
   } else {
     try {
       room.value = await getPublicRoom(roomId.value)
+      applyRoomBranding(room.value)
     } catch {
       error.value = 'Kon kamer niet laden.'
     }
   }
 })
 
-watch([logoTitle, logoSubtitle], persistBrandSettings)
 watch(roomId, () => {
   hasEnteredRoom.value = readStoredEntryState(roomId.value)
   activePanel.value = 'none'
@@ -530,6 +519,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="visitor-brand-card">
+          <img v-if="brandLogoUrl" :src="brandLogoUrl" alt="Brand logo" class="visitor-brand-logo" />
           <strong>{{ logoTitle }}</strong>
           <span>{{ logoSubtitle }}</span>
         </div>
@@ -547,15 +537,6 @@ onBeforeUnmount(() => {
             <p>2. Voeg tekst/foto/video/muziek toe en druk op opslaan.</p>
             <p>3. Reageer met comments of reacties op bestaande bijdragen.</p>
             <hr>
-            <h4>Logo instellingen</h4>
-            <label class="panel-field">
-              <span>Logo titel</span>
-              <input v-model="logoTitle" type="text" maxlength="40">
-            </label>
-            <label class="panel-field">
-              <span>Logo subtitel</span>
-              <input v-model="logoSubtitle" type="text" maxlength="40">
-            </label>
             <div class="roomMusicLine">
               <button type="button" class="visitor-pill-btn" @click="enableRoomSound">Geluid afspelen</button>
               <span v-if="roomMusicState.playing">Kamergeluid speelt</span>
@@ -698,6 +679,12 @@ onBeforeUnmount(() => {
   gap: 18px;
   text-align: center;
   padding: 26px;
+}
+
+.visitor-brand-logo {
+  max-width: 160px;
+  max-height: 44px;
+  object-fit: contain;
 }
 
 .visitor-entry-logo {

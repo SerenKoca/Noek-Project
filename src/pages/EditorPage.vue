@@ -95,7 +95,11 @@ async function shareCurrentRoom() {
         {{ state.saveStatus.value }}
       </div>
 
-      <EditorBrand name="Thibaut DELA" sub="Uitvaartzorg" />
+      <EditorBrand
+        :name="state.brandingState.value?.directorName || 'Noek'"
+        sub="Uitvaartzorg"
+        :logo-url="state.brandingState.value?.logoUrl || ''"
+      />
 
       <EditorHistoryControls @undo="state.onHistoryAction" @redo="state.onHistoryAction" />
 
