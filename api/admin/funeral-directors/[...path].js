@@ -4,7 +4,7 @@ function setJsonHeaders(res) {
 
 function buildDiagnostics(req, extra = {}) {
   return {
-    route: '/api/admin/funeral-directors',
+    route: '/api/admin/funeral-directors/[...path]',
     method: req.method,
     hasMongoUri: Boolean(process.env.MONGO_URI || process.env.MONGODB_URI || process.env.MONGO_URL || process.env.DATABASE_URL),
     hasJwtSecret: Boolean(process.env.JWT_SECRET),
@@ -30,25 +30,18 @@ function sanitizeUser(user) {
   }
 }
 
-export default async function handler(req, res) {
+// Handler for GET/POST (list and create)
+async function handleListCreate(req, res, auth) {
   try {
-    setJsonHeaders(res)
-
-    const [bcryptModule, mongoModule, userModule, authModule] = await Promise.all([
+    const [bcryptModule, mongoModule, userModule] = await Promise.all([
       import('bcryptjs'),
       import('../../../src/server/lib/mongodb.js'),
-      import('../../../src/server/models/User.js'),
-      import('../../../src/server/middleware/authMiddleware.js')
+      import('../../../src/server/models/User.js')
     ])
 
     const bcrypt = bcryptModule.default
     const { connectToDatabase } = mongoModule
     const { User } = userModule
-    const { requireAuth, requireRole } = authModule
-
-    const auth = requireAuth(req, res)
-    if (!auth) return
-    if (!requireRole(auth, res, 'admin')) return
 
     try {
       await connectToDatabase()
@@ -137,6 +130,92 @@ export default async function handler(req, res) {
   } catch (error) {
     console.error('ADMIN_FUNERAL_DIRECTORS_DIAGNOSTIC unhandled crash', buildDiagnostics(req, {
       stage: 'handler',
+      errorMessage: error?.message,
+      errorName: error?.name,
+      stack: error?.stack
+    }))
+
+    if (!res.headersSent) {
+      setJsonHeaders(res)
+      res.status(500).json({
+        error: 'Onverwachte serverfout.',
+        code: 'ADMIN_HANDLER_CRASH'
+      })
+    }
+  }
+}
+
+// Handler for DELETE /:id
+async function handleDelete(req, res, auth, directorId) {
+  try {
+    const [mongoModule, userModule] = await Promise.all([
+      import('../../../src/server/lib/mongodb.js'),
+      import('../../../src/server/models/User.js')
+    ])
+
+    const { connectToDatabase } = mongoModule
+    const { User } = userModule
+
+    await connectToDatabase()
+
+    if (req.method !== 'DELETE') {
+      res.setHeader('Allow', ['DELETE'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
+    }
+
+    if (!directorId) {
+      res.status(400).json({ error: 'Ongeldig account-id.' })
+      return
+    }
+
+    const director = await User.findOne({ _id: directorId, role: 'funeral_director' })
+    if (!director) {
+      res.status(404).json({ error: 'Uitvaartondernemer niet gevonden.' })
+      return
+    }
+
+    await User.deleteOne({ _id: directorId })
+
+    await User.updateMany(
+      { role: 'editor', funeralDirectorId: director._id },
+      { $set: { funeralDirectorId: null } }
+    )
+
+    res.status(200).json({ message: 'Uitvaartondernemer verwijderd.' })
+  } catch (error) {
+    console.error('deleteFuneralDirector error:', error)
+    res.status(500).json({ error: 'Kon uitvaartondernemer niet verwijderen.' })
+  }
+}
+
+export default async function handler(req, res) {
+  try {
+    setJsonHeaders(res)
+
+    const [authModule] = await Promise.all([
+      import('../../../src/server/middleware/authMiddleware.js')
+    ])
+
+    const { requireAuth, requireRole } = authModule
+
+    const auth = requireAuth(req, res)
+    if (!auth) return
+    if (!requireRole(auth, res, 'admin')) return
+
+    const path = Array.isArray(req.query.path) ? req.query.path : []
+    const directorId = path.length > 0 ? path[0] : null
+
+    if (!directorId) {
+      // No ID provided - handle list/create
+      return handleListCreate(req, res, auth)
+    }
+
+    // ID provided - handle delete
+    return handleDelete(req, res, auth, directorId)
+  } catch (error) {
+    console.error('ADMIN_FUNERAL_DIRECTORS_HANDLER unhandled crash', buildDiagnostics(req, {
+      stage: 'main handler',
       errorMessage: error?.message,
       errorName: error?.name,
       stack: error?.stack
