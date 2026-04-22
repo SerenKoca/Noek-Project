@@ -5,7 +5,7 @@ body {
   overflow-y: auto;
   background: var(--editor-bg-page);
   color: var(--editor-text);
-  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-family: 'Poppins', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
 }
 
 #app {
@@ -1279,7 +1279,8 @@ body {
   font-size: 0.9rem;
 }
 
-.auth-field-v2 input {
+.auth-field-v2 input,
+.auth-field-v2 select {
   border: 1px solid #c5d8eb;
   border-radius: 10px;
   padding: 12px 13px;
@@ -1743,6 +1744,7 @@ body {
 .auth-hero-v2 p,
 .auth-field-v2 span,
 .auth-field-v2 input,
+.auth-field-v2 select,
 .home-main-v2,
 .home-page-v2,
 .settings-page-v2 {
@@ -1750,6 +1752,7 @@ body {
 }
 
 .auth-field-v2 input,
+.auth-field-v2 select,
 .modal-card input,
 .auth-row input {
   border-color: var(--editor-border);

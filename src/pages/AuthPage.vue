@@ -1,10 +1,25 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
+import './styles/auth-page.css'
 
 const router = useRouter()
 const state = useNoekState()
+
+const isEditorRole = computed(() => state.authRegisterRole.value === 'editor')
+
+const authTitle = computed(() => {
+  if (state.authMode.value !== 'register') return 'Welkom terug'
+  return isEditorRole.value ? 'Editor account aanmaken' : 'Bezoekersaccount aanmaken'
+})
+
+const authSubtitle = computed(() => {
+  if (state.authMode.value !== 'register') return 'Log in om aan de reis te beginnen'
+  return isEditorRole.value
+    ? 'Gebruik je registratiecode om een kamer te creëren en herinneringen te delen'
+    : 'Met een account zal je samen gemakkelijker herinneringen kunnen delen en bewaren.'
+})
 
 function getRouteByRole(role) {
   if (role === 'admin') return '/admin'
@@ -35,14 +50,30 @@ async function submitAuth() {
     <div class="auth-page-v2">
       <div class="auth-card-v2">
         <div class="auth-hero-v2">
-          <div class="auth-logo-v2">NOEK</div>
-          <h1>{{ state.authMode.value === 'register' ? 'Welkom bij jouw herinneringsruimte' : 'Welkom terug' }}</h1>
-          <p>
-            {{ state.authMode.value === 'register' ? 'Maak een account aan om een kamer te starten.' : 'Log in om je kamers en bijdragen te beheren.' }}
-          </p>
+          <div class="auth-logo-v2">
+            <img src="/img/logo-noek.svg" alt="Noek logo" class="auth-logo-image-v2" />
+          </div>
+          <h1>{{ authTitle }}</h1>
+          <p>{{ authSubtitle }}</p>
+          <div class="auth-candle-scene-v2" aria-hidden="true">
+            <div class="auth-candle-v2 is-large">
+              <span class="auth-candle-flame-v2"></span>
+              <span class="auth-candle-wax-v2"></span>
+            </div>
+            <div class="auth-candle-v2 is-small">
+              <span class="auth-candle-flame-v2"></span>
+              <span class="auth-candle-wax-v2"></span>
+            </div>
+          </div>
         </div>
 
         <form class="auth-form-v2" @submit.prevent="submitAuth">
+
+          <label v-if="state.authMode.value === 'register'" class="auth-field-v2">
+            <span>Naam</span>
+            <input v-model="state.authDisplayName.value" type="text" placeholder="voor- en achternaam" autocomplete="nickname" />
+          </label>
+
           <label class="auth-field-v2">
             <span>Email</span>
             <input v-model="state.authEmail.value" type="email" placeholder="voer je email in" autocomplete="email" />
@@ -58,10 +89,7 @@ async function submitAuth() {
             />
           </label>
 
-          <label v-if="state.authMode.value === 'register'" class="auth-field-v2">
-            <span>Naam</span>
-            <input v-model="state.authDisplayName.value" type="text" placeholder="voor- en achternaam" autocomplete="nickname" />
-          </label>
+
 
           <label v-if="state.authMode.value === 'register'" class="auth-field-v2">
             <span>Accounttype</span>
@@ -71,7 +99,7 @@ async function submitAuth() {
             </select>
           </label>
 
-          <label v-if="state.authMode.value === 'register' && state.authRegisterRole.value === 'editor'" class="auth-field-v2">
+          <label v-if="state.authMode.value === 'register' && isEditorRole" class="auth-field-v2">
             <span>Registratiecode</span>
             <input
               v-model="state.authRegistrationCode.value"
@@ -93,9 +121,9 @@ async function submitAuth() {
             {{ state.authMode.value === 'register' ? 'Ik heb al een account' : 'Nog geen account? Registreren' }}
           </button>
 
-          <p v-if="state.authMode.value === 'login'" class="auth-info-inline">
-            Login mogelijk voor: admin, uitvaartondernemer, editor en bezoeker.
-          </p>
+          <!-- <p v-if="state.authMode.value === 'login'" class="auth-info-inline">
+            Login mogelijk voor: Uitvaartondernemers,  en bezoeker.
+          </p> -->
 
           <div v-if="state.authStatus.value" class="auth-status-v2" :class="state.authStatusType.value">{{ state.authStatus.value }}</div>
         </form>
@@ -103,5 +131,3 @@ async function submitAuth() {
     </div>
   </div>
 </template>
-
-<style src="./styles/auth-page.css"></style>

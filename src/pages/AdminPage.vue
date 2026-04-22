@@ -3,6 +3,8 @@ import { onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
 import { createFuneralDirector, deleteFuneralDirector, getFuneralDirectors } from '../services/adminService.js'
+import './styles/home-page.css'
+import './styles/auth-page.css'
 
 const router = useRouter()
 const state = useNoekState()
@@ -168,6 +170,3 @@ async function logout() {
     </div>
   </div>
 </template>
-
-<style src="./styles/home-page.css"></style>
-<style src="./styles/auth-page.css"></style>
