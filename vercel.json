@@ -14,6 +14,14 @@
       "destination": "/api/public-handler?path=:path*"
     },
     {
+      "source": "/api/me/:path*",
+      "destination": "/api/me/[...path]"
+    },
+    {
+      "source": "/api/director/:path*",
+      "destination": "/api/director/[...path]"
+    },
+    {
       "source": "/((?!api(?:/|$)).*)",
       "destination": "/index.html"
     }
