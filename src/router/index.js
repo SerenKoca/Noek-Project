@@ -8,6 +8,7 @@ import ProfilePage from '../pages/ProfilePage.vue'
 import VisitorRoomPage from '../pages/VisitorRoomPage.vue'
 import AdminPage from '../pages/AdminPage.vue'
 import DirectorPage from '../pages/DirectorPage.vue'
+import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
 
 const APP_TITLE = 'Noek'
 
@@ -139,9 +140,24 @@ const router = createRouter({
   ]
 })
 
+let navigationToken = null
+
+router.beforeEach((to, from, next) => {
+  endGlobalLoading(navigationToken)
+  navigationToken = startGlobalLoading()
+  next()
+})
+
 router.afterEach((to) => {
+  endGlobalLoading(navigationToken)
+  navigationToken = null
   const routeTitle = typeof to.meta?.title === 'string' ? to.meta.title.trim() : ''
   document.title = routeTitle ? `${routeTitle} | ${APP_TITLE}` : APP_TITLE
+})
+
+router.onError(() => {
+  endGlobalLoading(navigationToken)
+  navigationToken = null
 })
 
 export default router

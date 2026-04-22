@@ -353,7 +353,7 @@ async function uploadToCloudinary(file, resourceType) {
   return response.json()
 }
 
-async function loadRooms() {
+async function loadRooms(options = {}) {
   if (!authState.value?.token) {
     rooms.value = []
     return
@@ -365,7 +365,7 @@ async function loadRooms() {
   }
 
   try {
-    rooms.value = await getRooms()
+    rooms.value = await getRooms({ skipLoader: options.skipLoader === true })
   } catch (error) {
     console.error('Failed to load rooms', error)
     rooms.value = []
@@ -972,7 +972,7 @@ async function onSave() {
     }
     saveStatus.value = `Kamer "${saved.name || 'naamloos'}" is succesvol opgeslagen!`
     saveStatusType.value = 'success'
-    await loadRooms()
+    await loadRooms({ skipLoader: true })
 
     if (!currentRoom.value) {
       currentRoom.value = saved

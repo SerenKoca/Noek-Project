@@ -1,6 +1,8 @@
+import { trackPromiseWithGlobalLoader } from './globalLoading.js'
+
 export async function getSoundLibrary() {
   try {
-    const response = await fetch('/sounds/sound-manifest.json', { cache: 'no-store' })
+    const response = await trackPromiseWithGlobalLoader(fetch('/sounds/sound-manifest.json', { cache: 'no-store' }))
     if (!response.ok) {
       return { sounds: [], error: 'Kon geluidsbibliotheek niet laden.' }
     }

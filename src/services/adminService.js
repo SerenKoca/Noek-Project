@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getAuthToken } from './authService.js'
+import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
 
@@ -10,6 +11,8 @@ const http = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+attachGlobalLoaderToAxios(http)
 
 http.interceptors.request.use((config) => {
   const token = getAuthToken()

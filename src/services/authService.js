@@ -1,4 +1,5 @@
 import axios from 'axios'
+import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 const AUTH_STORAGE_KEY = 'noek_auth'
 const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
@@ -10,6 +11,8 @@ const http = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+attachGlobalLoaderToAxios(http)
 
 function safeParse(json) {
   try {

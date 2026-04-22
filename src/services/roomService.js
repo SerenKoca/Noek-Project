@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { getAuthToken } from './authService.js'
+import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
 
@@ -10,6 +11,8 @@ const http = axios.create({
     'Content-Type': 'application/json'
   }
 })
+
+attachGlobalLoaderToAxios(http)
 
 http.interceptors.request.use((config) => {
   const token = getAuthToken()
@@ -34,13 +37,17 @@ export async function deleteRoom(roomId) {
   return response.data
 }
 
-export async function getRooms() {
-  const response = await http.get('/rooms')
+export async function getRooms(options = {}) {
+  const response = await http.get('/rooms', {
+    loader: { skip: options.skipLoader === true }
+  })
   return response.data
 }
 
-export async function getRoomContributions(roomId) {
-  const response = await http.get(`/rooms/${roomId}/contributions`)
+export async function getRoomContributions(roomId, options = {}) {
+  const response = await http.get(`/rooms/${roomId}/contributions`, {
+    loader: { skip: options.skipLoader === true }
+  })
   return response.data
 }
 
@@ -80,7 +87,9 @@ export async function addRoomComment(roomId, payload) {
   return response.data
 }
 
-export async function getMyContributions() {
-  const response = await http.get('/me/contributions')
+export async function getMyContributions(options = {}) {
+  const response = await http.get('/me/contributions', {
+    loader: { skip: options.skipLoader === true }
+  })
   return response.data
 }

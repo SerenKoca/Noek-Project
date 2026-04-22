@@ -4,6 +4,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
+import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
 
 const props = defineProps({
   loadRequest: {
@@ -783,6 +784,8 @@ async function loadModelAsset({ url, title, id, replaceRoot = null }) {
     throw new Error('Missing model URL')
   }
 
+  const loadingToken = startGlobalLoading()
+
   return new Promise((resolve, reject) => {
     loader.load(
       url,
@@ -829,6 +832,8 @@ async function loadModelAsset({ url, title, id, replaceRoot = null }) {
       undefined,
       (err) => reject(err)
     )
+  }).finally(() => {
+    endGlobalLoading(loadingToken)
   })
 }
 
@@ -876,9 +881,14 @@ watch(
   [() => props.roomData, sceneReady],
   async ([newRoomData, ready]) => {
     if (!ready || !newRoomData) return
+    const roomHydrationToken = startGlobalLoading()
     // Wait for next tick to ensure scene is ready
-    await nextTick()
-    await loadRoom(newRoomData)
+    try {
+      await nextTick()
+      await loadRoom(newRoomData)
+    } finally {
+      endGlobalLoading(roomHydrationToken)
+    }
   },
   { immediate: true }
 )

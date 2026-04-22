@@ -1,5 +1,6 @@
 import axios from 'axios'
 import { fallbackModels } from './fallbackModels'
+import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 // Derived strictly from the provided OpenAPI YAML:
 // - Server base URL: https://api.poly.pizza/v1.1 (proxy-able in dev)
@@ -39,6 +40,8 @@ const http = axios.create({
   baseURL: API_BASE_URL,
   timeout: 15_000
 })
+
+attachGlobalLoaderToAxios(http)
 
 function getAuthHeaders() {
   const apiKey = import.meta.env.VITE_POLYPIZZA_API_KEY
