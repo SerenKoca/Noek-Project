@@ -30,6 +30,22 @@ function sanitizeUser(user) {
   }
 }
 
+const DEFAULT_BRAND_DARK = '#1e2b37'
+const DEFAULT_BRAND_LIGHT = '#d7e1eb'
+
+function normalizeHexColor(input, fallback) {
+  const value = String(input || '').trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(value) ? value : fallback
+}
+
+function sanitizeBranding(user) {
+  return {
+    logoUrl: String(user?.brandLogoUrl || '').trim(),
+    darkColor: normalizeHexColor(user?.brandDarkColor, DEFAULT_BRAND_DARK),
+    lightColor: normalizeHexColor(user?.brandLightColor, DEFAULT_BRAND_LIGHT)
+  }
+}
+
 // Handler for GET/POST (list and create)
 async function handleListCreate(req, res, auth) {
   try {
@@ -189,6 +205,86 @@ async function handleDelete(req, res, auth, directorId) {
   }
 }
 
+async function handleDetails(req, res, directorId) {
+  try {
+    const [mongoModule, userModule, roomModule] = await Promise.all([
+      import('../../../src/server/lib/mongodb.js'),
+      import('../../../src/server/models/User.js'),
+      import('../../../backend/models/Room.js')
+    ])
+
+    const { connectToDatabase } = mongoModule
+    const { User } = userModule
+    const Room = roomModule.default
+
+    await connectToDatabase()
+
+    if (req.method !== 'GET') {
+      res.setHeader('Allow', ['GET'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
+    }
+
+    if (!directorId) {
+      res.status(400).json({ error: 'Ongeldig account-id.' })
+      return
+    }
+
+    const director = await User.findOne({ _id: directorId, role: 'funeral_director' })
+    if (!director) {
+      res.status(404).json({ error: 'Uitvaartondernemer niet gevonden.' })
+      return
+    }
+
+    const editors = await User.find({ role: 'editor', funeralDirectorId: director._id }).sort({ createdAt: -1 })
+    const editorIdList = Array.from(new Set(editors.map((item) => String(item._id))))
+
+    const rooms = editorIdList.length
+      ? await Room.find({ ownerId: { $in: editorIdList } }).sort({ createdAt: -1 })
+      : []
+
+    const roomsByOwnerId = new Map()
+    for (const room of rooms) {
+      const ownerId = String(room.ownerId || '')
+      if (!roomsByOwnerId.has(ownerId)) {
+        roomsByOwnerId.set(ownerId, [])
+      }
+      roomsByOwnerId.get(ownerId).push({
+        id: room._id,
+        name: room.name,
+        isPublic: room.isPublic,
+        createdAt: room.createdAt
+      })
+    }
+
+    const clients = editors.map((item) => {
+      const key = String(item._id)
+      const ownedRooms = roomsByOwnerId.get(key) || []
+      return {
+        id: item._id,
+        email: item.email,
+        displayName: item.displayName,
+        createdAt: item.createdAt,
+        roomCount: ownedRooms.length,
+        rooms: ownedRooms
+      }
+    })
+
+    res.status(200).json({
+      director: sanitizeUser(director),
+      branding: sanitizeBranding(director),
+      stats: {
+        clientCount: clients.length,
+        roomCount: rooms.length
+      },
+      clients
+    })
+  } catch (error) {
+    console.error('getFuneralDirectorDetails error:', error)
+    res.status(500).json({ error: 'Kon details van uitvaartondernemer niet ophalen.' })
+  }
+}
+
 export default async function handler(req, res) {
   try {
     setJsonHeaders(res)
@@ -210,10 +306,15 @@ export default async function handler(req, res) {
     const remaining = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
     const segments = remaining.split('/').filter(Boolean)
     const directorId = segments.length > 0 ? segments[0] : null
+    const subPath = segments.length > 1 ? segments[1] : null
 
     if (!directorId) {
       // No ID provided - handle list/create
       return handleListCreate(req, res, auth)
+    }
+
+    if (subPath === 'details') {
+      return handleDetails(req, res, directorId)
     }
 
     // ID provided - handle delete

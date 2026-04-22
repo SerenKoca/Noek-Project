@@ -36,3 +36,8 @@ export async function deleteFuneralDirector(id) {
   const response = await http.delete(`/admin/funeral-directors/${id}`)
   return response.data
 }
+
+export async function getFuneralDirectorDetails(id) {
+  const response = await http.get(`/admin/funeral-directors/${id}/details`)
+  return response.data
+}
