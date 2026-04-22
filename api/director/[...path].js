@@ -54,8 +54,8 @@ async function generateUniqueCode(EditorRegistrationCodeModel) {
 async function handleBranding(req, res, auth) {
   try {
     const [mongoModule, userModule] = await Promise.all([
-      import('../../../src/server/lib/mongodb.js'),
-      import('../../../src/server/models/User.js')
+      import('../../src/server/lib/mongodb.js'),
+      import('../../src/server/models/User.js')
     ])
 
     const { connectToDatabase } = mongoModule
@@ -116,8 +116,8 @@ async function handleEditors(req, res, auth) {
     }
 
     const [mongoModule, userModule] = await Promise.all([
-      import('../../../src/server/lib/mongodb.js'),
-      import('../../../src/server/models/User.js')
+      import('../../src/server/lib/mongodb.js'),
+      import('../../src/server/models/User.js')
     ])
 
     const { connectToDatabase } = mongoModule
@@ -187,8 +187,8 @@ async function handleEditors(req, res, auth) {
 async function handleEditorCodes(req, res, auth) {
   try {
     const [mongoModule, editorCodeModule] = await Promise.all([
-      import('../../../src/server/lib/mongodb.js'),
-      import('../../../src/server/models/EditorRegistrationCode.js')
+      import('../../src/server/lib/mongodb.js'),
+      import('../../src/server/models/EditorRegistrationCode.js')
     ])
 
     const { connectToDatabase } = mongoModule
@@ -302,7 +302,7 @@ export default async function handler(req, res) {
     setJsonHeaders(res)
 
     const [authModule] = await Promise.all([
-      import('../../../src/server/middleware/authMiddleware.js')
+      import('../../src/server/middleware/authMiddleware.js')
     ])
 
     const { requireAuth, requireRole } = authModule
@@ -311,7 +311,13 @@ export default async function handler(req, res) {
     if (!auth) return
     if (!requireRole(auth, res, 'funeral_director')) return
 
-    const path = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path || ''
+    // Extract the path segment from req.url
+    const url = new URL(req.url || '/', 'http://localhost')
+    const pathname = url.pathname
+    const basePath = '/api/director'
+    const remaining = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
+    const segments = remaining.split('/').filter(Boolean)
+    const path = segments[0] || ''
 
     if (path === 'branding') {
       return handleBranding(req, res, auth)

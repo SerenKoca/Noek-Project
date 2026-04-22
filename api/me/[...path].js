@@ -106,8 +106,13 @@ export default async function handler(req, res) {
   const auth = requireAuth(req, res)
   if (!auth) return
 
-  // Extract the path segment from the catch-all param
-  const path = Array.isArray(req.query.path) ? req.query.path[0] : req.query.path || ''
+  // Extract the path segment from req.url
+  const url = new URL(req.url || '/', 'http://localhost')
+  const pathname = url.pathname
+  const basePath = '/api/me'
+  const remaining = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
+  const segments = remaining.split('/').filter(Boolean)
+  const path = segments[0] || ''
 
   if (path === 'branding') {
     return handleBranding(req, res, auth)

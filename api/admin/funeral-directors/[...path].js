@@ -203,8 +203,13 @@ export default async function handler(req, res) {
     if (!auth) return
     if (!requireRole(auth, res, 'admin')) return
 
-    const path = Array.isArray(req.query.path) ? req.query.path : []
-    const directorId = path.length > 0 ? path[0] : null
+    // Extract the path segment from req.url
+    const url = new URL(req.url || '/', 'http://localhost')
+    const pathname = url.pathname
+    const basePath = '/api/admin/funeral-directors'
+    const remaining = pathname.startsWith(basePath) ? pathname.slice(basePath.length) : ''
+    const segments = remaining.split('/').filter(Boolean)
+    const directorId = segments.length > 0 ? segments[0] : null
 
     if (!directorId) {
       // No ID provided - handle list/create
