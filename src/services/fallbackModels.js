@@ -91,5 +91,77 @@ export const fallbackModels = [
     Attribution:
       'Fox Hat by J-Toastie, https://poly.pizza/m/vIhmiBqBtr. Licence at https://creativecommons.org/licenses/by/3.0',
     Licence: 'CC-BY 3.0'
+  },
+  {
+    ID: 'AnzHB44wlW',
+    Title: 'Candles',
+    Thumbnail: 'https://static.poly.pizza/39564825-7671-42df-a1e4-6b48df6a80d6.webp',
+    Download: 'https://static.poly.pizza/39564825-7671-42df-a1e4-6b48df6a80d6.glb',
+    Attribution:
+      '"Candles" by Quaternius, https://poly.pizza/m/AnzHB44wlW. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: '94tuTO5eJv',
+    Title: 'Skull Candle',
+    Thumbnail: 'https://static.poly.pizza/d61ccc1f-5a41-4acb-92d4-1a793399b659.webp',
+    Download: 'https://static.poly.pizza/d61ccc1f-5a41-4acb-92d4-1a793399b659.glb',
+    Attribution:
+      '"Skull Candle" by Kay Lousberg, https://poly.pizza/m/94tuTO5eJv. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: 'tknOVwxT8B',
+    Title: 'Candlestick',
+    Thumbnail: 'https://static.poly.pizza/e6c65b91-0e3a-45f6-8e9e-9da5faa3f91d.webp',
+    Download: 'https://static.poly.pizza/e6c65b91-0e3a-45f6-8e9e-9da5faa3f91d.glb',
+    Attribution:
+      '"Candlestick" by CreativeTrio, https://poly.pizza/m/tknOVwxT8B. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: 'ZOPP3KzNIk',
+    Title: 'Couch Small',
+    Thumbnail: 'https://static.poly.pizza/4e8fbbf3-9992-4068-8918-2126a0304127.webp',
+    Download: 'https://static.poly.pizza/4e8fbbf3-9992-4068-8918-2126a0304127.glb',
+    Attribution:
+      '"Couch Small" by Quaternius, https://poly.pizza/m/ZOPP3KzNIk. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: 'myd1WSucAz',
+    Title: 'Armchair',
+    Thumbnail: 'https://static.poly.pizza/2584a961-1b06-4fb7-ba7d-1074b52ca908.webp',
+    Download: 'https://static.poly.pizza/2584a961-1b06-4fb7-ba7d-1074b52ca908.glb',
+    Attribution:
+      '"Armchair" by CreativeTrio, https://poly.pizza/m/myd1WSucAz. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: 'rAEBvfb1FT',
+    Title: 'Small Table',
+    Thumbnail: 'https://static.poly.pizza/0f319f3b-b0d6-4691-bae5-c6c6e612df99.webp',
+    Download: 'https://static.poly.pizza/0f319f3b-b0d6-4691-bae5-c6c6e612df99.glb',
+    Attribution:
+      '"Small Table" by Quaternius, https://poly.pizza/m/rAEBvfb1FT. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: '9trLeWoBek',
+    Title: 'Television',
+    Thumbnail: 'https://static.poly.pizza/1ddcd36c-ac9e-4dc2-a056-846cea033c02.webp',
+    Download: 'https://static.poly.pizza/1ddcd36c-ac9e-4dc2-a056-846cea033c02.glb',
+    Attribution:
+      '"Television" by Kenney, https://poly.pizza/m/9trLeWoBek. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
+  },
+  {
+    ID: 'tACDGJ4CGW',
+    Title: 'Bookcase with Books',
+    Thumbnail: 'https://static.poly.pizza/7d59d0aa-6447-4bbb-afc7-0452e9a34353.webp',
+    Download: 'https://static.poly.pizza/7d59d0aa-6447-4bbb-afc7-0452e9a34353.glb',
+    Attribution:
+      '"Bookcase with Books" by Quaternius, https://poly.pizza/m/tACDGJ4CGW. Licence at https://creativecommons.org/publicdomain/zero/1.0/',
+    Licence: 'CC0 1.0'
   }
 ]

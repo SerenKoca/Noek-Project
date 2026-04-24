@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
+import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 
 const props = defineProps({
   loadRequest: {
@@ -49,7 +50,7 @@ const sceneReady = ref(false)
 const loader = new GLTFLoader()
 
 // Keep incoming assets within a predictable size range for easier placement.
-const MODEL_SIZE_TARGET = 24
+const MODEL_SIZE_TARGET = 10
 const MODEL_SCALE_MIN = 0.5
 const MODEL_SCALE_MAX = 20
 const START_CAMERA = new THREE.Vector3(-83.47, 66.5, 81.55)
@@ -68,17 +69,212 @@ const ROOM_SIZE = 34
 const WALL_HEIGHT = 19
 const DEFAULT_FLOOR_COLOR = '#c0b496'
 const DEFAULT_WALL_COLOR = '#8f98a3'
+const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
 
-const FURNITURE_SLOTS = [
-  { id: 'slot-sofa', position: new THREE.Vector3(10, 0, -12), rotationY: Math.PI },
-  { id: 'slot-table', position: new THREE.Vector3(9, 0, -15), rotationY: Math.PI * 0.5 },
-  { id: 'slot-tv', position: new THREE.Vector3(14, 0, -9), rotationY: Math.PI },
-  { id: 'slot-shelf', position: new THREE.Vector3(6, 0, -8), rotationY: Math.PI * 0.5 }
-]
+function normalizeTemplateSlots(slots = []) {
+  return Array.isArray(slots)
+    ? slots
+      .map((slot) => ({
+        ...slot,
+        accepts: Array.isArray(slot?.accepts) && slot.accepts.length ? [...slot.accepts] : ['meubel'],
+        position: Array.isArray(slot?.position)
+          ? new THREE.Vector3(Number(slot.position[0]) || 0, Number(slot.position[1]) || 0, Number(slot.position[2]) || 0)
+          : slot?.position?.isVector3
+            ? slot.position.clone()
+            : new THREE.Vector3(0, 0, 0),
+        rotationY: Number(slot?.rotationY) || 0,
+        initialModel: slot?.initialModel || null
+      }))
+      .filter((slot) => String(slot?.id || '').trim())
+    : []
+}
+
+function cloneTemplateSlots(slots = []) {
+  return slots.map((slot) => ({
+    ...slot,
+    accepts: Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel'],
+    position: slot?.position?.isVector3 ? slot.position.clone() : new THREE.Vector3(0, 0, 0),
+    initialModel: slot?.initialModel ? { ...slot.initialModel } : null
+  }))
+}
+
+const BASE_TEMPLATE_SLOTS = normalizeTemplateSlots(ROOM_TEMPLATE?.slots || [])
+const TEMPLATE_SLOTS = cloneTemplateSlots(BASE_TEMPLATE_SLOTS)
+const TEMPLATE_SLOT_BY_ID = new Map(TEMPLATE_SLOTS.map((slot) => [slot.id, slot]))
 
 const slotStates = new Map()
 let floorMaterial = null
 let wallMaterial = null
+const templateEditorOpen = ref(false)
+const templateEditorMessage = ref('')
+const templateEditorSlotId = ref(TEMPLATE_SLOTS[0]?.id || '')
+const templateDraft = ref({
+  x: 0,
+  y: 0,
+  z: 0,
+  rotationDeg: 0,
+  acceptsMeubel: true,
+  acceptsPersoonlijk: false,
+  acceptsDecoratie: false
+})
+
+function getTemplateSlot(slotId = templateEditorSlotId.value) {
+  return TEMPLATE_SLOT_BY_ID.get(String(slotId || '')) || null
+}
+
+function writeDraftFromSlot(slotId = templateEditorSlotId.value) {
+  const slot = getTemplateSlot(slotId)
+  if (!slot) return
+
+  const accepts = Array.isArray(slot.accepts) ? slot.accepts : []
+  templateDraft.value = {
+    x: Number(slot.position?.x || 0).toFixed(2),
+    y: Number(slot.position?.y || 0).toFixed(2),
+    z: Number(slot.position?.z || 0).toFixed(2),
+    rotationDeg: Number((slot.rotationY * 180) / Math.PI).toFixed(1),
+    acceptsMeubel: accepts.includes('meubel') || accepts.includes('alles'),
+    acceptsPersoonlijk: accepts.includes('persoonlijk') || accepts.includes('alles'),
+    acceptsDecoratie: accepts.includes('decoratie') || accepts.includes('alles')
+  }
+}
+
+function applyTemplateSlotToScene(slotId) {
+  const slot = getTemplateSlot(slotId)
+  const slotState = slotStates.get(slotId)
+  if (!slot || !slotState) return
+
+  slotState.position.copy(slot.position)
+  slotState.rotationY = slot.rotationY
+  slotState.label = String(slot?.label || slot.id)
+  slotState.accepts = Array.isArray(slot.accepts) ? [...slot.accepts] : ['meubel']
+
+  if (slotState.root) {
+    slotState.root.position.copy(slot.position)
+    const yOffset = Number(slotState.root.userData?.rotationYOffset || 0)
+    slotState.root.rotation.set(0, slot.rotationY + yOffset, 0)
+    slotState.root.userData.slotLabel = slotState.label
+    slotState.root.userData.slotAccepts = [...slotState.accepts]
+  }
+
+  if (slotState.marker) {
+    slotState.marker.position.copy(slot.position)
+    slotState.marker.rotation.set(0, slot.rotationY, 0)
+    slotState.marker.userData.slotLabel = slotState.label
+    slotState.marker.userData.slotAccepts = [...slotState.accepts]
+    slotState.marker.userData.title = `Plaats hier (${slotState.label})`
+  }
+
+  if (selectedRoot?.userData?.slotId === slotId) {
+    select(selectedRoot)
+  }
+}
+
+function applyTemplateDraft() {
+  const slot = getTemplateSlot()
+  if (!slot) return
+
+  const x = Number(templateDraft.value.x)
+  const y = Number(templateDraft.value.y)
+  const z = Number(templateDraft.value.z)
+  const rotationDeg = Number(templateDraft.value.rotationDeg)
+
+  if (![x, y, z, rotationDeg].every(Number.isFinite)) {
+    templateEditorMessage.value = 'Gebruik geldige numerieke waarden voor positie en rotatie.'
+    return
+  }
+
+  const accepts = []
+  if (templateDraft.value.acceptsMeubel) accepts.push('meubel')
+  if (templateDraft.value.acceptsPersoonlijk) accepts.push('persoonlijk')
+  if (templateDraft.value.acceptsDecoratie) accepts.push('decoratie')
+
+  if (!accepts.length) {
+    templateEditorMessage.value = 'Selecteer minstens 1 toegestaan type.'
+    return
+  }
+
+  slot.position.set(x, y, z)
+  slot.rotationY = (rotationDeg * Math.PI) / 180
+  slot.accepts = accepts
+  applyTemplateSlotToScene(slot.id)
+  templateEditorMessage.value = 'Template slot bijgewerkt.'
+}
+
+function getTemplateSnapshot() {
+  return TEMPLATE_SLOTS.map((slot) => ({
+    id: slot.id,
+    label: slot.label,
+    accepts: Array.isArray(slot.accepts) ? [...slot.accepts] : ['meubel'],
+    position: [slot.position.x, slot.position.y, slot.position.z],
+    rotationY: slot.rotationY,
+    initialModel: slot.initialModel ? { ...slot.initialModel } : null
+  }))
+}
+
+function saveTemplateToLocalStorage() {
+  try {
+    localStorage.setItem(ROOM_TEMPLATE_STORAGE_KEY, JSON.stringify(getTemplateSnapshot()))
+    templateEditorMessage.value = 'Template lokaal opgeslagen.'
+  } catch {
+    templateEditorMessage.value = 'Opslaan mislukt (localStorage niet beschikbaar).'
+  }
+}
+
+function restoreTemplateFromBase() {
+  const baseById = new Map(BASE_TEMPLATE_SLOTS.map((slot) => [slot.id, slot]))
+  for (const slot of TEMPLATE_SLOTS) {
+    const base = baseById.get(slot.id)
+    if (!base) continue
+    slot.label = base.label
+    slot.accepts = Array.isArray(base.accepts) ? [...base.accepts] : ['meubel']
+    slot.position.copy(base.position)
+    slot.rotationY = base.rotationY
+    slot.initialModel = base.initialModel ? { ...base.initialModel } : null
+    applyTemplateSlotToScene(slot.id)
+  }
+}
+
+function resetTemplateDefaults() {
+  try {
+    localStorage.removeItem(ROOM_TEMPLATE_STORAGE_KEY)
+  } catch {
+    // ignore
+  }
+
+  restoreTemplateFromBase()
+  writeDraftFromSlot()
+  templateEditorMessage.value = 'Template hersteld naar standaard.'
+}
+
+function applyStoredTemplateIfAny() {
+  let parsed = null
+  try {
+    const raw = localStorage.getItem(ROOM_TEMPLATE_STORAGE_KEY)
+    parsed = raw ? JSON.parse(raw) : null
+  } catch {
+    parsed = null
+  }
+
+  if (!Array.isArray(parsed) || parsed.length === 0) return
+
+  const byId = new Map(parsed.map((slot) => [String(slot?.id || ''), slot]))
+  for (const slot of TEMPLATE_SLOTS) {
+    const saved = byId.get(slot.id)
+    if (!saved) continue
+    if (Array.isArray(saved.position) && saved.position.length >= 3) {
+      slot.position.set(Number(saved.position[0]) || 0, Number(saved.position[1]) || 0, Number(saved.position[2]) || 0)
+    }
+    if (Number.isFinite(Number(saved.rotationY))) {
+      slot.rotationY = Number(saved.rotationY)
+    }
+    if (Array.isArray(saved.accepts) && saved.accepts.length) {
+      slot.accepts = [...saved.accepts]
+    }
+    if (typeof saved.label === 'string' && saved.label.trim()) {
+      slot.label = saved.label.trim()
+    }
+  }
+}
 
 function toColorHex(value, fallback) {
   const input = String(value || '').trim().toLowerCase()
@@ -203,6 +399,7 @@ function createScene() {
   scene.add(rightWall)
 
   initializeFurnitureSlots()
+  hydrateCuratedDefaultFurniture()
   deselect()
 
   // Event handlers
@@ -388,9 +585,11 @@ function updateSelectedAnchor() {
 }
 
 function initializeFurnitureSlots() {
-  for (const slot of FURNITURE_SLOTS) {
+  for (const slot of TEMPLATE_SLOTS) {
     slotStates.set(slot.id, {
       id: slot.id,
+      label: String(slot?.label || slot.id),
+      accepts: Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel'],
       position: slot.position.clone(),
       rotationY: slot.rotationY,
       root: null,
@@ -402,13 +601,39 @@ function initializeFurnitureSlots() {
   }
 }
 
+async function hydrateCuratedDefaultFurniture() {
+  for (const slot of TEMPLATE_SLOTS) {
+    const curated = slot.initialModel
+    if (!curated?.url) continue
+
+    try {
+      await loadModelAsset({
+        url: curated.url,
+        title: curated.title || slot.label || slot.id,
+        id: curated.id || slot.id,
+        replaceRoot: { slotId: slot.id },
+        transform: {
+          scaleMultiplier: curated.scaleMultiplier,
+          rotationYOffset: curated.rotationYOffset,
+          yOffset: curated.yOffset
+        }
+      })
+    } catch (error) {
+      // Keep placeholder furniture when remote model loading fails.
+      console.warn(`Curated default model failed for ${slot.id}:`, error?.message || error)
+    }
+  }
+}
+
 function createDefaultFurnitureForSlot(slot) {
   const root = new THREE.Group()
   root.userData.isRootModel = true
   root.userData.isSlotMarker = false
   root.userData.slotId = slot.id
+  root.userData.slotLabel = String(slot?.label || slot.id)
+  root.userData.slotAccepts = Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel']
   root.userData.id = slot.id
-  root.userData.title = slot.id.replace('slot-', '').replace('-', ' ')
+  root.userData.title = String(slot?.label || slot.id.replace('slot-', '').replace('-', ' '))
 
   const material = new THREE.MeshStandardMaterial({ color: 0xc6b89b, roughness: 0.95, metalness: 0 })
 
@@ -444,12 +669,15 @@ function createDefaultFurnitureForSlot(slot) {
 }
 
 function createSlotMarker(slotId) {
+  const slot = TEMPLATE_SLOT_BY_ID.get(slotId)
   const root = new THREE.Group()
   root.userData.isRootModel = true
   root.userData.isSlotMarker = true
   root.userData.slotId = slotId
+  root.userData.slotLabel = String(slot?.label || slotId)
+  root.userData.slotAccepts = Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel']
   root.userData.id = `marker-${slotId}`
-  root.userData.title = 'Plaats hier'
+  root.userData.title = `Plaats hier (${root.userData.slotLabel})`
 
   const markerMat = new THREE.MeshStandardMaterial({ color: 0x2b7dd8, roughness: 0.75, metalness: 0.1 })
   const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.12), markerMat)
@@ -476,9 +704,12 @@ function assignRootToSlot(root, slotId) {
   }
 
   root.userData.slotId = slotId
+  root.userData.slotLabel = String(slot?.label || slotId)
+  root.userData.slotAccepts = Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel']
+  root.userData.rotationYOffset = Number(root.userData?.rotationYOffset || 0)
   root.userData.isSlotMarker = false
   root.position.copy(slot.position)
-  root.rotation.set(0, slot.rotationY, 0)
+  root.rotation.set(0, slot.rotationY + Number(root.userData.rotationYOffset || 0), 0)
 
   scene.add(root)
   selectableRoots.push(root)
@@ -521,11 +752,17 @@ function deselect() {
 
 function select(root) {
   selectedRoot = root
+  if (root?.userData?.slotId) {
+    templateEditorSlotId.value = String(root.userData.slotId)
+    writeDraftFromSlot(templateEditorSlotId.value)
+  }
   const info = {
     uuid: root?.uuid || '',
     id: root?.userData?.id || '',
     title: root?.userData?.title || '',
     slotId: root?.userData?.slotId || '',
+    slotLabel: root?.userData?.slotLabel || '',
+    slotAccepts: Array.isArray(root?.userData?.slotAccepts) ? [...root.userData.slotAccepts] : [],
     isSlotMarker: !!root?.userData?.isSlotMarker
   }
   emit('selected', info)
@@ -599,13 +836,13 @@ function serializeRoom() {
 async function loadRoom(sceneData) {
   if (!sceneData || !Array.isArray(sceneData.furniture)) {
     // Reset to default state for new rooms
-    resetSceneToDefault()
+    resetSceneToDefault({ hydrateCurated: true })
     applyRoomColors()
     return
   }
 
   // Reset scene to default state first
-  resetSceneToDefault()
+  resetSceneToDefault({ hydrateCurated: false })
   applyRoomColors(sceneData.appearance || {})
 
   // Load saved furniture
@@ -666,9 +903,9 @@ async function loadRoom(sceneData) {
   deselect()
 }
 
-function resetSceneToDefault() {
+function resetSceneToDefault({ hydrateCurated = true } = {}) {
   // Remove all current objects
-  for (const slot of FURNITURE_SLOTS) {
+  for (const slot of TEMPLATE_SLOTS) {
     const slotState = slotStates.get(slot.id)
     if (slotState?.root) {
       removeRoot(slotState.root)
@@ -690,6 +927,9 @@ function resetSceneToDefault() {
 
   // Reinitialize default furniture
   initializeFurnitureSlots()
+  if (hydrateCurated) {
+    hydrateCuratedDefaultFurniture()
+  }
   applyRoomColors()
 }
 
@@ -750,7 +990,7 @@ function onPointerUp() {
   }
 }
 
-function centerAndGround(object3D) {
+function centerAndGround(object3D, targetSize = MODEL_SIZE_TARGET) {
   const box = new THREE.Box3().setFromObject(object3D)
   if (!isFinite(box.min.x) || !isFinite(box.max.x)) return
 
@@ -759,7 +999,7 @@ function centerAndGround(object3D) {
 
   const maxDim = Math.max(size.x, size.y, size.z)
   if (maxDim > 0) {
-    const targetScale = THREE.MathUtils.clamp(MODEL_SIZE_TARGET / maxDim, MODEL_SCALE_MIN, MODEL_SCALE_MAX)
+    const targetScale = THREE.MathUtils.clamp(targetSize / maxDim, MODEL_SCALE_MIN, MODEL_SCALE_MAX)
     object3D.scale.multiplyScalar(targetScale)
   }
 
@@ -779,7 +1019,7 @@ function centerAndGround(object3D) {
   }
 }
 
-async function loadModelAsset({ url, title, id, replaceRoot = null }) {
+async function loadModelAsset({ url, title, id, replaceRoot = null, transform = {} }) {
   if (!url) {
     throw new Error('Missing model URL')
   }
@@ -814,7 +1054,15 @@ async function loadModelAsset({ url, title, id, replaceRoot = null }) {
           })
 
           rawScene.position.set(0, 0, 0)
-          centerAndGround(holder)
+          centerAndGround(holder, transform?.targetSize || MODEL_SIZE_TARGET)
+
+          if (Number.isFinite(transform?.scaleMultiplier) && transform.scaleMultiplier > 0) {
+            holder.scale.multiplyScalar(transform.scaleMultiplier)
+          }
+
+          if (Number.isFinite(transform?.yOffset)) {
+            holder.position.y += transform.yOffset
+          }
 
           const targetSlotId = replaceRoot?.userData?.slotId || replaceRoot?.slotId || ''
           if (!targetSlotId || !slotStates.has(targetSlotId)) {
@@ -823,6 +1071,11 @@ async function loadModelAsset({ url, title, id, replaceRoot = null }) {
           }
 
           assignRootToSlot(holder, targetSlotId)
+
+          if (Number.isFinite(transform?.rotationYOffset)) {
+            holder.userData.rotationYOffset = Number(transform.rotationYOffset)
+            holder.rotation.y += transform.rotationYOffset
+          }
 
           resolve(holder)
         } catch (e) {
@@ -912,8 +1165,16 @@ watch(
   }
 )
 
+watch(templateEditorSlotId, (slotId) => {
+  if (!slotId) return
+  writeDraftFromSlot(slotId)
+  templateEditorMessage.value = ''
+})
+
 onMounted(() => {
+  applyStoredTemplateIfAny()
   createScene()
+  writeDraftFromSlot(templateEditorSlotId.value)
   sceneReady.value = true
 })
 
@@ -951,6 +1212,71 @@ onBeforeUnmount(() => {
 <template>
   <div class="relative h-full w-full">
     <div ref="containerEl" class="h-full w-full"></div>
+    <div
+      class="rounded bg-black/80 px-3 py-2 text-xs text-white"
+      style="position: fixed; right: 14px; bottom: 18px; z-index: 2200; width: min(360px, calc(100vw - 28px)); max-height: min(72vh, 640px); overflow: auto; border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 40px rgba(0,0,0,0.45);"
+    >
+      <button
+        type="button"
+        style="width: 100%; border: 1px solid rgba(255,255,255,0.35); padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); color: #fff;"
+        @click="templateEditorOpen = !templateEditorOpen"
+      >
+        {{ templateEditorOpen ? 'Template editor sluiten' : 'Template editor openen' }}
+      </button>
+
+      <div v-if="templateEditorOpen" style="margin-top: 10px; display: grid; gap: 8px;">
+        <label style="display: grid; gap: 4px;">
+          <span>Slot</span>
+          <select v-model="templateEditorSlotId" style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);">
+            <option v-for="slot in TEMPLATE_SLOTS" :key="slot.id" :value="slot.id">
+              {{ slot.label || slot.id }}
+            </option>
+          </select>
+        </label>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+          <label style="display: grid; gap: 4px;">
+            <span>X</span>
+            <input v-model="templateDraft.x" type="number" step="0.1" style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);" />
+          </label>
+          <label style="display: grid; gap: 4px;">
+            <span>Z</span>
+            <input v-model="templateDraft.z" type="number" step="0.1" style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);" />
+          </label>
+          <label style="display: grid; gap: 4px;">
+            <span>Y</span>
+            <input v-model="templateDraft.y" type="number" step="0.1" style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);" />
+          </label>
+          <label style="display: grid; gap: 4px;">
+            <span>Rotatie (deg)</span>
+            <input v-model="templateDraft.rotationDeg" type="number" step="1" style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);" />
+          </label>
+        </div>
+
+        <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+          <label><input v-model="templateDraft.acceptsMeubel" type="checkbox" /> meubel</label>
+          <label><input v-model="templateDraft.acceptsPersoonlijk" type="checkbox" /> persoonlijk</label>
+          <label><input v-model="templateDraft.acceptsDecoratie" type="checkbox" /> decoratie</label>
+        </div>
+
+        <div style="display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;">
+          <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff;" @click="applyTemplateDraft">
+            Toepassen
+          </button>
+          <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff;" @click="saveTemplateToLocalStorage">
+            Lokaal opslaan
+          </button>
+          <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff; grid-column: 1 / -1;" @click="resetTemplateDefaults">
+            Reset template
+          </button>
+        </div>
+
+        <div v-if="templateEditorMessage" style="color: #d8f3dc; font-size: 11px;">
+          {{ templateEditorMessage }}
+        </div>
+      </div>
+    </div>
+
     <div
       class="pointer-events-none rounded bg-black/70 px-3 py-2 text-xs text-white"
       style="position: fixed; top: 108px; right: 14px; z-index: 120; min-width: 230px;"

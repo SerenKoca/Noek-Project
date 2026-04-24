@@ -108,7 +108,7 @@ export default async function handler(req, res) {
         const room = await Room.findOneAndUpdate(
           { _id: roomId, ownerId: auth.userId },
           updates,
-          { new: true, runValidators: true }
+          { returnDocument: 'after', runValidators: true }
         )
 
         if (!room) {

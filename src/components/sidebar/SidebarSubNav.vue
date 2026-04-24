@@ -23,10 +23,6 @@ const subCategories = computed(() => {
     return ['Paletten', 'Neutraal', 'Aarde', 'Koel']
   }
 
-  if (props.activeCategory === 'Kamer') {
-    return ['Alle', 'Persoonlijk', 'Decoratie']
-  }
-
   return ['Sofa\'s', 'Persoonlijk', 'Meubels', 'Decoratie']
 })
 </script>

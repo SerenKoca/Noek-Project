@@ -313,8 +313,22 @@ export default async function handler(req, res) {
       return handleListCreate(req, res, auth)
     }
 
-    if (subPath === 'details') {
+    if (!subPath && req.method === 'GET') {
       return handleDetails(req, res, directorId)
+    }
+
+    if (subPath === 'details' && req.method === 'GET') {
+      return handleDetails(req, res, directorId)
+    }
+
+    if (!subPath && req.method === 'DELETE') {
+      return handleDelete(req, res, auth, directorId)
+    }
+
+    if (subPath === 'details') {
+      res.setHeader('Allow', ['GET'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
     }
 
     // ID provided - handle delete

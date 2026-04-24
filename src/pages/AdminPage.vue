@@ -141,154 +141,228 @@ async function logout() {
 
 <template>
   <div class="editor-page is-home">
-    <div class="home-page-v2">
-      <header class="home-topbar-v2">
-        <div class="home-brand-v2">
-          <strong>Admin</strong>
-          <span>Beheer uitvaartondernemers</span>
-        </div>
-        <div class="home-user-v2">
-          <span>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
-          <span class="role-badge">admin</span>
-          <button type="button" class="secondary-btn" @click="logout">Uitloggen</button>
-        </div>
-      </header>
+    <div class="auth-page-v2 admin-auth-page">
+      <div class="auth-card-v2 admin-auth-card">
+        <section class="auth-hero-v2 admin-hero">
+          <div class="auth-logo-v2">
+            <img src="/img/logo-noek.svg" alt="Noek logo" class="auth-logo-image-v2" />
+          </div>
+          <h1>Hoofdadmin</h1>
+          <p>Beheer uitvaartondernemers en bekijk klanten, kamers en gekozen branding.</p>
+          <div class="auth-candle-scene-v2" aria-hidden="true">
+            <div class="auth-candle-v2 is-large">
+              <span class="auth-candle-flame-v2"></span>
+              <span class="auth-candle-wax-v2"></span>
+            </div>
+            <div class="auth-candle-v2 is-small">
+              <span class="auth-candle-flame-v2"></span>
+              <span class="auth-candle-wax-v2"></span>
+            </div>
+          </div>
+        </section>
 
-      <section class="home-main-v2">
-        <div class="home-main-header-v2">
-          <div>
+        <section class="auth-form-v2 admin-form-v2">
+          <header class="admin-toolbar">
+            <div class="admin-toolbar-user">
+              <strong>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</strong>
+              <span class="role-badge">admin</span>
+            </div>
+            <div class="admin-toolbar-actions">
+              <button type="button" class="auth-switch-v2" @click="loadDirectors">Ververs</button>
+              <button type="button" class="auth-switch-v2" @click="logout">Uitloggen</button>
+            </div>
+          </header>
+
+          <div class="admin-title-block">
             <h2>Uitvaartondernemers</h2>
             <p>Maak accounts aan en beheer bestaande uitvaartondernemers.</p>
           </div>
-          <div class="home-actions">
-            <button type="button" class="secondary-btn" @click="loadDirectors">Ververs</button>
-          </div>
-        </div>
 
-        <form class="auth-form-v2" @submit.prevent="submitCreateDirector">
-          <label class="auth-field-v2">
-            <span>Naam</span>
-            <input v-model="form.displayName" type="text" placeholder="volledige naam" />
-          </label>
-          <label class="auth-field-v2">
-            <span>Email</span>
-            <input v-model="form.email" type="email" placeholder="emailadres" />
-          </label>
-          <label class="auth-field-v2">
-            <span>Tijdelijk wachtwoord</span>
-            <input v-model="form.password" type="password" placeholder="min. 8 tekens" />
-          </label>
-          <button type="submit" class="auth-submit-v2">Uitvaartondernemer aanmaken</button>
-        </form>
+          <form class="admin-create-form" @submit.prevent="submitCreateDirector">
+            <label class="auth-field-v2">
+              <span>Naam</span>
+              <input v-model="form.displayName" type="text" placeholder="volledige naam" />
+            </label>
+            <label class="auth-field-v2">
+              <span>Email</span>
+              <input v-model="form.email" type="email" placeholder="emailadres" />
+            </label>
+            <label class="auth-field-v2">
+              <span>Tijdelijk wachtwoord</span>
+              <input v-model="form.password" type="password" placeholder="min. 8 tekens" />
+            </label>
+            <button type="submit" class="auth-submit-v2">Uitvaartondernemer aanmaken</button>
+          </form>
 
-        <div v-if="status" class="auth-status-v2 success">{{ status }}</div>
-        <div v-if="error" class="auth-status-v2 error">{{ error }}</div>
+          <div v-if="status" class="auth-status-v2 success">{{ status }}</div>
+          <div v-if="error" class="auth-status-v2 error">{{ error }}</div>
 
-        <div v-if="loading" class="room-empty">
-          <h3>Bezig met laden...</h3>
-        </div>
-
-        <div v-else-if="directors.length === 0" class="room-empty">
-          <h3>Geen uitvaartondernemers</h3>
-          <p>Maak hierboven een eerste account aan.</p>
-        </div>
-
-        <div v-else class="room-grid room-grid-v2">
-          <article v-for="item in directors" :key="item.id" class="room-card room-card-v2">
-            <div class="room-info">
-              <strong>{{ item.displayName }}</strong>
-              <div class="room-meta">{{ item.email }}</div>
-              <div class="room-meta">Aangemaakt: {{ new Date(item.createdAt).toLocaleString('nl-NL') }}</div>
-            </div>
-            <div class="room-actions-row room-actions-row-v2">
-              <button
-                type="button"
-                class="secondary-btn"
-                @click="showDirectorDetails(item)"
-              >
-                {{ selectedDirectorId === item.id ? 'Sluit details' : 'Bekijk details' }}
-              </button>
-              <button type="button" class="danger-btn" @click="removeDirector(item)">Verwijder</button>
-            </div>
-          </article>
-        </div>
-
-        <section v-if="selectedDirectorId" class="admin-details-panel">
-          <h3>Details uitvaartondernemer</h3>
-
-          <div v-if="detailsLoading" class="room-empty compact">
-            <h3>Details laden...</h3>
+          <div v-if="loading" class="room-empty compact-empty">
+            <h3>Bezig met laden...</h3>
           </div>
 
-          <div v-else-if="detailsError" class="auth-status-v2 error">{{ detailsError }}</div>
+          <div v-else-if="directors.length === 0" class="room-empty compact-empty">
+            <h3>Geen uitvaartondernemers</h3>
+            <p>Maak hierboven een eerste account aan.</p>
+          </div>
 
-          <div v-else-if="selectedDetails" class="admin-details-body">
-            <div class="admin-stats-row">
-              <article class="admin-stat-card">
-                <span>Klanten</span>
-                <strong>{{ selectedDetails.stats?.clientCount ?? 0 }}</strong>
-              </article>
-              <article class="admin-stat-card">
-                <span>Kamers</span>
-                <strong>{{ selectedDetails.stats?.roomCount ?? 0 }}</strong>
-              </article>
-            </div>
-
-            <article class="admin-info-card">
-              <h4>Branding gekozen</h4>
-              <div class="room-meta">Logo: {{ selectedDetails.branding?.logoUrl || 'Geen logo' }}</div>
-              <div class="admin-color-row">
-                <span class="admin-color-pill">
-                  Donker: {{ selectedDetails.branding?.darkColor || '-' }}
-                  <i :style="{ backgroundColor: selectedDetails.branding?.darkColor || '#1e2b37' }" />
-                </span>
-                <span class="admin-color-pill">
-                  Licht: {{ selectedDetails.branding?.lightColor || '-' }}
-                  <i :style="{ backgroundColor: selectedDetails.branding?.lightColor || '#d7e1eb' }" />
-                </span>
+          <div v-else class="room-grid room-grid-v2">
+            <article v-for="item in directors" :key="item.id" class="room-card room-card-v2 admin-room-card">
+              <div class="room-info">
+                <strong>{{ item.displayName }}</strong>
+                <div class="room-meta">{{ item.email }}</div>
+                <div class="room-meta">Aangemaakt: {{ new Date(item.createdAt).toLocaleString('nl-NL') }}</div>
+              </div>
+              <div class="room-actions-row room-actions-row-v2">
+                <button
+                  type="button"
+                  class="auth-switch-v2 details-btn"
+                  @click="showDirectorDetails(item)"
+                >
+                  {{ selectedDirectorId === item.id ? 'Sluit details' : 'Bekijk details' }}
+                </button>
+                <button type="button" class="danger-btn" @click="removeDirector(item)">Verwijder</button>
               </div>
             </article>
+          </div>
 
-            <article class="admin-info-card">
-              <h4>Klanten en kamers</h4>
-              <div v-if="(selectedDetails.clients || []).length === 0" class="room-meta">
-                Geen klanten gekoppeld aan deze uitvaartondernemer.
+          <section v-if="selectedDirectorId" class="admin-details-panel">
+            <h3>Details uitvaartondernemer</h3>
+
+            <div v-if="detailsLoading" class="room-empty compact-empty">
+              <h3>Details laden...</h3>
+            </div>
+
+            <div v-else-if="detailsError" class="auth-status-v2 error">{{ detailsError }}</div>
+
+            <div v-else-if="selectedDetails" class="admin-details-body">
+              <div class="admin-stats-row">
+                <article class="admin-stat-card">
+                  <span>Klanten</span>
+                  <strong>{{ selectedDetails.stats?.clientCount ?? 0 }}</strong>
+                </article>
+                <article class="admin-stat-card">
+                  <span>Kamers</span>
+                  <strong>{{ selectedDetails.stats?.roomCount ?? 0 }}</strong>
+                </article>
               </div>
-              <div v-else class="admin-client-list">
-                <div v-for="client in selectedDetails.clients" :key="client.id" class="admin-client-item">
-                  <div class="admin-client-head">
-                    <strong>{{ client.displayName }}</strong>
-                    <span>{{ client.email }}</span>
-                    <span>{{ client.roomCount }} kamer(s)</span>
-                  </div>
-                  <ul v-if="(client.rooms || []).length" class="admin-room-list">
-                    <li v-for="room in client.rooms" :key="room.id">
-                      {{ room.name }}
-                      <span>{{ room.isPublic ? 'Publiek' : 'Privaat' }}</span>
-                    </li>
-                  </ul>
-                  <p v-else class="room-meta">Nog geen kamers.</p>
+
+              <article class="admin-info-card">
+                <h4>Branding gekozen</h4>
+                <div class="room-meta">Logo: {{ selectedDetails.branding?.logoUrl || 'Geen logo' }}</div>
+                <div class="admin-color-row">
+                  <span class="admin-color-pill">
+                    Donker: {{ selectedDetails.branding?.darkColor || '-' }}
+                    <i :style="{ backgroundColor: selectedDetails.branding?.darkColor || '#1e2b37' }" />
+                  </span>
+                  <span class="admin-color-pill">
+                    Licht: {{ selectedDetails.branding?.lightColor || '-' }}
+                    <i :style="{ backgroundColor: selectedDetails.branding?.lightColor || '#d7e1eb' }" />
+                  </span>
                 </div>
-              </div>
-            </article>
-          </div>
+              </article>
+
+              <article class="admin-info-card">
+                <h4>Klanten en kamers</h4>
+                <div v-if="(selectedDetails.clients || []).length === 0" class="room-meta">
+                  Geen klanten gekoppeld aan deze uitvaartondernemer.
+                </div>
+                <div v-else class="admin-client-list">
+                  <div v-for="client in selectedDetails.clients" :key="client.id" class="admin-client-item">
+                    <div class="admin-client-head">
+                      <strong>{{ client.displayName }}</strong>
+                      <span>{{ client.email }}</span>
+                      <span>{{ client.roomCount }} kamer(s)</span>
+                    </div>
+                    <ul v-if="(client.rooms || []).length" class="admin-room-list">
+                      <li v-for="room in client.rooms" :key="room.id">
+                        {{ room.name }}
+                        <span>{{ room.isPublic ? 'Publiek' : 'Privaat' }}</span>
+                      </li>
+                    </ul>
+                    <p v-else class="room-meta">Nog geen kamers.</p>
+                  </div>
+                </div>
+              </article>
+            </div>
+          </section>
         </section>
-      </section>
+      </div>
     </div>
   </div>
 </template>
 
 <style scoped>
+.admin-auth-page {
+  padding: 28px;
+}
+
+.admin-auth-card {
+  width: min(1180px, 100%);
+  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.45fr);
+}
+
+.admin-form-v2 {
+  padding-top: 42px;
+  gap: 16px;
+  max-height: min(90vh, 920px);
+  overflow: auto;
+}
+
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-toolbar-user {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--auth-ink);
+}
+
+.admin-toolbar-actions {
+  display: inline-flex;
+  gap: 0.75rem;
+}
+
+.admin-title-block h2 {
+  margin: 0;
+  color: var(--auth-ink);
+}
+
+.admin-title-block p {
+  margin: 0.3rem 0 0;
+  color: var(--auth-ink-soft);
+}
+
+.admin-create-form {
+  display: grid;
+  gap: 12px;
+}
+
+.admin-room-card {
+  border-color: var(--auth-field-border);
+  background: #fffdfd;
+}
+
+.details-btn {
+  text-decoration: none;
+}
+
 .admin-details-panel {
-  margin-top: 1rem;
+  margin-top: 0.35rem;
   padding: 1rem;
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--auth-field-border);
   border-radius: 12px;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.75);
 }
 
 .admin-details-panel h3 {
   margin: 0 0 0.75rem;
+  color: var(--auth-ink);
 }
 
 .admin-details-body {
@@ -303,30 +377,33 @@ async function logout() {
 }
 
 .admin-stat-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--auth-field-border);
   border-radius: 10px;
   padding: 0.75rem;
-  background: #f8fafc;
+  background: #fcf9ff;
 }
 
 .admin-stat-card span {
   display: block;
-  color: #4d5b68;
+  color: var(--auth-ink-soft);
   font-size: 0.86rem;
 }
 
 .admin-stat-card strong {
   font-size: 1.4rem;
+  color: var(--auth-ink);
 }
 
 .admin-info-card {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--auth-field-border);
   border-radius: 10px;
   padding: 0.75rem;
+  background: #ffffff;
 }
 
 .admin-info-card h4 {
   margin: 0 0 0.5rem;
+  color: var(--auth-ink);
 }
 
 .admin-color-row {
@@ -342,8 +419,9 @@ async function logout() {
   gap: 0.5rem;
   padding: 0.3rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid rgba(0, 0, 0, 0.1);
-  background: #f8fafc;
+  border: 1px solid var(--auth-field-border);
+  background: #fcf9ff;
+  color: var(--auth-ink);
   font-size: 0.86rem;
 }
 
@@ -361,10 +439,10 @@ async function logout() {
 }
 
 .admin-client-item {
-  border: 1px solid rgba(0, 0, 0, 0.08);
+  border: 1px solid var(--auth-field-border);
   border-radius: 8px;
   padding: 0.6rem;
-  background: #f8fafc;
+  background: #fcf9ff;
 }
 
 .admin-client-head {
@@ -375,7 +453,7 @@ async function logout() {
 }
 
 .admin-client-head span {
-  color: #4d5b68;
+  color: var(--auth-ink-soft);
   font-size: 0.84rem;
 }
 
@@ -390,11 +468,21 @@ async function logout() {
 
 .admin-room-list li span {
   margin-left: 0.5rem;
-  color: #4d5b68;
+  color: var(--auth-ink-soft);
   font-size: 0.84rem;
 }
 
-.compact {
+.compact-empty {
   padding: 0.75rem;
+}
+
+@media (max-width: 980px) {
+  .admin-auth-card {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-form-v2 {
+    max-height: none;
+  }
 }
 </style>

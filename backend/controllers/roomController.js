@@ -106,7 +106,7 @@ exports.updateRoom = async (req, res) => {
     const room = await Room.findOneAndUpdate(
       { _id: req.params.id, ownerId: req.auth?.userId },
       updates,
-      { new: true, runValidators: true }
+      { returnDocument: 'after', runValidators: true }
     );
 
     if (!room) {

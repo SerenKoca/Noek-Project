@@ -29,12 +29,18 @@ const STATIC_BASE_URL = (() => {
 
 const RELATIVE_URL_BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
 const EXCLUDED_CATEGORIES = new Set(['People & Characters'])
-const EXCLUDED_IDS = new Set(['kZ3DmI'])
+const BASE_EXCLUDED_IDS = new Set(['kZ3DmI'])
 const EXCLUDED_ID_PREFIXES = new Set(['kZ3DmI'])
 
 const PREFERRED_TAGS = new Set(['tree', 'plant', 'chair', 'desk', 'bench', 'lamp', 'statue', 'boat', 'animal'])
 
 const FALLBACK_CATEGORY = 'General'
+const CONFIGURED_FURNITURE_LIST = String(import.meta.env.VITE_POLYPIZZA_FURNITURE_LIST || '').trim()
+const CONFIGURED_FURNITURE_LISTS = String(import.meta.env.VITE_POLYPIZZA_FURNITURE_LISTS || '').trim()
+const CONFIGURED_PINNED_MODELS = String(import.meta.env.VITE_POLYPIZZA_PINNED_MODELS || '').trim()
+const CONFIGURED_EXCLUDE_IDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_IDS || '').trim()
+const CONFIGURED_EXCLUDE_KEYWORDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_KEYWORDS || '').trim().toLowerCase()
+const ONLY_CONFIGURED_SOURCES = String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
 
 const http = axios.create({
   baseURL: API_BASE_URL,
@@ -42,6 +48,24 @@ const http = axios.create({
 })
 
 attachGlobalLoaderToAxios(http)
+
+function splitConfigList(value) {
+  return String(value || '')
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function makeConfiguredExcludeIds() {
+  const out = new Set(BASE_EXCLUDED_IDS)
+  for (const id of splitConfigList(CONFIGURED_EXCLUDE_IDS)) {
+    out.add(String(id))
+  }
+  return out
+}
+
+const EXCLUDED_IDS = makeConfiguredExcludeIds()
+const EXCLUDED_KEYWORDS = new Set(splitConfigList(CONFIGURED_EXCLUDE_KEYWORDS).map((item) => item.toLowerCase()))
 
 function getAuthHeaders() {
   const apiKey = import.meta.env.VITE_POLYPIZZA_API_KEY
@@ -130,6 +154,21 @@ function isAllowedModel(model) {
   for (const prefix of EXCLUDED_ID_PREFIXES) {
     if (normalized.startsWith(prefix)) return false
   }
+
+  if (EXCLUDED_KEYWORDS.size) {
+    const title = String(model?.Title || model?.raw?.Title || model?.title || '').toLowerCase()
+    const category = String(model?.Category || model?.raw?.Category || '').toLowerCase()
+    const tags = Array.isArray(model?.Tags)
+      ? model.Tags.map((tag) => String(tag).toLowerCase()).join(' ')
+      : ''
+    const haystack = `${title} ${category} ${tags}`.trim()
+    for (const keyword of EXCLUDED_KEYWORDS) {
+      if (keyword && haystack.includes(keyword)) {
+        return false
+      }
+    }
+  }
+
   return true
 }
 
@@ -203,6 +242,123 @@ function uniqueById(models) {
   return out
 }
 
+function extractListId(value) {
+  const input = String(value || '').trim()
+  if (!input) return ''
+
+  if (/^[A-Za-z0-9_-]{6,}$/.test(input)) {
+    return input
+  }
+
+  try {
+    const parsed = new URL(input)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const bundleIndex = parts.findIndex((part) => part.toLowerCase() === 'bundle')
+    if (bundleIndex >= 0 && parts[bundleIndex + 1]) {
+      const slug = String(parts[bundleIndex + 1]).trim()
+      const token = slug.split('-').filter(Boolean).pop() || ''
+      return token
+    }
+
+    const listIndex = parts.findIndex((part) => part.toLowerCase() === 'list' || part.toLowerCase() === 'l')
+    if (listIndex >= 0 && parts[listIndex + 1]) {
+      return String(parts[listIndex + 1]).trim()
+    }
+    const last = parts[parts.length - 1]
+    return String(last || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function extractModelId(value) {
+  const input = String(value || '').trim()
+  if (!input) return ''
+
+  if (/^[A-Za-z0-9_-]{6,}$/.test(input)) {
+    return input
+  }
+
+  try {
+    const parsed = new URL(input)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const modelIndex = parts.findIndex((part) => part.toLowerCase() === 'm' || part.toLowerCase() === 'model')
+    if (modelIndex >= 0 && parts[modelIndex + 1]) {
+      return String(parts[modelIndex + 1]).trim()
+    }
+    return String(parts[parts.length - 1] || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function resolveConfiguredListInputs() {
+  const values = []
+  if (CONFIGURED_FURNITURE_LIST) values.push(CONFIGURED_FURNITURE_LIST)
+  values.push(...splitConfigList(CONFIGURED_FURNITURE_LISTS))
+  return [...new Set(values.map((value) => extractListId(value)).filter(Boolean))]
+}
+
+function resolveConfiguredPinnedModelIds() {
+  return [...new Set(splitConfigList(CONFIGURED_PINNED_MODELS).map((value) => extractModelId(value)).filter(Boolean))]
+}
+
+async function fetchListModels(listId, headers) {
+  const res = await http.get(`/list/${encodeURIComponent(listId)}`, { headers })
+  const items = Array.isArray(res?.data?.Models) ? res.data.Models : []
+  return items
+    .map((model) => normalizeModel(model, 'api-list'))
+    .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
+}
+
+async function fetchModelById(modelId, headers) {
+  const res = await http.get(`/model/${encodeURIComponent(modelId)}`, { headers })
+  const normalized = normalizeModel(res?.data || {}, 'api-pinned')
+  if (!isAllowedModel(normalized) || !isCompatibleAssetUrl(normalized?.Download) || !isAllowedCategory(normalized)) {
+    return null
+  }
+  return normalized
+}
+
+async function fetchConfiguredFurnitureSources() {
+  const headers = getAuthHeaders()
+  const listIds = resolveConfiguredListInputs()
+  const pinnedModelIds = resolveConfiguredPinnedModelIds()
+  const errors = []
+
+  if (!headers || (!listIds.length && !pinnedModelIds.length)) {
+    return { ok: false, models: [], error: '' }
+  }
+
+  const collected = []
+
+  for (const listId of listIds) {
+    try {
+      const models = await fetchListModels(listId, headers)
+      collected.push(...models)
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Kon Poly Pizza lijst niet laden.'
+      errors.push(`Lijst ${listId}: ${msg}`)
+    }
+  }
+
+  for (const modelId of pinnedModelIds) {
+    try {
+      const model = await fetchModelById(modelId, headers)
+      if (model) collected.push(model)
+    } catch (err) {
+      const msg = err?.response?.data?.error || err?.message || 'Kon model niet laden.'
+      errors.push(`Model ${modelId}: ${msg}`)
+    }
+  }
+
+  return {
+    ok: collected.length > 0,
+    models: uniqueById(collected),
+    error: errors.length ? `Poly Pizza configuratie fout: ${errors.join(' | ')}` : ''
+  }
+}
+
 async function fetchSearchPage({ limit, page, license }) {
   const headers = getAuthHeaders()
   if (!headers) {
@@ -265,6 +421,22 @@ async function fetchSearchPage({ limit, page, license }) {
 
 export async function fetchModels({ max = 12 } = {}) {
   const limit = Math.min(Math.max(1, max), 12)
+  const sourceResult = await fetchConfiguredFurnitureSources()
+  const pinnedFromConfig = Array.isArray(sourceResult.models) ? sourceResult.models : []
+
+  if (ONLY_CONFIGURED_SOURCES) {
+    if (pinnedFromConfig.length > 0) {
+      return {
+        models: pinnedFromConfig.slice(0, limit),
+        error: sourceResult.error || ''
+      }
+    }
+
+    return {
+      models: [],
+      error: sourceResult.error || 'Geen modellen gevonden in geconfigureerde lijsten/modellen.'
+    }
+  }
 
   // We want 6–12 models in the UI, but we must never exceed 12.
   // The API requires at least one filter on /search.
@@ -304,10 +476,13 @@ export async function fetchModels({ max = 12 } = {}) {
     const fallbackList = fallbackModels
       .map((model) => normalizeModel(model, 'fallback'))
       .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
-    const diversified = diversifyModels(fallbackList, limit)
+    const baseFallback = uniqueById([...pinnedFromConfig, ...fallbackList])
+    const pinned = baseFallback.slice(0, limit)
+    const rest = baseFallback.filter((m) => !pinned.some((p) => p.ID === m.ID))
+    const diversifiedRest = diversifyModels(rest, Math.max(0, limit - pinned.length))
     return {
-      models: diversified,
-      error: cc0.error
+      models: [...pinned, ...diversifiedRest].slice(0, limit),
+      error: [cc0.error, sourceResult.error].filter(Boolean).join(' | ')
     }
   }
 
@@ -326,21 +501,28 @@ export async function fetchModels({ max = 12 } = {}) {
     models = uniqueById([...models, ...ccby.models])
   }
 
-  models = diversifyModels(models, limit)
+  models = uniqueById([...pinnedFromConfig, ...models])
+  const pinned = models.slice(0, limit)
+  const rest = models.filter((m) => !pinned.some((p) => p.ID === m.ID))
+  const diversifiedRest = diversifyModels(rest, Math.max(0, limit - pinned.length))
+  models = [...pinned, ...diversifiedRest].slice(0, limit)
 
   if (models.length === 0) {
     // Empty or incompatible response: fallback.
     const fallbackList = fallbackModels
       .map((model) => normalizeModel(model, 'fallback'))
       .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
-    const diversified = diversifyModels(fallbackList, limit)
+    const baseFallback = uniqueById([...pinnedFromConfig, ...fallbackList])
+    const pinnedFallback = baseFallback.slice(0, limit)
+    const restFallback = baseFallback.filter((m) => !pinnedFallback.some((p) => p.ID === m.ID))
+    const diversified = diversifyModels(restFallback, Math.max(0, limit - pinnedFallback.length))
     return {
-      models: diversified,
-      error: 'No compatible GLB/GLTF models returned by API.'
+      models: [...pinnedFallback, ...diversified].slice(0, limit),
+      error: ['No compatible GLB/GLTF models returned by API.', sourceResult.error].filter(Boolean).join(' | ')
     }
   }
 
-  return { models, error: '' }
+  return { models, error: sourceResult.error || '' }
 }
 
 export function isValidManualUrl(url) {
