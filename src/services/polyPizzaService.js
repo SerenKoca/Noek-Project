@@ -28,9 +28,8 @@ const STATIC_BASE_URL = (() => {
 })()
 
 const RELATIVE_URL_BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
-const EXCLUDED_CATEGORIES = new Set(['People & Characters'])
-const BASE_EXCLUDED_IDS = new Set(['kZ3DmI'])
-const EXCLUDED_ID_PREFIXES = new Set(['kZ3DmI'])
+const BASE_EXCLUDED_IDS = new Set()
+const EXCLUDED_ID_PREFIXES = new Set()
 
 const PREFERRED_TAGS = new Set(['tree', 'plant', 'chair', 'desk', 'bench', 'lamp', 'statue', 'boat', 'animal'])
 
@@ -139,10 +138,8 @@ function normalizeModel(raw, source = 'api') {
   }
 }
 
-function isAllowedCategory(model) {
-  const category = model?.raw?.Category || model?.raw?.CategoryName || model?.Category
-  if (!category) return true
-  return !EXCLUDED_CATEGORIES.has(String(category).trim())
+function isAllowedCategory() {
+  return true
 }
 
 function isAllowedModel(model) {
@@ -419,8 +416,8 @@ async function fetchSearchPage({ limit, page, license }) {
   }
 }
 
-export async function fetchModels({ max = 12 } = {}) {
-  const limit = Math.min(Math.max(1, max), 12)
+export async function fetchModels({ max = 200 } = {}) {
+  const limit = Math.min(Math.max(1, max), 500)
   const sourceResult = await fetchConfiguredFurnitureSources()
   const pinnedFromConfig = Array.isArray(sourceResult.models) ? sourceResult.models : []
 
@@ -445,7 +442,7 @@ export async function fetchModels({ max = 12 } = {}) {
   // - If we still have fewer than 6 compatible models, also try CC-BY (License=0).
   // - Always filter to models whose `Download` URL ends with .glb/.gltf.
 
-  const MAX_PAGES_TO_TRY = 3 // 0..2
+  const MAX_PAGES_TO_TRY = 4 // 0..3
 
   const gather = async (license) => {
     let out = []

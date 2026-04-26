@@ -13,6 +13,7 @@ import { useNoekState } from '../composables/useNoekState.js'
 const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
+const showRoomReactions = false
 
 onMounted(async () => {
   await state.bootstrap()
@@ -118,7 +119,7 @@ async function shareCurrentRoom() {
         <div v-if="state.roomMusicState.value.error" class="room-contribution-empty error">{{ state.roomMusicState.value.error }}</div>
       </section>
 
-      <aside class="editor-room-side-panel">
+      <aside v-if="showRoomReactions" class="editor-room-side-panel">
         <section class="editor-room-widget">
           <h4>Reacties op deze kamer</h4>
           <div class="item-reactions-row">

@@ -11,10 +11,18 @@ const props = defineProps({
   activeSubCategory: {
     type: String,
     required: true
+  },
+  allowedSubCategories: {
+    type: Array,
+    default: () => []
   }
 })
 
 const subCategories = computed(() => {
+  if (Array.isArray(props.allowedSubCategories) && props.allowedSubCategories.length) {
+    return props.allowedSubCategories
+  }
+
   if (props.activeCategory === 'Geluid') {
     return ['Alle', 'Natuur', 'Instrumentaal', 'Overig']
   }
@@ -23,7 +31,7 @@ const subCategories = computed(() => {
     return ['Paletten', 'Neutraal', 'Aarde', 'Koel']
   }
 
-  return ['Sofa\'s', 'Persoonlijk', 'Meubels', 'Decoratie']
+  return ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Decoratie klein', 'Decoratie groot', 'Persoonlijk', 'Media']
 })
 </script>
 
