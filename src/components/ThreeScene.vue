@@ -7,6 +7,8 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
 import { adaptStaticAssetUrl } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
+import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
+import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, createFloorTexture, createWallTexture, normalizeFloorTextureId, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
 
 const props = defineProps({
   loadRequest: {
@@ -70,8 +72,8 @@ const ZOOM_RECENTER_STRENGTH = 0.5
 const FAR_RESET_BLEND_START = 0.08
 const ROOM_SIZE = 34
 const WALL_HEIGHT = 19
-const DEFAULT_FLOOR_COLOR = '#c0b496'
-const DEFAULT_WALL_COLOR = '#8f98a3'
+const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
+const DEFAULT_WALL_COLOR = DEFAULT_ROOM_WALL_COLOR
 const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
 const FLOOR_Y = 0
 const ENFORCE_UNIFORM_MODEL_SIZE = true
@@ -91,6 +93,290 @@ const KEYWORD_SIZE_MULTIPLIERS = [
   { test: /sofa|couch|bench/i, multiplier: 1.28 },
   { test: /cabinet|bookcase|shelf|wardrobe|closet/i, multiplier: 1.5 }
 ]
+
+let floorTexture = null
+let wallTexture = null
+let sideWallTexture = null
+let floorTextureId = DEFAULT_FLOOR_TEXTURE_ID
+let wallTextureId = DEFAULT_WALL_TEXTURE_ID
+
+function createTextureCanvas(size, draw) {
+  const canvas = document.createElement('canvas')
+  canvas.width = size
+  canvas.height = size
+  const context = canvas.getContext('2d')
+  if (!context) return null
+
+  draw(context, size)
+
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.wrapS = THREE.RepeatWrapping
+  texture.wrapT = THREE.RepeatWrapping
+  texture.anisotropy = 8
+  texture.needsUpdate = true
+  return texture
+}
+
+function createWoodFloorTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#9f6f42'
+    context.fillRect(0, 0, size, size)
+
+    const plankCount = 6
+    const plankWidth = size / plankCount
+
+    for (let i = 0; i < plankCount; i++) {
+      const x = Math.floor(i * plankWidth)
+      const shade = i % 2 === 0 ? '#b47b4c' : '#a36c41'
+      context.fillStyle = shade
+      context.fillRect(x, 0, Math.ceil(plankWidth), size)
+
+      context.strokeStyle = 'rgba(75, 42, 18, 0.34)'
+      context.lineWidth = 4
+      context.beginPath()
+      context.moveTo(x + 1, 0)
+      context.lineTo(x + 1, size)
+      context.stroke()
+
+      context.fillStyle = 'rgba(255, 245, 225, 0.08)'
+      for (let y = 14; y < size; y += 24) {
+        context.fillRect(x + 4, y, Math.max(plankWidth - 8, 1), 2)
+      }
+    }
+
+    context.fillStyle = 'rgba(46, 25, 11, 0.18)'
+    for (let i = 0; i < 2000; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      const w = 1 + Math.random() * 2
+      const h = 1 + Math.random() * 8
+      context.fillRect(x, y, w, h)
+    }
+  })
+}
+
+function createWallpaperTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#efe4d6'
+    context.fillRect(0, 0, size, size)
+
+    const stripeWidth = 48
+    for (let x = 0; x < size; x += stripeWidth) {
+      context.fillStyle = x % (stripeWidth * 2) === 0 ? 'rgba(164, 132, 105, 0.08)' : 'rgba(255, 255, 255, 0.06)'
+      context.fillRect(x, 0, stripeWidth, size)
+    }
+
+    context.strokeStyle = 'rgba(134, 96, 64, 0.12)'
+    context.lineWidth = 2
+    for (let y = 24; y < size; y += 48) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+
+    const patternColor = 'rgba(131, 89, 70, 0.22)'
+    for (let y = 32; y < size; y += 64) {
+      for (let x = 32; x < size; x += 64) {
+        context.fillStyle = patternColor
+        context.beginPath()
+        context.arc(x, y, 5, 0, Math.PI * 2)
+        context.fill()
+
+        context.beginPath()
+        context.moveTo(x - 10, y)
+        context.lineTo(x + 10, y)
+        context.moveTo(x, y - 10)
+        context.lineTo(x, y + 10)
+        context.stroke()
+      }
+    }
+  })
+}
+
+function createTileTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#ddd6cd'
+    context.fillRect(0, 0, size, size)
+
+    const tile = 64
+    context.strokeStyle = 'rgba(92, 84, 73, 0.28)'
+    context.lineWidth = 2
+
+    for (let y = 0; y <= size; y += tile) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+
+    for (let x = 0; x <= size; x += tile) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x, size)
+      context.stroke()
+    }
+
+    for (let y = 0; y < size; y += tile) {
+      for (let x = 0; x < size; x += tile) {
+        context.fillStyle = (x + y) % (tile * 2) === 0 ? 'rgba(180, 154, 132, 0.18)' : 'rgba(255, 255, 255, 0.08)'
+        context.fillRect(x + 1, y + 1, tile - 2, tile - 2)
+      }
+    }
+  })
+}
+
+function createStripedWallpaperTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#f2e9dc'
+    context.fillRect(0, 0, size, size)
+
+    for (let x = 0; x < size; x += 36) {
+      context.fillStyle = x % 72 === 0 ? 'rgba(167, 126, 95, 0.12)' : 'rgba(255, 255, 255, 0.05)'
+      context.fillRect(x, 0, 36, size)
+    }
+
+    context.strokeStyle = 'rgba(120, 91, 64, 0.12)'
+    context.lineWidth = 1.5
+    for (let y = 16; y < size; y += 32) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+
+    context.fillStyle = 'rgba(137, 98, 71, 0.14)'
+    for (let i = 0; i < 1200; i++) {
+      context.fillRect(Math.random() * size, Math.random() * size, 1, 1)
+    }
+  })
+}
+
+function createFabricTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#9a7861'
+    context.fillRect(0, 0, size, size)
+
+    context.strokeStyle = 'rgba(255, 244, 230, 0.16)'
+    context.lineWidth = 1
+    for (let y = 0; y < size; y += 8) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+    for (let x = 0; x < size; x += 8) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x, size)
+      context.stroke()
+    }
+
+    context.fillStyle = 'rgba(62, 36, 26, 0.08)'
+    for (let i = 0; i < 1800; i++) {
+      context.fillRect(Math.random() * size, Math.random() * size, 1, 1)
+    }
+  })
+}
+
+function createDarkWoodTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#6f4b2f'
+    context.fillRect(0, 0, size, size)
+
+    for (let y = 0; y < size; y += 28) {
+      const shade = y % 56 === 0 ? 'rgba(184, 126, 76, 0.16)' : 'rgba(52, 30, 17, 0.14)'
+      context.fillStyle = shade
+      context.fillRect(0, y, size, 14)
+    }
+
+    context.strokeStyle = 'rgba(255, 236, 212, 0.12)'
+    context.lineWidth = 2
+    for (let i = 0; i < 8; i++) {
+      const y = (i * size) / 8
+      context.beginPath()
+      context.moveTo(0, y)
+      context.quadraticCurveTo(size * 0.3, y + 8, size, y)
+      context.stroke()
+    }
+  })
+}
+
+function createRattanTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#d3b58a'
+    context.fillRect(0, 0, size, size)
+
+    context.strokeStyle = 'rgba(104, 74, 43, 0.28)'
+    context.lineWidth = 10
+    for (let x = -size; x < size * 2; x += 28) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x + size, size)
+      context.stroke()
+    }
+    for (let x = 0; x < size * 2; x += 28) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x - size, size)
+      context.stroke()
+    }
+
+    context.strokeStyle = 'rgba(255, 247, 230, 0.1)'
+    context.lineWidth = 2
+    for (let y = 0; y < size; y += 42) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+  })
+}
+
+function createSlateTexture() {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = '#49515a'
+    context.fillRect(0, 0, size, size)
+    context.fillStyle = 'rgba(255, 255, 255, 0.06)'
+    for (let i = 0; i < 1800; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      const radius = 1 + Math.random() * 2
+      context.beginPath()
+      context.arc(x, y, radius, 0, Math.PI * 2)
+      context.fill()
+    }
+    context.strokeStyle = 'rgba(0, 0, 0, 0.2)'
+    context.lineWidth = 2
+    for (let y = 0; y < size; y += 64) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+  })
+}
+
+function createBaseMaterial(texture, color) {
+  return new THREE.MeshStandardMaterial({
+    map: texture,
+    color,
+    roughness: 0.98,
+    metalness: 0.0
+  })
+}
+
+function setMaterialMap(material, texture) {
+  if (!material) return
+  const previous = material.map
+  material.map = texture || null
+  material.color.set(0xffffff)
+  material.needsUpdate = true
+  if (previous && previous !== texture && typeof previous.dispose === 'function') {
+    previous.dispose()
+  }
+}
 
 function normalizeTemplateSlots(slots = []) {
   return Array.isArray(slots)
@@ -127,6 +413,8 @@ const TEMPLATE_SLOTS = ref(cloneTemplateSlots(BASE_TEMPLATE_SLOTS))
 const slotStates = new Map()
 let floorMaterial = null
 let wallMaterial = null
+let sideWallMaterial = null
+let tileMaterial = null
 const templateEditorOpen = ref(false)
 const templateEditorMessage = ref('')
 const templateEditorSlotId = ref(TEMPLATE_SLOTS.value[0]?.id || '')
@@ -445,27 +733,35 @@ function toColorHex(value, fallback) {
   return fallback
 }
 
-function applyRoomColors({ floorColor, wallColor } = {}) {
-  const nextFloor = toColorHex(floorColor, DEFAULT_FLOOR_COLOR)
-  const nextWall = toColorHex(wallColor, DEFAULT_WALL_COLOR)
+function applyRoomColors({ floorTextureId: incomingFloorTextureId, wallTextureId: incomingWallTextureId } = {}) {
+  const nextFloorTextureId = normalizeFloorTextureId(incomingFloorTextureId || floorTextureId)
+  const nextWallTextureId = normalizeWallTextureId(incomingWallTextureId || wallTextureId)
 
-  if (floorMaterial?.color) {
-    floorMaterial.color.set(nextFloor)
-    floorMaterial.needsUpdate = true
+  if (nextFloorTextureId !== floorTextureId) {
+    floorTextureId = nextFloorTextureId
+    floorTexture = createFloorTexture(floorTextureId)
+    setMaterialMap(floorMaterial, floorTexture)
   }
 
-  if (wallMaterial?.color) {
-    wallMaterial.color.set(nextWall)
-    wallMaterial.needsUpdate = true
+  if (nextWallTextureId !== wallTextureId) {
+    wallTextureId = nextWallTextureId
+    wallTexture = createWallTexture(wallTextureId)
+    sideWallTexture = wallTexture
+    setMaterialMap(wallMaterial, wallTexture)
+    setMaterialMap(sideWallMaterial, sideWallTexture)
   }
 
-  return { floorColor: nextFloor, wallColor: nextWall }
+  return {
+    floorTextureId,
+    wallTextureId
+  }
 }
 
 
 function createScene() {
   scene = new THREE.Scene()
-  scene.background = null
+  scene.background = new THREE.Color(0xf4eadf)
+  scene.fog = null
 
   camera = new THREE.PerspectiveCamera(36, 1, 0.1, 400)
   camera.up.set(0, 1, 0)
@@ -475,6 +771,11 @@ function createScene() {
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
   renderer.setClearColor(0x000000, 0)
+  renderer.shadowMap.enabled = true
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap
+  renderer.outputColorSpace = THREE.SRGBColorSpace
+  renderer.toneMapping = THREE.ACESFilmicToneMapping
+  renderer.toneMappingExposure = 1.08
   renderer.domElement.style.width = '100%'
   renderer.domElement.style.height = '100%'
   renderer.domElement.style.display = 'block'
@@ -529,45 +830,91 @@ function createScene() {
   pointer = new THREE.Vector2()
 
   // Lights (required)
-  const hemi = new THREE.HemisphereLight(0xffffff, 0xb2c8dd, 1.05)
+  const hemi = new THREE.HemisphereLight(0xfff5ea, 0xc7b4a1, 1.15)
   hemi.position.set(0, 10, 0)
   scene.add(hemi)
 
-  const dir = new THREE.DirectionalLight(0xffffff, 1.15)
-  dir.position.set(5, 10, 3)
-  dir.castShadow = false
+  const dir = new THREE.DirectionalLight(0xffefd8, 1.35)
+  dir.position.set(-10, 18, 8)
+  dir.castShadow = true
+  dir.shadow.mapSize.set(2048, 2048)
+  dir.shadow.camera.near = 1
+  dir.shadow.camera.far = 50
+  dir.shadow.camera.left = -24
+  dir.shadow.camera.right = 24
+  dir.shadow.camera.top = 24
+  dir.shadow.camera.bottom = -24
+  dir.shadow.bias = -0.0008
   scene.add(dir)
 
+  const fill = new THREE.PointLight(0xffc98a, 1.45, 75, 1.6)
+  fill.position.set(-8, 6.5, 8)
+  fill.castShadow = true
+  fill.shadow.mapSize.set(1024, 1024)
+  scene.add(fill)
+
+  const warmLamp = new THREE.PointLight(0xffe0bb, 1.2, 55, 1.8)
+  warmLamp.position.set(10, 5.3, -8)
+  scene.add(warmLamp)
+
+  const cornerWarm = new THREE.PointLight(0xffc48a, 0.9, 45, 1.9)
+  cornerWarm.position.set(8, 3.2, 10)
+  scene.add(cornerWarm)
+
+  const accent = new THREE.SpotLight(0xfff0d6, 0.9, 90, Math.PI / 6, 0.45, 1.2)
+  accent.position.set(0, 16, 2)
+  accent.target.position.set(0, 2, -10)
+  accent.castShadow = true
+  accent.shadow.mapSize.set(1024, 1024)
+  accent.shadow.bias = -0.0005
+  scene.add(accent)
+  scene.add(accent.target)
+
   // Large room surfaces to keep borders out of view while zooming.
+  const TILE_BAND_HEIGHT = 4.2
   const floorGeo = new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE)
-  floorMaterial = new THREE.MeshStandardMaterial({
-    color: DEFAULT_FLOOR_COLOR,
-    roughness: 0.95,
-    metalness: 0.0
-  })
+  floorTexture = createFloorTexture(floorTextureId)
+  floorMaterial = createBaseMaterial(floorTexture, 0xffffff)
   const floor = new THREE.Mesh(floorGeo, floorMaterial)
   floor.rotation.x = -Math.PI / 2
   floor.position.set(0, -0.001, 0)
-  floor.receiveShadow = false
+  floor.receiveShadow = true
   scene.add(floor)
 
   // Back wall
-  wallMaterial = new THREE.MeshStandardMaterial({
-    color: DEFAULT_WALL_COLOR,
-    roughness: 0.92,
-    metalness: 0.0,
-    side: THREE.DoubleSide
-  })
+  wallTexture = createWallTexture(wallTextureId)
+  wallMaterial = createBaseMaterial(wallTexture, 0xffffff)
+  wallMaterial.side = THREE.DoubleSide
 
-  const backWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
-  backWall.position.set(0, WALL_HEIGHT / 2, -ROOM_SIZE / 2)
-  scene.add(backWall)
+  sideWallTexture = wallTexture
+  sideWallMaterial = createBaseMaterial(sideWallTexture, 0xffffff)
+  sideWallMaterial.side = THREE.DoubleSide
+
+  tileMaterial = createBaseMaterial(createTileTexture(), DEFAULT_WALL_COLOR)
+  tileMaterial.side = THREE.DoubleSide
+
+  const backWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+  backWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, -ROOM_SIZE / 2)
+  backWallTiles.receiveShadow = true
+  scene.add(backWallTiles)
+
+  const backWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
+  backWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, -ROOM_SIZE / 2)
+  backWallWallpaper.receiveShadow = true
+  scene.add(backWallWallpaper)
 
   // Right wall
-  const rightWall = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
-  rightWall.rotation.y = -Math.PI / 2
-  rightWall.position.set(ROOM_SIZE / 2, WALL_HEIGHT / 2, 0)
-  scene.add(rightWall)
+  const rightWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+  rightWallTiles.rotation.y = -Math.PI / 2
+  rightWallTiles.position.set(ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
+  rightWallTiles.receiveShadow = true
+  scene.add(rightWallTiles)
+
+  const rightWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
+  rightWallWallpaper.rotation.y = -Math.PI / 2
+  rightWallWallpaper.position.set(ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
+  rightWallWallpaper.receiveShadow = true
+  scene.add(rightWallWallpaper)
 
   initializeFurnitureSlots()
   hydrateCuratedDefaultFurniture()
@@ -808,30 +1155,55 @@ function createDefaultFurnitureForSlot(slot) {
   root.userData.id = slot.id
   root.userData.title = String(slot?.label || slot.id.replace('slot-', '').replace('-', ' '))
 
-  const material = new THREE.MeshStandardMaterial({ color: 0xc6b89b, roughness: 0.95, metalness: 0 })
+  const makeMaterial = (texture, color, roughness = 0.95, metalness = 0) => new THREE.MeshStandardMaterial({
+    map: texture,
+    color,
+    roughness,
+    metalness
+  })
+
+  const sofaMaterial = makeMaterial(createFabricTexture(), 0xa7836b, 1.0, 0)
+  const tableMaterial = makeMaterial(createWoodFloorTexture(), 0xb07a4c, 0.96, 0)
+  const shelfMaterial = makeMaterial(createRattanTexture(), 0xd0b28a, 0.98, 0)
+  const tvMaterial = makeMaterial(createSlateTexture(), 0x4f545f, 0.88, 0.04)
+  const legMaterial = makeMaterial(createDarkWoodTexture(), 0x7b5a3a, 0.95, 0)
 
   if (slot.id === 'slot-sofa') {
-    const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.0, 1.7), material)
+    const base = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.0, 1.7), sofaMaterial)
     base.position.set(0, 0.5, 0)
+    base.castShadow = true
+    base.receiveShadow = true
     root.add(base)
+    const backrest = new THREE.Mesh(new THREE.BoxGeometry(4.2, 1.0, 0.35), sofaMaterial)
+    backrest.position.set(0, 1.15, -0.65)
+    backrest.castShadow = true
+    backrest.receiveShadow = true
+    root.add(backrest)
   } else if (slot.id === 'slot-table') {
-    const top = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.15, 1.2), material)
+    const top = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.15, 1.2), tableMaterial)
     top.position.set(0, 1.0, 0)
+    top.castShadow = true
+    top.receiveShadow = true
     root.add(top)
-    const legMat = new THREE.MeshStandardMaterial({ color: 0x9a8d73, roughness: 0.95, metalness: 0 })
     const legPositions = [[0.9, 0.5, 0.5], [-0.9, 0.5, 0.5], [0.9, 0.5, -0.5], [-0.9, 0.5, -0.5]]
     for (const [x, y, z] of legPositions) {
-      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), legMat)
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.12, 1.0, 0.12), legMaterial)
       leg.position.set(x, y, z)
+      leg.castShadow = true
+      leg.receiveShadow = true
       root.add(leg)
     }
   } else if (slot.id === 'slot-tv') {
-    const stand = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.35, 0.6), material)
+    const stand = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.35, 0.6), tvMaterial)
     stand.position.set(0, 0.18, 0)
+    stand.castShadow = true
+    stand.receiveShadow = true
     root.add(stand)
   } else {
-    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.8), material)
+    const cabinet = new THREE.Mesh(new THREE.BoxGeometry(1.6, 2.6, 0.8), shelfMaterial)
     cabinet.position.set(0, 1.3, 0)
+    cabinet.castShadow = true
+    cabinet.receiveShadow = true
     root.add(cabinet)
   }
 
@@ -1045,8 +1417,8 @@ function serializeRoom() {
     templateSlots: getTemplateSnapshot(),
     furniture,
     appearance: applyRoomColors({
-      floorColor: floorMaterial?.color?.getHexString ? `#${floorMaterial.color.getHexString()}` : DEFAULT_FLOOR_COLOR,
-      wallColor: wallMaterial?.color?.getHexString ? `#${wallMaterial.color.getHexString()}` : DEFAULT_WALL_COLOR
+      floorTextureId,
+      wallTextureId
     }),
     camera: {
       position: camera?.position?.toArray?.() || null,
@@ -1362,8 +1734,8 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
           // Basic material safety: ensure meshes are visible.
           holder.traverse((c) => {
             if (c.isMesh) {
-              c.castShadow = false
-              c.receiveShadow = false
+              c.castShadow = true
+              c.receiveShadow = true
               c.frustumCulled = true
             }
           })
@@ -1499,8 +1871,8 @@ watch(
 
     if (command.type === 'apply-room-colors') {
       applyRoomColors({
-        floorColor: command.floorColor,
-        wallColor: command.wallColor
+        floorTextureId: command.floorTextureId,
+        wallTextureId: command.wallTextureId
       })
     }
   }

@@ -16,6 +16,8 @@ import { getSoundLibrary } from '../services/soundLibraryService.js'
 import { loginAccount, registerAccount, getStoredAuth, clearAuth } from '../services/authService.js'
 import { getMyBranding } from '../services/brandingService.js'
 import { applyBrandingTheme, getDefaultBranding } from '../services/brandTheme.js'
+import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
+import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, normalizeFloorTextureId, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
 
 const rooms = ref([])
 const authState = ref(getStoredAuth())
@@ -60,7 +62,12 @@ const commentStateByItem = ref({})
 const roomMusicDraftUrl = ref('')
 const roomMusicDraftVolume = ref(35)
 const roomMusicState = ref({ loading: false, error: '', success: '' })
-const roomAppearanceDraft = ref({ floorColor: '#c0b496', wallColor: '#8f98a3' })
+const roomAppearanceDraft = ref({
+  floorColor: DEFAULT_ROOM_FLOOR_COLOR,
+  wallColor: DEFAULT_ROOM_WALL_COLOR,
+  floorTextureId: DEFAULT_FLOOR_TEXTURE_ID,
+  wallTextureId: DEFAULT_WALL_TEXTURE_ID
+})
 const availableSounds = ref([])
 const roomCommentDraft = ref('')
 const roomCommentState = ref({ loading: false, error: '' })
@@ -105,8 +112,8 @@ const currentRoomSoundTitle = computed(() => {
   return decodeURIComponent(last).replace(/\.[^/.]+$/, '')
 })
 
-const DEFAULT_FLOOR_COLOR = '#c0b496'
-const DEFAULT_WALL_COLOR = '#8f98a3'
+const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
+const DEFAULT_WALL_COLOR = DEFAULT_ROOM_WALL_COLOR
 let initialized = false
 
 function applyCurrentBranding(branding) {
@@ -149,7 +156,9 @@ function syncRoomAppearanceDraft(room) {
   const appearance = room?.sceneData?.appearance || {}
   roomAppearanceDraft.value = {
     floorColor: normalizeHexColor(appearance.floorColor, DEFAULT_FLOOR_COLOR),
-    wallColor: normalizeHexColor(appearance.wallColor, DEFAULT_WALL_COLOR)
+    wallColor: normalizeHexColor(appearance.wallColor, DEFAULT_WALL_COLOR),
+    floorTextureId: normalizeFloorTextureId(appearance.floorTextureId || DEFAULT_FLOOR_TEXTURE_ID),
+    wallTextureId: normalizeWallTextureId(appearance.wallTextureId || DEFAULT_WALL_TEXTURE_ID)
   }
 }
 
@@ -743,7 +752,12 @@ function showHome() {
   saveStatusType.value = ''
   currentRoomData.value = null
   currentRoom.value = null
-  roomAppearanceDraft.value = { floorColor: DEFAULT_FLOOR_COLOR, wallColor: DEFAULT_WALL_COLOR }
+  roomAppearanceDraft.value = {
+    floorColor: DEFAULT_FLOOR_COLOR,
+    wallColor: DEFAULT_WALL_COLOR,
+    floorTextureId: DEFAULT_FLOOR_TEXTURE_ID,
+    wallTextureId: DEFAULT_WALL_TEXTURE_ID
+  }
   stopRoomAudio()
   activeContributionsRoomId.value = ''
   resetContributionDrafts()
@@ -913,13 +927,17 @@ async function onSelectRoomSound(sound) {
 function onApplyRoomColors(colors) {
   roomAppearanceDraft.value = {
     floorColor: normalizeHexColor(colors?.floorColor, DEFAULT_FLOOR_COLOR),
-    wallColor: normalizeHexColor(colors?.wallColor, DEFAULT_WALL_COLOR)
+    wallColor: normalizeHexColor(colors?.wallColor, DEFAULT_WALL_COLOR),
+    floorTextureId: normalizeFloorTextureId(colors?.floorTextureId || roomAppearanceDraft.value.floorTextureId || DEFAULT_FLOOR_TEXTURE_ID),
+    wallTextureId: normalizeWallTextureId(colors?.wallTextureId || roomAppearanceDraft.value.wallTextureId || DEFAULT_WALL_TEXTURE_ID)
   }
 
   sceneCommand.value = {
     type: 'apply-room-colors',
     floorColor: roomAppearanceDraft.value.floorColor,
     wallColor: roomAppearanceDraft.value.wallColor,
+    floorTextureId: roomAppearanceDraft.value.floorTextureId,
+    wallTextureId: roomAppearanceDraft.value.wallTextureId,
     _requestId: Date.now()
   }
 }
