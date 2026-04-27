@@ -55,6 +55,30 @@ function splitConfigList(value) {
     .filter(Boolean)
 }
 
+function extractPolyErrorMessage(err, fallback = 'Unknown API error.') {
+  const payload = err?.response?.data
+  const messageCandidate =
+    payload?.error?.message ||
+    payload?.error ||
+    payload?.message ||
+    err?.message ||
+    fallback
+
+  if (typeof messageCandidate === 'string' && messageCandidate.trim()) {
+    return messageCandidate.trim()
+  }
+
+  if (messageCandidate && typeof messageCandidate === 'object') {
+    try {
+      return JSON.stringify(messageCandidate)
+    } catch {
+      return fallback
+    }
+  }
+
+  return fallback
+}
+
 function makeConfiguredExcludeIds() {
   const out = new Set(BASE_EXCLUDED_IDS)
   for (const id of splitConfigList(CONFIGURED_EXCLUDE_IDS)) {
@@ -337,8 +361,12 @@ async function fetchConfiguredFurnitureSources() {
       const models = await fetchListModels(listId, headers)
       collected.push(...models)
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.message || 'Kon Poly Pizza lijst niet laden.'
-      errors.push(`Lijst ${listId}: ${msg}`)
+      const status = err?.response?.status
+      const msg = extractPolyErrorMessage(err, 'Kon Poly Pizza lijst niet laden.')
+      const details = status === 404
+        ? `${msg} (404: lijst-ID of endpoint niet gevonden)`
+        : msg
+      errors.push(`Lijst ${listId}: ${details}`)
     }
   }
 
@@ -347,7 +375,7 @@ async function fetchConfiguredFurnitureSources() {
       const model = await fetchModelById(modelId, headers)
       if (model) collected.push(model)
     } catch (err) {
-      const msg = err?.response?.data?.error || err?.message || 'Kon model niet laden.'
+      const msg = extractPolyErrorMessage(err, 'Kon model niet laden.')
       errors.push(`Model ${modelId}: ${msg}`)
     }
   }
@@ -403,15 +431,14 @@ async function fetchSearchPage({ limit, page, license }) {
     }
 
     // OpenAPI includes 400 error shape; other errors are possible.
-    const msg =
-      err?.response?.data?.error?.message ||
-      err?.response?.data?.error ||
-      err?.message ||
-      'Unknown API error.'
+    const msg = extractPolyErrorMessage(err, 'Unknown API error.')
+    const details = status === 404
+      ? `${msg} (404: controleer /api/poly-api proxy route en endpoint pad)`
+      : msg
 
     return {
       ok: false,
-      error: `Poly Pizza API request failed: ${msg}`,
+      error: `Poly Pizza API request failed: ${details}`,
       models: fallbackModels
         .map((model) => normalizeModel(model, 'fallback'))
         .filter((m) => isAllowedModel(m) && isAllowedCategory(m))
