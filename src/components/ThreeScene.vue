@@ -5,6 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
+import { adaptStaticAssetUrl } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 
 const props = defineProps({
@@ -780,7 +781,7 @@ async function hydrateCuratedDefaultFurniture() {
 
     try {
       await loadModelAsset({
-        url: curated.url,
+        url: adaptStaticAssetUrl(curated.url),
         title: curated.title || slot.label || slot.id,
         id: curated.id || slot.id,
         replaceRoot: { slotId: slot.id },
@@ -1088,14 +1089,8 @@ async function loadRoom(sceneData) {
     if (item.url) {
       // Load custom model
       try {
-        // Fix URL if it's relative
-        let fixedUrl = item.url
-        if (fixedUrl.startsWith('/poly-static/')) {
-          fixedUrl = 'http://localhost:5000/api' + fixedUrl
-        }
-
         await loadModelAsset({
-          url: fixedUrl,
+          url: adaptStaticAssetUrl(item.url),
           title: item.title || 'Loaded model',
           id: item.id || `loaded-${Date.now()}`,
           replaceRoot: { slotId },

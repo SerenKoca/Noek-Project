@@ -18,13 +18,13 @@ const STATIC_ORIGIN = 'https://static.poly.pizza'
 const API_BASE_URL = (() => {
   if (import.meta.env.VITE_POLYPIZZA_API_BASE_URL) return import.meta.env.VITE_POLYPIZZA_API_BASE_URL
   if (import.meta.env.DEV) return `/poly-api${API_VERSION_PATH}`
-  return `${API_ORIGIN}${API_VERSION_PATH}`
+  return `/api/poly-api${API_VERSION_PATH}`
 })()
 
 const STATIC_BASE_URL = (() => {
   if (import.meta.env.VITE_POLYPIZZA_STATIC_BASE_URL) return import.meta.env.VITE_POLYPIZZA_STATIC_BASE_URL
   if (import.meta.env.DEV) return '/poly-static'
-  return STATIC_ORIGIN
+  return '/api/poly-static'
 })()
 
 const RELATIVE_URL_BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
@@ -80,9 +80,12 @@ function getAuthHeaders() {
   }
 }
 
-function adaptStaticAssetUrl(url) {
+export function adaptStaticAssetUrl(url) {
   if (!url) return ''
-  if (STATIC_BASE_URL === STATIC_ORIGIN) return url
+  if (url.startsWith(STATIC_BASE_URL)) return url
+  if (url.startsWith('/poly-static/')) {
+    return import.meta.env.DEV ? url : `/api${url}`
+  }
   if (url.startsWith(STATIC_ORIGIN)) {
     return `${STATIC_BASE_URL}${url.slice(STATIC_ORIGIN.length)}`
   }

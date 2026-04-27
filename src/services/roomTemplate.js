@@ -1,3 +1,5 @@
+import { adaptStaticAssetUrl } from './polyPizzaService.js'
+
 export const ROOM_TEMPLATE = {
   slots: [
     {
@@ -9,7 +11,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'ZOPP3KzNIk',
         title: 'Couch Small',
-        url: 'https://static.poly.pizza/4e8fbbf3-9992-4068-8918-2126a0304127.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/4e8fbbf3-9992-4068-8918-2126a0304127.glb'),
         scaleMultiplier: 1.22,
         rotationYOffset: 0.08
       }
@@ -23,7 +25,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'myd1WSucAz',
         title: 'Armchair',
-        url: 'https://static.poly.pizza/2584a961-1b06-4fb7-ba7d-1074b52ca908.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/2584a961-1b06-4fb7-ba7d-1074b52ca908.glb'),
         scaleMultiplier: 1.05,
         rotationYOffset: -0.05
       }
@@ -37,7 +39,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'rAEBvfb1FT',
         title: 'Small Table',
-        url: 'https://static.poly.pizza/0f319f3b-b0d6-4691-bae5-c6c6e612df99.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/0f319f3b-b0d6-4691-bae5-c6c6e612df99.glb'),
         scaleMultiplier: 1.08,
         rotationYOffset: 0.05
       }
@@ -51,7 +53,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'tknOVwxT8B',
         title: 'Candlestick',
-        url: 'https://static.poly.pizza/e6c65b91-0e3a-45f6-8e9e-9da5faa3f91d.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/e6c65b91-0e3a-45f6-8e9e-9da5faa3f91d.glb'),
         scaleMultiplier: 0.46,
         rotationYOffset: 0
       }
@@ -65,7 +67,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: '9trLeWoBek',
         title: 'Television',
-        url: 'https://static.poly.pizza/1ddcd36c-ac9e-4dc2-a056-846cea033c02.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/1ddcd36c-ac9e-4dc2-a056-846cea033c02.glb'),
         scaleMultiplier: 1.06,
         rotationYOffset: 0
       }
@@ -79,7 +81,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'tACDGJ4CGW',
         title: 'Bookcase with Books',
-        url: 'https://static.poly.pizza/7d59d0aa-6447-4bbb-afc7-0452e9a34353.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/7d59d0aa-6447-4bbb-afc7-0452e9a34353.glb'),
         scaleMultiplier: 1.14,
         rotationYOffset: -0.08
       }
@@ -93,7 +95,7 @@ export const ROOM_TEMPLATE = {
       initialModel: {
         id: 'IWnizIOIyu',
         title: 'Hat Stand',
-        url: 'https://static.poly.pizza/f9aa955b-0515-4d32-8b27-0e48062b7c34.glb',
+        url: adaptStaticAssetUrl('https://static.poly.pizza/f9aa955b-0515-4d32-8b27-0e48062b7c34.glb'),
         scaleMultiplier: 1.18,
         rotationYOffset: 0
       }
