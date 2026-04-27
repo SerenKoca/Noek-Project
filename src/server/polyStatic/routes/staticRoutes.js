@@ -9,12 +9,29 @@ export async function staticRouter(req, res) {
     return
   }
 
-  const { targetPath, search } = deriveTarget(req.url)
+  const { targetPath, search } = deriveTarget(req)
   await handlePolyStatic(req, res, { targetPath, search })
 }
 
-function deriveTarget(requestUrl) {
+function deriveTarget(req) {
+  const requestUrl = req?.url || '/'
   const url = new URL(requestUrl, 'http://localhost')
+
+  const pathFromQuery = req?.query?.path
+  if (Array.isArray(pathFromQuery) && pathFromQuery.length) {
+    return {
+      targetPath: `/${pathFromQuery.join('/')}`,
+      search: url.search
+    }
+  }
+
+  if (typeof pathFromQuery === 'string' && pathFromQuery.trim()) {
+    return {
+      targetPath: `/${pathFromQuery.trim()}`,
+      search: url.search
+    }
+  }
+
   let relativePath = url.pathname.startsWith(STATIC_BASE_PATH) ? url.pathname.slice(STATIC_BASE_PATH.length) : url.pathname
   if (!relativePath || relativePath === '') relativePath = '/'
   return {

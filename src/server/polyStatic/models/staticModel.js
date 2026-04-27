@@ -7,8 +7,7 @@ export async function fetchPolyStaticAsset({ path, search, acceptHeader, userAge
   const upstream = await fetch(url, {
     method: 'GET',
     headers: {
-      accept: acceptHeader || '*/*',
-      'user-agent': userAgent || 'PolyPizzaProxy/1.0'
+      accept: acceptHeader || '*/*'
     }
   })
 

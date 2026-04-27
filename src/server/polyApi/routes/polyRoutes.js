@@ -11,7 +11,7 @@ export async function polyRouter(req, res) {
     return
   }
 
-  const { targetPath, search } = deriveTarget(req.url)
+  const { targetPath, search } = deriveTarget(req)
 
   if (targetPath === '/health') {
     await handleHealthCheck(res)
@@ -21,8 +21,25 @@ export async function polyRouter(req, res) {
   await handlePolyProxy(req, res, { targetPath, search })
 }
 
-function deriveTarget(requestUrl) {
+function deriveTarget(req) {
+  const requestUrl = req?.url || '/'
   const url = new URL(requestUrl, 'http://localhost')
+
+  const pathFromQuery = req?.query?.path
+  if (Array.isArray(pathFromQuery) && pathFromQuery.length) {
+    return {
+      targetPath: `/${pathFromQuery.join('/')}`,
+      search: url.search
+    }
+  }
+
+  if (typeof pathFromQuery === 'string' && pathFromQuery.trim()) {
+    return {
+      targetPath: `/${pathFromQuery.trim()}`,
+      search: url.search
+    }
+  }
+
   let relativePath = url.pathname.startsWith(API_BASE_PATH) ? url.pathname.slice(API_BASE_PATH.length) : url.pathname
   if (!relativePath || relativePath === '') relativePath = '/'
   return {
