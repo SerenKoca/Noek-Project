@@ -10,6 +10,23 @@ export async function handlePolyProxy(req, res, context) {
       userAgent: req.headers['user-agent']
     })
 
+    setProxyDebugHeaders(res, {
+      proxy: 'poly-api',
+      targetPath: context.targetPath,
+      search: context.search,
+      status: result.status
+    })
+
+    if (result.status >= 400) {
+      console.warn('[poly-api-proxy] upstream non-2xx', {
+        status: result.status,
+        targetPath: context.targetPath,
+        search: context.search,
+        contentType: result.headers?.['content-type'] || '',
+        bodyPreview: toBodyPreview(result.body)
+      })
+    }
+
     res.status(result.status)
     Object.entries(result.headers).forEach(([key, value]) => {
       if (value) res.setHeader(key, value)
@@ -25,5 +42,21 @@ export async function handlePolyProxy(req, res, context) {
 
     console.error('Poly Pizza proxy error', error)
     res.status(502).json({ error: 'Proxy request to Poly Pizza failed.' })
+  }
+}
+
+function setProxyDebugHeaders(res, { proxy, targetPath, search, status }) {
+  res.setHeader('x-noek-proxy', proxy)
+  res.setHeader('x-noek-target-path', String(targetPath || '/'))
+  res.setHeader('x-noek-target-search', String(search || ''))
+  res.setHeader('x-noek-upstream-status', String(status || 0))
+}
+
+function toBodyPreview(buffer) {
+  try {
+    const text = Buffer.from(buffer || []).toString('utf8').trim()
+    return text.slice(0, 280)
+  } catch {
+    return ''
   }
 }
