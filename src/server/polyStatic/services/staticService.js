@@ -1,14 +1,13 @@
 import { fetchPolyStaticAsset } from '../models/staticModel.js'
 
-export async function proxyPolyStaticRequest({ targetPath, search, acceptHeader, userAgent }) {
+export async function proxyPolyStaticRequest({ targetPath, search, headers }) {
   const normalizedPath = normalizePath(targetPath)
   const searchSuffix = typeof search === 'string' ? search : ''
 
   return fetchPolyStaticAsset({
     path: normalizedPath,
     search: searchSuffix,
-    acceptHeader,
-    userAgent
+    headers
   })
 }
 

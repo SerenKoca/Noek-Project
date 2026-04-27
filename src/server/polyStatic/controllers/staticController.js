@@ -5,8 +5,7 @@ export async function handlePolyStatic(req, res, context) {
     const result = await proxyPolyStaticRequest({
       targetPath: context.targetPath,
       search: context.search,
-      acceptHeader: req.headers.accept,
-      userAgent: req.headers['user-agent']
+      headers: pickForwardHeaders(req.headers)
     })
 
     setProxyDebugHeaders(res, {
@@ -35,6 +34,22 @@ export async function handlePolyStatic(req, res, context) {
   } catch (error) {
     console.error('Poly Pizza static proxy error', error)
     res.status(502).json({ error: 'Proxy request to Poly Pizza static host failed.' })
+  }
+}
+
+function pickForwardHeaders(headers = {}) {
+  return {
+    accept: headers.accept,
+    'accept-language': headers['accept-language'],
+    origin: headers.origin,
+    referer: headers.referer || headers.referrer,
+    'sec-ch-ua': headers['sec-ch-ua'],
+    'sec-ch-ua-mobile': headers['sec-ch-ua-mobile'],
+    'sec-ch-ua-platform': headers['sec-ch-ua-platform'],
+    'sec-fetch-dest': headers['sec-fetch-dest'],
+    'sec-fetch-mode': headers['sec-fetch-mode'],
+    'sec-fetch-site': headers['sec-fetch-site'],
+    'user-agent': headers['user-agent']
   }
 }
 

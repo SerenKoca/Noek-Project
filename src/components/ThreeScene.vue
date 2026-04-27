@@ -1127,7 +1127,7 @@ async function hydrateCuratedDefaultFurniture() {
     if (!curated?.url) continue
 
     try {
-      await loadModelAsset({
+      await loadModelAssetWithFallback({
         url: adaptStaticAssetUrl(curated.url),
         title: curated.title || slot.label || slot.id,
         id: curated.id || slot.id,
@@ -1461,7 +1461,7 @@ async function loadRoom(sceneData) {
     if (item.url) {
       // Load custom model
       try {
-        await loadModelAsset({
+        await loadModelAssetWithFallback({
           url: adaptStaticAssetUrl(item.url),
           title: item.title || 'Loaded model',
           id: item.id || `loaded-${Date.now()}`,
@@ -1697,6 +1697,52 @@ function snapRootToFloor(root, floorY = FLOOR_Y) {
   if (Number.isFinite(delta) && delta > 0) {
     root.position.y += delta
     root.updateMatrixWorld(true)
+  }
+}
+
+function buildDirectStaticUrl(url) {
+  if (!url) return ''
+  const normalized = String(url)
+  if (normalized.startsWith('https://static.poly.pizza')) {
+    return normalized
+  }
+  if (normalized.startsWith('/api/poly-static/')) {
+    return `https://static.poly.pizza${normalized.slice('/api/poly-static'.length)}`
+  }
+  if (normalized.startsWith('/poly-static/')) {
+    return `https://static.poly.pizza${normalized.slice('/poly-static'.length)}`
+  }
+  return normalized
+}
+
+async function loadModelAssetWithFallback({ url, title, id, replaceRoot = null, transform = {} }) {
+  const primaryUrl = adaptStaticAssetUrl(url)
+
+  try {
+    return await loadModelAsset({
+      url: primaryUrl,
+      title,
+      id,
+      replaceRoot,
+      transform
+    })
+  } catch (error) {
+    const status = Number(error?.status || error?.response?.status || error?.cause?.status)
+    const directUrl = buildDirectStaticUrl(url)
+    const shouldRetry = directUrl && directUrl !== primaryUrl && (status === 403 || /403/.test(String(error?.message || '')))
+
+    if (!shouldRetry) {
+      throw error
+    }
+
+    console.warn(`Primary static URL failed for ${title || id || 'model'}; retrying direct static host.`)
+    return loadModelAsset({
+      url: directUrl,
+      title,
+      id,
+      replaceRoot,
+      transform
+    })
   }
 }
 
