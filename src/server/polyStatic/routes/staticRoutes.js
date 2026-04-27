@@ -19,23 +19,40 @@ function deriveTarget(req) {
 
   const pathFromQuery = req?.query?.path
   if (Array.isArray(pathFromQuery) && pathFromQuery.length) {
+    const normalized = normalizeProxyPath(`/${pathFromQuery.join('/')}`)
     return {
-      targetPath: `/${pathFromQuery.join('/')}`,
+      targetPath: normalized,
       search: url.search
     }
   }
 
   if (typeof pathFromQuery === 'string' && pathFromQuery.trim()) {
+    const normalized = normalizeProxyPath(`/${pathFromQuery.trim()}`)
     return {
-      targetPath: `/${pathFromQuery.trim()}`,
+      targetPath: normalized,
       search: url.search
     }
   }
 
   let relativePath = url.pathname.startsWith(STATIC_BASE_PATH) ? url.pathname.slice(STATIC_BASE_PATH.length) : url.pathname
   if (!relativePath || relativePath === '') relativePath = '/'
+  relativePath = normalizeProxyPath(relativePath)
   return {
     targetPath: relativePath,
     search: url.search
   }
+}
+
+function normalizeProxyPath(rawPath) {
+  let p = String(rawPath || '/').trim()
+  if (!p.startsWith('/')) p = `/${p}`
+
+  if (p.startsWith(`${STATIC_BASE_PATH}/`)) {
+    p = p.slice(STATIC_BASE_PATH.length)
+  } else if (p === STATIC_BASE_PATH) {
+    p = '/'
+  }
+
+  if (!p || p === '') p = '/'
+  return p
 }
