@@ -106,30 +106,42 @@ function getAuthHeaders() {
 
 export function adaptStaticAssetUrl(url) {
   if (!url) return ''
+  const isDev = import.meta.env.DEV
+
+  if (!isDev && url.startsWith('/api/poly-static/')) {
+    return `${STATIC_ORIGIN}${url.slice('/api/poly-static'.length)}`
+  }
+
+  if (!isDev && url.startsWith('/poly-static/')) {
+    return `${STATIC_ORIGIN}${url.slice('/poly-static'.length)}`
+  }
+
   try {
     const parsed = new URL(url, RELATIVE_URL_BASE)
     const host = String(parsed.hostname || '').toLowerCase()
     const isLocalHost = host === 'localhost' || host === '127.0.0.1'
 
     if (isLocalHost && parsed.pathname.startsWith('/api/poly-static/')) {
-      const suffix = `${parsed.pathname}${parsed.search || ''}${parsed.hash || ''}`
-      return import.meta.env.DEV ? suffix.replace(/^\/api/, '') : suffix
+      const suffix = `${parsed.pathname.slice('/api/poly-static'.length)}${parsed.search || ''}${parsed.hash || ''}`
+      return isDev ? `/poly-static${suffix}` : `${STATIC_ORIGIN}${suffix}`
     }
 
     if (isLocalHost && parsed.pathname.startsWith('/poly-static/')) {
-      const suffix = `${parsed.pathname}${parsed.search || ''}${parsed.hash || ''}`
-      return import.meta.env.DEV ? suffix : `/api${suffix}`
+      const suffix = `${parsed.pathname.slice('/poly-static'.length)}${parsed.search || ''}${parsed.hash || ''}`
+      return isDev ? `/poly-static${suffix}` : `${STATIC_ORIGIN}${suffix}`
     }
   } catch {
     // Ignore URL parsing errors and continue with simple string checks.
   }
 
-  if (url.startsWith(STATIC_BASE_URL)) return url
+  if (url.startsWith(STATIC_BASE_URL)) {
+    return isDev ? url : `${STATIC_ORIGIN}${url.slice(STATIC_BASE_URL.length)}`
+  }
   if (url.startsWith('/poly-static/')) {
-    return import.meta.env.DEV ? url : `/api${url}`
+    return isDev ? url : `${STATIC_ORIGIN}${url.slice('/poly-static'.length)}`
   }
   if (url.startsWith(STATIC_ORIGIN)) {
-    return `${STATIC_BASE_URL}${url.slice(STATIC_ORIGIN.length)}`
+    return isDev ? `${STATIC_BASE_URL}${url.slice(STATIC_ORIGIN.length)}` : url
   }
   return url
 }

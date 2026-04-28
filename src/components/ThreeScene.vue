@@ -1735,7 +1735,9 @@ async function loadModelAssetWithFallback({ url, title, id, replaceRoot = null, 
       throw error
     }
 
-    console.warn(`Primary static URL failed for ${title || id || 'model'}; retrying direct static host.`)
+    if (import.meta.env.DEV) {
+      console.warn(`Primary static URL failed for ${title || id || 'model'}; retrying direct static host.`)
+    }
     return loadModelAsset({
       url: directUrl,
       title,
