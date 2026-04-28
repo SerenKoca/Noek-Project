@@ -23,7 +23,7 @@ export async function fetchPolyStaticAsset({ path, search, headers = {} }) {
     }
   })
 
-  const headers = PASS_HEADERS.reduce((acc, header) => {
+  const responseHeaders = PASS_HEADERS.reduce((acc, header) => {
     const value = upstream.headers.get(header)
     if (value) acc[header] = value
     return acc
@@ -33,7 +33,7 @@ export async function fetchPolyStaticAsset({ path, search, headers = {} }) {
 
   return {
     status: upstream.status,
-    headers,
+    headers: responseHeaders,
     body: buffer
   }
 }
