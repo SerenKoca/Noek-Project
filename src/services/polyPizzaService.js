@@ -450,6 +450,9 @@ export async function fetchModels({ max = 200 } = {}) {
   const limit = Math.min(Math.max(1, max), 500)
   const sourceResult = await fetchConfiguredFurnitureSources()
   const pinnedFromConfig = Array.isArray(sourceResult.models) ? sourceResult.models : []
+  const fallbackList = fallbackModels
+    .map((model) => normalizeModel(model, 'fallback'))
+    .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
 
   if (ONLY_CONFIGURED_SOURCES) {
     if (pinnedFromConfig.length > 0) {
@@ -460,8 +463,8 @@ export async function fetchModels({ max = 200 } = {}) {
     }
 
     return {
-      models: [],
-      error: sourceResult.error || 'Geen modellen gevonden in geconfigureerde lijsten/modellen.'
+      models: fallbackList.slice(0, limit),
+      error: sourceResult.error || 'Geen modellen gevonden in geconfigureerde lijsten/modellen. Toon fallbackmodellen.'
     }
   }
 
@@ -500,9 +503,6 @@ export async function fetchModels({ max = 200 } = {}) {
   const cc0 = await gather(1)
   if (!cc0.ok) {
     // API failure: fallback immediately (requirement).
-    const fallbackList = fallbackModels
-      .map((model) => normalizeModel(model, 'fallback'))
-      .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
     const baseFallback = uniqueById([...pinnedFromConfig, ...fallbackList])
     const pinned = baseFallback.slice(0, limit)
     const rest = baseFallback.filter((m) => !pinned.some((p) => p.ID === m.ID))
@@ -536,9 +536,6 @@ export async function fetchModels({ max = 200 } = {}) {
 
   if (models.length === 0) {
     // Empty or incompatible response: fallback.
-    const fallbackList = fallbackModels
-      .map((model) => normalizeModel(model, 'fallback'))
-      .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
     const baseFallback = uniqueById([...pinnedFromConfig, ...fallbackList])
     const pinnedFallback = baseFallback.slice(0, limit)
     const restFallback = baseFallback.filter((m) => !pinnedFallback.some((p) => p.ID === m.ID))
