@@ -1870,8 +1870,8 @@ watch(
         replaceRoot = slot?.root || slot?.marker || null
       }
 
-      await loadModelAsset({
-        url: assetUrl,
+      await loadModelAssetWithFallback({
+        url: adaptStaticAssetUrl(assetUrl),
         title,
         id,
         replaceRoot,
