@@ -1764,7 +1764,7 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
             return
           }
 
-          const targetSlotId = replaceRoot?.userData?.slotId || replaceRoot?.slotId || ''
+          const targetSlotId = replaceRoot?.userData?.slotId || replaceRoot?.slotId || templateEditorSlotId.value || TEMPLATE_SLOTS.value[0]?.id || ''
           if (!targetSlotId || !slotStates.has(targetSlotId)) {
             reject(new Error('Selecteer eerst een meubel of pluspositie in de kamer.'))
             return

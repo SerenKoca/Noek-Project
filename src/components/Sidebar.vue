@@ -327,8 +327,7 @@ function requestLoadWithMode(model, mode = 'add') {
     payload.targetUuid = props.selected.uuid
     payload.targetSlotId = props.selected.slotId || ''
   } else if (effectiveMode === 'replace-selected') {
-    error.value = 'Selecteer eerst een meubel of pluspositie in de kamer.'
-    return
+    payload.placementMode = 'add'
   }
 
   emit('load-model', payload)
