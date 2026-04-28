@@ -2,6 +2,10 @@
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "rewrites": [
     {
+      "source": "/api/admin/funeral-directors/:path*",
+      "destination": "/api/admin/funeral-directors?path=:path*"
+    },
+    {
       "source": "/api/poly-api",
       "destination": "/api/poly-api-handler"
     },
