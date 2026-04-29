@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { fallbackModels } from './fallbackModels'
+import { fallbackModels } from './fallbackModels.js'
 import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 // Derived strictly from the provided OpenAPI YAML:

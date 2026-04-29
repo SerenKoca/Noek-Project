@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
-import { adaptStaticAssetUrl } from '../services/polyPizzaService.js'
+import { adaptStaticAssetUrl, fetchModels } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
 import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, createFloorTexture, createWallTexture, normalizeFloorTextureId, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
@@ -430,10 +430,15 @@ let sideWallMaterial = null
 let tileMaterial = null
 const templateEditorOpen = ref(false)
 const templateEditorMessage = ref('')
+const selectedTemplateTarget = ref(null)
 const templateEditorSlotId = ref(TEMPLATE_SLOTS.value[0]?.id || '')
 const templateSlotCategory = ref('Alle')
 const templateDragEnabled = ref(false)
 const templateDragMode = ref('translate')
+const templateReplacementLoading = ref(false)
+const templateReplacementError = ref('')
+const templateReplacementSearch = ref('')
+const templateReplacementModels = ref([])
 const templateDraft = ref({
   x: 0,
   y: 0,
@@ -447,6 +452,18 @@ const templateDraft = ref({
 let isSyncingSlotFromTransform = false
 
 const TEMPLATE_SLOT_EDITOR_CATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Persoonlijk', 'Media']
+
+const filteredReplacementModels = computed(() => {
+  const query = String(templateReplacementSearch.value || '').trim().toLowerCase()
+  if (!query) return templateReplacementModels.value
+
+  return templateReplacementModels.value.filter((model) => {
+    const title = String(model?.title || '').toLowerCase()
+    const id = String(model?.id || '').toLowerCase()
+    const category = String(model?.modelCategory || '').toLowerCase()
+    return title.includes(query) || id.includes(query) || category.includes(query)
+  })
+})
 
 function getDefaultTemplateCategories(slotId) {
   const id = String(slotId || '').toLowerCase()
@@ -503,6 +520,58 @@ function writeDraftFromSlot(slotId = templateEditorSlotId.value) {
     acceptsMeubel: accepts.includes('meubel') || accepts.includes('alles'),
     acceptsPersoonlijk: accepts.includes('persoonlijk') || accepts.includes('alles'),
     acceptsDecoratie: accepts.includes('decoratie') || accepts.includes('alles')
+  }
+}
+
+async function loadTemplateReplacementModels() {
+  if (!canEditTemplate.value || templateReplacementLoading.value) return
+
+  templateReplacementLoading.value = true
+  templateReplacementError.value = ''
+
+  try {
+    const result = await fetchModels({ max: 80 })
+    templateReplacementModels.value = Array.isArray(result?.models) ? result.models : []
+    if (!templateReplacementModels.value.length) {
+      templateReplacementError.value = String(result?.error || 'Geen vervangmodellen gevonden.')
+    }
+  } catch (error) {
+    templateReplacementModels.value = []
+    templateReplacementError.value = error?.message || 'Kon vervangmodellen niet laden.'
+  } finally {
+    templateReplacementLoading.value = false
+  }
+}
+
+async function replaceSelectedTemplateObject(model) {
+  if (!canEditTemplate.value) return
+
+  if (!selectedRoot) {
+    templateEditorMessage.value = 'Klik eerst op een object in de kamer om het te vervangen.'
+    return
+  }
+
+  const url = model?.url || model?.downloadUrl || model?.Download || ''
+  if (!url) {
+    templateEditorMessage.value = 'Het gekozen model mist een download-URL.'
+    return
+  }
+
+  try {
+    templateEditorMessage.value = ''
+    await loadModelAssetWithFallback({
+      url: adaptStaticAssetUrl(url),
+      title: model?.title || model?.Title || 'Vervangmodel',
+      id: model?.id || model?.ID || '',
+      replaceRoot: selectedRoot,
+      transform: {
+        sizeMultiplier: Number(model?.sizeMultiplier) || 1,
+        modelCategory: model?.modelCategory || ''
+      }
+    })
+    templateEditorMessage.value = `Object vervangen door ${model?.title || model?.Title || 'nieuw model'}.`
+  } catch (error) {
+    templateEditorMessage.value = error?.message || 'Vervangen mislukt.'
   }
 }
 
@@ -1360,6 +1429,7 @@ function getRootModel(obj) {
 
 function deselect() {
   selectedRoot = null
+  selectedTemplateTarget.value = null
   if (transform) {
     transform.detach()
     transform.visible = false
@@ -1371,6 +1441,15 @@ function deselect() {
 
 function select(root) {
   selectedRoot = root
+  selectedTemplateTarget.value = root?.userData?.isSlotMarker
+    ? null
+    : {
+        uuid: root?.uuid || '',
+        id: root?.userData?.id || '',
+        title: root?.userData?.title || '',
+        slotId: root?.userData?.slotId || '',
+        slotLabel: root?.userData?.slotLabel || ''
+      }
   if (root?.userData?.slotId) {
     templateEditorSlotId.value = String(root.userData.slotId)
     writeDraftFromSlot(templateEditorSlotId.value)
@@ -1984,6 +2063,8 @@ watch(templateSlotCategory, () => {
 watch(templateEditorOpen, (isOpen) => {
   if (!isOpen) {
     templateDragEnabled.value = false
+  } else {
+    loadTemplateReplacementModels()
   }
   updateTemplateDragBinding()
 })
@@ -2004,6 +2085,7 @@ onMounted(() => {
   }
   createScene()
   writeDraftFromSlot(templateEditorSlotId.value)
+  loadTemplateReplacementModels()
   sceneReady.value = true
 })
 
@@ -2043,7 +2125,7 @@ onBeforeUnmount(() => {
     <div ref="containerEl" class="h-full w-full"></div>
     <div
       class="rounded bg-black/80 px-3 py-2 text-xs text-white"
-      style="position: fixed; right: 14px; bottom: 18px; z-index: 2200; width: min(360px, calc(100vw - 28px)); max-height: min(72vh, 640px); overflow: auto; border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 40px rgba(0,0,0,0.45);"
+      style="position: fixed; right: 14px; bottom: 18px; z-index: 2200; width: min(480px, calc(100vw - 28px)); max-height: min(78vh, 720px); overflow: auto; border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 40px rgba(0,0,0,0.45);"
     >
       <button
         v-if="canEditTemplate"
@@ -2165,6 +2247,65 @@ onBeforeUnmount(() => {
 
         <div style="font-size: 11px; color: rgba(255,255,255,0.8);">
           Tip: kies een slot, zet verslepen aan, en sleep direct in de scene.
+        </div>
+
+        <div style="display: grid; gap: 6px; padding-top: 8px; border-top: 1px solid rgba(255,255,255,0.12);">
+          <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
+            <span>Object vervangen</span>
+            <span style="padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.12); color: #fff; font-size: 11px;">
+              {{ selectedTemplateTarget?.title || 'Klik een object aan' }}
+            </span>
+          </div>
+
+          <label style="display: grid; gap: 4px;">
+            <span>Zoek model</span>
+            <input
+              v-model="templateReplacementSearch"
+              type="text"
+              placeholder="zoek op naam of categorie"
+              style="padding: 6px; border-radius: 6px; background: #0f1720; color: #fff; border: 1px solid rgba(255,255,255,0.2);"
+            />
+          </label>
+
+          <div v-if="templateReplacementLoading" style="color: rgba(255,255,255,0.85);">
+            Modellen laden...
+          </div>
+
+          <div v-else-if="templateReplacementError" style="color: #ffb4b4;">
+            {{ templateReplacementError }}
+          </div>
+
+          <div
+            v-else
+            style="display: grid; gap: 6px; max-height: 240px; overflow: auto; padding-right: 4px;"
+          >
+            <button
+              v-for="model in filteredReplacementModels.slice(0, 30)"
+              :key="model.id || model.ID || model.title"
+              type="button"
+              :disabled="!selectedTemplateTarget"
+              style="display: flex; align-items: center; gap: 10px; padding: 8px; border-radius: 8px; border: 1px solid rgba(255,255,255,0.18); background: rgba(255,255,255,0.06); color: #fff; text-align: left; cursor: pointer;"
+              @click="replaceSelectedTemplateObject(model)"
+            >
+              <img
+                :src="model.thumbnailUrl || model.previewUrl || model.Thumbnail || ''"
+                :alt="model.title || model.Title || 'Model preview'"
+                style="width: 54px; height: 54px; flex: 0 0 54px; border-radius: 8px; object-fit: cover; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.14);"
+              />
+              <span style="display: grid; gap: 2px; min-width: 0;">
+                <strong style="font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">{{ model.title || model.Title }}</strong>
+                <small style="color: rgba(255,255,255,0.75); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+                  {{ model.modelCategory || model.category || 'Model' }}
+                </small>
+              </span>
+              <span style="margin-left: auto; padding: 2px 8px; border-radius: 999px; background: rgba(255,255,255,0.1); font-size: 11px; white-space: nowrap;">
+                Vervang
+              </span>
+            </button>
+            <div v-if="filteredReplacementModels.length === 0" style="color: rgba(255,255,255,0.75);">
+              Geen modellen gevonden.
+            </div>
+          </div>
         </div>
 
         <div v-if="templateEditorMessage" style="color: #d8f3dc; font-size: 11px;">
