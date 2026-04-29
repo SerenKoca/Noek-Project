@@ -44,6 +44,13 @@ export async function getRooms(options = {}) {
   return response.data
 }
 
+export async function getRoomTemplate(options = {}) {
+  const response = await http.get('/rooms/template', {
+    loader: { skip: options.skipLoader === true }
+  })
+  return response.data
+}
+
 export async function getRoomContributions(roomId, options = {}) {
   const response = await http.get(`/rooms/${roomId}/contributions`, {
     loader: { skip: options.skipLoader === true }

@@ -1,7 +1,13 @@
 import Room from '../../backend/models/Room.js'
 import RoomContribution from '../../backend/models/RoomContribution.js'
+import { User } from '../../src/server/models/User.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
+import { ROOM_TEMPLATE } from '../../src/services/roomTemplate.js'
+
+const ROOM_TEMPLATE_OWNER_EMAIL = String(
+  process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
+).trim().toLowerCase()
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
@@ -29,6 +35,18 @@ async function findOwnedRoom(roomId, ownerId) {
 
 async function findOwnedContribution(roomId, ownerId, contributionId) {
   return RoomContribution.findOne({ _id: contributionId, roomId, ownerId })
+}
+
+function buildFallbackTemplateSceneData() {
+  return {
+    templateSlots: JSON.parse(JSON.stringify(ROOM_TEMPLATE?.slots || [])),
+    furniture: [],
+    appearance: {},
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      source: 'fallback-template'
+    }
+  }
 }
 
 function normalizeRoomReactionType(value) {
@@ -62,6 +80,37 @@ export default async function handler(req, res) {
   }
 
   const segments = normalizePathSegments(req.query.path)
+
+  if (segments[0] === 'template' && segments.length === 1) {
+    try {
+      const templateOwner = await User.findOne({
+        email: ROOM_TEMPLATE_OWNER_EMAIL,
+        role: 'editor'
+      })
+
+      if (templateOwner) {
+        const templateRoom = await Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })
+        if (templateRoom?.sceneData) {
+          res.status(200).json({
+            sceneData: templateRoom.sceneData,
+            roomId: templateRoom._id,
+            source: 'template-room'
+          })
+          return
+        }
+      }
+
+      res.status(200).json({
+        sceneData: buildFallbackTemplateSceneData(),
+        source: 'fallback-template'
+      })
+    } catch (error) {
+      console.error('getRoomTemplate error:', error)
+      res.status(500).json({ error: 'Kon begintemplate niet ophalen.' })
+    }
+    return
+  }
+
   const roomId = segments[0]
 
   if (!roomId) {

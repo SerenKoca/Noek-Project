@@ -1,5 +1,5 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import ThreeScene from '../components/ThreeScene.vue'
@@ -14,6 +14,11 @@ const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
 const showRoomReactions = false
+const TEMPLATE_OWNER_EMAIL = String(import.meta.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
+const canEditTemplate = computed(() => {
+  const email = String(state.authState.value?.user?.email || '').trim().toLowerCase()
+  return email === TEMPLATE_OWNER_EMAIL
+})
 
 onMounted(async () => {
   await state.bootstrap()
@@ -197,6 +202,7 @@ async function shareCurrentRoom() {
             :load-request="state.loadRequest.value"
             :scene-command="state.sceneCommand.value"
             :room-data="state.currentRoomData.value"
+            :can-edit-template="canEditTemplate"
             @selected="state.onSelected"
             @selected-anchor="state.onSelectedAnchor"
             @load-error="state.onLoadError"

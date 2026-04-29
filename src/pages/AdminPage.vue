@@ -1,12 +1,15 @@
 <script setup>
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
+import ThreeScene from '../components/ThreeScene.vue'
 import {
   createFuneralDirector,
   deleteFuneralDirector,
   getFuneralDirectorDetails,
-  getFuneralDirectors
+  getFuneralDirectors,
+  getTemplateRoom,
+  updateTemplateRoom
 } from '../services/adminService.js'
 import './styles/home-page.css'
 import './styles/auth-page.css'
@@ -22,11 +25,22 @@ const selectedDirectorId = ref('')
 const selectedDetails = ref(null)
 const detailsLoading = ref(false)
 const detailsError = ref('')
+const templatePanelOpen = ref(true)
+const templateLoading = ref(false)
+const templateSaving = ref(false)
+const templateError = ref('')
+const templateStatus = ref('')
+const templateRoomId = ref('')
+const templateRoomName = ref('')
+const templateSceneData = ref(null)
+const templateSceneRef = ref(null)
 const form = ref({
   displayName: '',
   email: '',
   password: ''
 })
+
+const canEditTemplate = computed(() => true)
 
 function formatApiError(err, fallback) {
   const data = err?.response?.data || {}
@@ -52,6 +66,59 @@ async function loadDirectors() {
   }
 }
 
+async function loadTemplateRoom() {
+  templateLoading.value = true
+  templateError.value = ''
+  templateStatus.value = ''
+
+  try {
+    const result = await getTemplateRoom()
+    templateRoomId.value = String(result?.roomId || '')
+    templateRoomName.value = String(result?.name || 'Template kamer')
+    templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : null
+  } catch (err) {
+    templateError.value = formatApiError(err, 'Kon template kamer niet laden.')
+    templateSceneData.value = null
+  } finally {
+    templateLoading.value = false
+  }
+}
+
+async function openTemplateEditor() {
+  templatePanelOpen.value = true
+  await loadTemplateRoom()
+}
+
+function closeTemplateEditor() {
+  templatePanelOpen.value = false
+  templateError.value = ''
+  templateStatus.value = ''
+}
+
+async function saveTemplateRoom() {
+  if (!templateSceneRef.value?.serializeRoom) {
+    templateError.value = 'Template scene is nog niet klaar om op te slaan.'
+    return
+  }
+
+  templateSaving.value = true
+  templateError.value = ''
+  templateStatus.value = ''
+
+  try {
+    const sceneData = templateSceneRef.value.serializeRoom()
+    const result = await updateTemplateRoom({ sceneData })
+    templateRoomId.value = String(result?.roomId || templateRoomId.value || '')
+    templateRoomName.value = String(result?.name || templateRoomName.value || 'Template kamer')
+    templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : sceneData
+    templateStatus.value = 'Template opgeslagen.'
+  } catch (err) {
+    templateError.value = formatApiError(err, 'Kon template niet opslaan.')
+  } finally {
+    templateSaving.value = false
+  }
+}
+
 onMounted(async () => {
   await state.bootstrap()
 
@@ -65,6 +132,7 @@ onMounted(async () => {
     return
   }
 
+  await loadTemplateRoom()
   await loadDirectors()
 })
 
@@ -143,24 +211,6 @@ async function logout() {
   <div class="editor-page is-home">
     <div class="auth-page-v2 admin-auth-page">
       <div class="auth-card-v2 admin-auth-card">
-        <section class="auth-hero-v2 admin-hero">
-          <div class="auth-logo-v2">
-            <img src="/img/logo-noek.svg" alt="Noek logo" class="auth-logo-image-v2" />
-          </div>
-          <h1>Hoofdadmin</h1>
-          <p>Beheer uitvaartondernemers en bekijk klanten, kamers en gekozen branding.</p>
-          <div class="auth-candle-scene-v2" aria-hidden="true">
-            <div class="auth-candle-v2 is-large">
-              <span class="auth-candle-flame-v2"></span>
-              <span class="auth-candle-wax-v2"></span>
-            </div>
-            <div class="auth-candle-v2 is-small">
-              <span class="auth-candle-flame-v2"></span>
-              <span class="auth-candle-wax-v2"></span>
-            </div>
-          </div>
-        </section>
-
         <section class="auth-form-v2 admin-form-v2">
           <header class="admin-toolbar">
             <div class="admin-toolbar-user">
@@ -168,6 +218,7 @@ async function logout() {
               <span class="role-badge">admin</span>
             </div>
             <div class="admin-toolbar-actions">
+              <button type="button" class="auth-switch-v2" @click="openTemplateEditor">Template editor</button>
               <button type="button" class="auth-switch-v2" @click="loadDirectors">Ververs</button>
               <button type="button" class="auth-switch-v2" @click="logout">Uitloggen</button>
             </div>
@@ -286,6 +337,50 @@ async function logout() {
               </article>
             </div>
           </section>
+
+          <section class="admin-details-panel template-admin-panel">
+            <div class="template-admin-header">
+              <div>
+                <h3>Template kamer</h3>
+                <p>Pas hier de startkamer aan die nieuwe kamers als basis krijgen.</p>
+              </div>
+              <button type="button" class="auth-switch-v2" @click="templatePanelOpen = !templatePanelOpen">
+                {{ templatePanelOpen ? 'Template verbergen' : 'Template tonen' }}
+              </button>
+            </div>
+
+            <div v-if="templateStatus" class="auth-status-v2 success">{{ templateStatus }}</div>
+            <div v-if="templateError" class="auth-status-v2 error">{{ templateError }}</div>
+            <div v-if="templateRoomName" class="room-meta">Huidige template: {{ templateRoomName }}</div>
+            <div v-if="templatePanelOpen" class="template-scene-shell">
+              <div v-if="templateLoading" class="room-empty compact-empty">
+                <h3>Template laden...</h3>
+              </div>
+
+              <div v-else-if="!templateSceneData" class="room-empty compact-empty">
+                <h3>Geen template beschikbaar</h3>
+                <p>Er is nog geen template kamer geladen.</p>
+              </div>
+
+              <div v-else class="template-scene-wrap">
+                <ThreeScene
+                  ref="templateSceneRef"
+                  class="template-scene"
+                  :room-data="templateSceneData"
+                  :can-edit-template="true"
+                  :use-stored-template="false"
+                  :hide-local-template-actions="true"
+                />
+
+                <div class="template-modal-actions">
+                  <button type="button" class="auth-submit-v2" :disabled="templateSaving" @click="saveTemplateRoom">
+                    {{ templateSaving ? 'Opslaan...' : 'Template opslaan' }}
+                  </button>
+                  <button type="button" class="auth-switch-v2" @click="loadTemplateRoom">Herladen</button>
+                </div>
+              </div>
+            </div>
+          </section>
         </section>
       </div>
     </div>
@@ -299,14 +394,14 @@ async function logout() {
 
 .admin-auth-card {
   width: min(1180px, 100%);
-  grid-template-columns: minmax(300px, 0.85fr) minmax(0, 1.45fr);
+  grid-template-columns: 1fr;
 }
 
 .admin-form-v2 {
   padding-top: 42px;
   gap: 16px;
-  max-height: min(90vh, 920px);
-  overflow: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .admin-toolbar {
@@ -470,6 +565,51 @@ async function logout() {
   margin-left: 0.5rem;
   color: var(--auth-ink-soft);
   font-size: 0.84rem;
+}
+
+.template-admin-panel {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.template-admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.template-admin-header h3 {
+  margin: 0;
+}
+
+.template-admin-header p {
+  margin: 0.25rem 0 0;
+  color: var(--auth-ink-soft);
+}
+
+.template-scene-shell {
+  display: grid;
+  gap: 12px;
+}
+
+.template-scene-wrap {
+  display: grid;
+  gap: 12px;
+}
+
+.template-scene {
+  height: min(80vh, 900px);
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+}
+
+.template-modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .compact-empty {

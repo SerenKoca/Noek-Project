@@ -4,6 +4,9 @@ const Room = require('../models/Room')
 
 const DEFAULT_BRAND_DARK = '#1e2b37'
 const DEFAULT_BRAND_LIGHT = '#d7e1eb'
+const TEMPLATE_OWNER_EMAIL = String(
+  process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
+).trim().toLowerCase()
 
 function normalizeHexColor(input, fallback) {
   const value = String(input || '').trim().toLowerCase()
@@ -28,6 +31,25 @@ function sanitizeUser(user) {
     createdAt: user.createdAt,
     updatedAt: user.updatedAt
   }
+}
+
+function buildFallbackTemplateSceneData() {
+  return {
+    templateSlots: [],
+    furniture: [],
+    appearance: {},
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      source: 'fallback-template'
+    }
+  }
+}
+
+async function findTemplateRoom() {
+  const templateOwner = await User.findOne({ email: TEMPLATE_OWNER_EMAIL, role: 'editor' })
+  if (!templateOwner) return null
+
+  return Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })
 }
 
 exports.listFuneralDirectors = async (req, res) => {
@@ -167,5 +189,60 @@ exports.deleteFuneralDirector = async (req, res) => {
   } catch (error) {
     console.error('deleteFuneralDirector error:', error)
     res.status(500).json({ error: 'Kon uitvaartondernemer niet verwijderen.' })
+  }
+}
+
+exports.getTemplateRoom = async (req, res) => {
+  try {
+    const templateRoom = await findTemplateRoom()
+
+    if (templateRoom?.sceneData) {
+      res.json({
+        roomId: templateRoom._id,
+        name: templateRoom.name,
+        sceneData: templateRoom.sceneData,
+        source: 'template-room'
+      })
+      return
+    }
+
+    res.json({
+      roomId: '',
+      name: 'Template kamer',
+      sceneData: buildFallbackTemplateSceneData(),
+      source: 'fallback-template'
+    })
+  } catch (error) {
+    console.error('getTemplateRoom error:', error)
+    res.status(500).json({ error: 'Kon template kamer niet ophalen.' })
+  }
+}
+
+exports.updateTemplateRoom = async (req, res) => {
+  try {
+    const sceneData = req.body?.sceneData
+    if (!sceneData || typeof sceneData !== 'object') {
+      res.status(400).json({ error: 'sceneData is verplicht.' })
+      return
+    }
+
+    const templateRoom = await findTemplateRoom()
+    if (!templateRoom) {
+      res.status(404).json({ error: 'Template kamer niet gevonden.' })
+      return
+    }
+
+    templateRoom.sceneData = sceneData
+    await templateRoom.save()
+
+    res.json({
+      roomId: templateRoom._id,
+      name: templateRoom.name,
+      sceneData: templateRoom.sceneData,
+      source: 'template-room'
+    })
+  } catch (error) {
+    console.error('updateTemplateRoom error:', error)
+    res.status(500).json({ error: 'Kon template kamer niet opslaan.' })
   }
 }

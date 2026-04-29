@@ -4,6 +4,7 @@ import {
   updateRoom,
   deleteRoom,
   getRooms,
+  getRoomTemplate,
   getRoomContributions,
   createRoomContribution,
   reactToRoomContribution,
@@ -742,8 +743,20 @@ async function openEditor(room = null) {
   roomCommentState.value = { loading: false, error: '' }
   await startRoomAudioFromRoom(room)
 
-  const roomData = room?.sceneData ? JSON.parse(JSON.stringify(room.sceneData)) : null
+  let roomData = room?.sceneData ? JSON.parse(JSON.stringify(room.sceneData)) : null
+  if (!roomData && authState.value?.user?.role === 'editor') {
+    try {
+      const template = await getRoomTemplate({ skipLoader: true })
+      roomData = template?.sceneData ? JSON.parse(JSON.stringify(template.sceneData)) : null
+    } catch {
+      roomData = null
+    }
+  }
   currentRoomData.value = roomData
+  if (!room && roomData && sceneRef.value?.loadRoom) {
+    await nextTick()
+    await sceneRef.value.loadRoom(roomData)
+  }
   syncRoomAppearanceDraft(room)
 }
 

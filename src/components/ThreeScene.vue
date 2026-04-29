@@ -22,6 +22,18 @@ const props = defineProps({
   roomData: {
     type: Object,
     default: null
+  },
+  canEditTemplate: {
+    type: Boolean,
+    default: false
+  },
+  useStoredTemplate: {
+    type: Boolean,
+    default: true
+  },
+  hideLocalTemplateActions: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -49,6 +61,7 @@ const selectableRoots = []
 let selectedRoot = null
 
 const sceneReady = ref(false)
+const canEditTemplate = computed(() => props.canEditTemplate === true)
 
 const loader = new GLTFLoader()
 
@@ -549,7 +562,14 @@ function syncSlotFromRoot(root) {
 }
 
 function updateTemplateDragBinding() {
-  if (!transform) return
+  if (!transform || !canEditTemplate.value) {
+    transform?.detach()
+    if (transform) {
+      transform.visible = false
+      transform.enabled = false
+    }
+    return
+  }
 
   if (!templateDragEnabled.value || !selectedRoot?.userData?.slotId) {
     transform.detach()
@@ -565,17 +585,20 @@ function updateTemplateDragBinding() {
 }
 
 function toggleTemplateDrag() {
+  if (!canEditTemplate.value) return
   templateDragEnabled.value = !templateDragEnabled.value
   updateTemplateDragBinding()
 }
 
 function setTemplateDragMode(mode) {
+  if (!canEditTemplate.value) return
   if (mode !== 'translate' && mode !== 'rotate') return
   templateDragMode.value = mode
   updateTemplateDragBinding()
 }
 
 function applyTemplateDraft() {
+  if (!canEditTemplate.value) return
   const slot = getTemplateSlot()
   if (!slot) return
 
@@ -617,6 +640,7 @@ function applyTemplateDraft() {
 }
 
 function createNewTemplateSlot() {
+  if (!canEditTemplate.value) return
   const currentSlot = getTemplateSlot()
   const currentCategories = normalizeCategoryList(templateDraft.value.slotCategories.length ? templateDraft.value.slotCategories : getTemplateEditorSlotCategories(currentSlot))
   const currentAccepts = []
@@ -688,6 +712,7 @@ function getTemplateSnapshot() {
 }
 
 function saveTemplateToLocalStorage() {
+  if (!canEditTemplate.value) return
   try {
     localStorage.setItem(ROOM_TEMPLATE_STORAGE_KEY, JSON.stringify(getTemplateSnapshot()))
     templateEditorMessage.value = 'Template lokaal opgeslagen.'
@@ -701,6 +726,7 @@ function restoreTemplateFromBase() {
 }
 
 function resetTemplateDefaults() {
+  if (!canEditTemplate.value) return
   try {
     localStorage.removeItem(ROOM_TEMPLATE_STORAGE_KEY)
   } catch {
@@ -714,6 +740,7 @@ function resetTemplateDefaults() {
 }
 
 function applyStoredTemplateIfAny() {
+  if (!canEditTemplate.value) return
   let parsed = null
   try {
     const raw = localStorage.getItem(ROOM_TEMPLATE_STORAGE_KEY)
@@ -1970,6 +1997,11 @@ watch(templateDragMode, () => {
 })
 
 onMounted(() => {
+  if (canEditTemplate.value && props.useStoredTemplate) {
+    applyStoredTemplateIfAny()
+  } else {
+    restoreTemplateFromBase()
+  }
   createScene()
   writeDraftFromSlot(templateEditorSlotId.value)
   sceneReady.value = true
@@ -2014,6 +2046,7 @@ onBeforeUnmount(() => {
       style="position: fixed; right: 14px; bottom: 18px; z-index: 2200; width: min(360px, calc(100vw - 28px)); max-height: min(72vh, 640px); overflow: auto; border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 40px rgba(0,0,0,0.45);"
     >
       <button
+        v-if="canEditTemplate"
         type="button"
         style="width: 100%; border: 1px solid rgba(255,255,255,0.35); padding: 6px 8px; border-radius: 6px; background: rgba(255,255,255,0.08); color: #fff;"
         @click="templateEditorOpen = !templateEditorOpen"
@@ -2021,7 +2054,7 @@ onBeforeUnmount(() => {
         {{ templateEditorOpen ? 'Template editor sluiten' : 'Template editor openen' }}
       </button>
 
-      <div v-if="templateEditorOpen" style="margin-top: 10px; display: grid; gap: 8px;">
+      <div v-if="canEditTemplate && templateEditorOpen" style="margin-top: 10px; display: grid; gap: 8px;">
         <div style="display: grid; gap: 4px;">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 8px;">
             <span>Categorie</span>
@@ -2098,7 +2131,7 @@ onBeforeUnmount(() => {
           <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff;" @click="createNewTemplateSlot">
             Nieuw slot toevoegen
           </button>
-          <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff;" @click="saveTemplateToLocalStorage">
+          <button v-if="!hideLocalTemplateActions" type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff;" @click="saveTemplateToLocalStorage">
             Lokaal opslaan
           </button>
           <button type="button" style="padding: 6px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.25); background: rgba(255,255,255,0.08); color: #fff; grid-column: 1 / -1;" @click="resetTemplateDefaults">

@@ -1,6 +1,10 @@
 const Room = require('../models/Room');
 const RoomContribution = require('../models/RoomContribution');
 
+const ROOM_TEMPLATE_OWNER_EMAIL = String(
+  process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
+).trim().toLowerCase();
+
 function countWords(value) {
   return (value || '').trim().split(/\s+/).filter(Boolean).length;
 }
@@ -23,6 +27,63 @@ function normalizeRoomReactionType(value) {
   const reactionField = fieldByType[reactionType];
   return { reactionType, reactionField };
 }
+
+function buildFallbackTemplateSceneData(templateSlots = []) {
+  return {
+    templateSlots: Array.isArray(templateSlots) ? templateSlots : [],
+    furniture: [],
+    appearance: {},
+    metadata: {
+      generatedAt: new Date().toISOString(),
+      source: 'fallback-template'
+    }
+  };
+}
+
+exports.getRoomTemplate = async (req, res) => {
+  try {
+    if (req.auth?.role !== 'editor') {
+      return res.status(403).json({ error: 'Alleen editors kunnen de template gebruiken.' });
+    }
+
+    // Load User model first, then optionally attempt to load the frontend ROOM_TEMPLATE.
+    // Importing frontend modules can fail in a Node/CommonJS context, so keep this guarded.
+    const userModule = await import('../models/User.js')
+    const UserModel = userModule.default || userModule.User || userModule
+
+    let templateSlots = []
+    try {
+      const templateModule = await import('../../src/services/roomTemplate.js')
+      templateSlots = templateModule?.ROOM_TEMPLATE?.slots || []
+    } catch (innerErr) {
+      // If the frontend module can't be imported (import.meta/env usage etc.), fall back to empty slots.
+      console.warn('roomController: unable to import roomTemplate (using empty slots):', innerErr && innerErr.message)
+    }
+    const templateOwner = await UserModel.findOne({
+      email: ROOM_TEMPLATE_OWNER_EMAIL,
+      role: 'editor'
+    });
+
+    if (templateOwner) {
+      const templateRoom = await Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 });
+      if (templateRoom?.sceneData) {
+        return res.json({
+          sceneData: templateRoom.sceneData,
+          roomId: templateRoom._id,
+          source: 'template-room'
+        });
+      }
+    }
+
+    return res.json({
+      sceneData: buildFallbackTemplateSceneData(templateSlots),
+      source: 'fallback-template'
+    });
+  } catch (error) {
+    console.error('getRoomTemplate error:', error);
+    res.status(500).json({ error: 'Kon begintemplate niet ophalen.' });
+  }
+};
 
 exports.createRoom = async (req, res) => {
   try {

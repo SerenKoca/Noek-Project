@@ -41,3 +41,13 @@ export async function getFuneralDirectorDetails(id) {
   const response = await http.get(`/admin/funeral-directors/${id}/details`)
   return response.data
 }
+
+export async function getTemplateRoom() {
+  const response = await http.get('/admin/template-room')
+  return response.data
+}
+
+export async function updateTemplateRoom(payload) {
+  const response = await http.put('/admin/template-room', payload)
+  return response.data
+}
