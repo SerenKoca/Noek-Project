@@ -716,26 +716,46 @@ onBeforeUnmount(() => {
         </div>
         <div v-else-if="loading" class="visitor-status">Kamer laden...</div>
         <div v-else class="visitor-status error">{{ error }}</div>
-
-        <div class="visitor-candles left">🕯</div>
-        <div class="visitor-candles right">🕯</div>
       </main>
 
       <footer class="visitor-footer">
         <button type="button" class="visitor-pill-btn" @click="openContributionPanel('tutorial')">Tutorial volgen</button>
 
         <div class="visitor-action-bar">
-          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">Foto's</button>
-          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">Muziek</button>
-          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">Video's</button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">Kaarsjes</button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">Bericht</button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">
+            <div class="visitor-action-icon">
+              <img src="/img/icons/icon_foto.svg" alt="Foto's" />
+            </div>
+            <span class="visitor-action-label">Foto's</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">
+            <div class="visitor-action-icon">
+              <img src="/img/icons/icon_muziek.svg" alt="Muziek" />
+            </div>
+            <span class="visitor-action-label">Muziek</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">
+            <div class="visitor-action-icon">
+              <img src="/img/icons/icon_video.svg" alt="Video's" />
+            </div>
+            <span class="visitor-action-label">Video's</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">
+            <div class="visitor-action-icon">
+              <img src="/img/icons/icon_kaars.svg" alt="Kaarsjes" />
+            </div>
+            <span class="visitor-action-label">Kaarsjes</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">
+            <div class="visitor-action-icon">
+              <img src="/img/icons/icon_bericht.svg" alt="Bericht" />
+            </div>
+            <span class="visitor-action-label">Bericht</span>
+          </button>
         </div>
 
         <div class="visitor-brand-card">
           <img v-if="brandLogoUrl" :src="brandLogoUrl" alt="Brand logo" class="visitor-brand-logo" />
-          <strong>{{ logoTitle }}</strong>
-          <span>{{ logoSubtitle }}</span>
         </div>
       </footer>
 
@@ -855,20 +875,46 @@ onBeforeUnmount(() => {
 
 <style scoped>
 .visitor-page-v3 {
-  --visitor-color-dark: var(--editor-panel-strong);
-  --visitor-color-light: var(--editor-bg-shell-bottom);
+  --visitor-color-dark: var(--brand-dark);
+  --visitor-color-light: var(--brand-light);
   --visitor-ink: var(--editor-text);
-  --visitor-soft: color-mix(in srgb, var(--editor-bg-shell-bottom) 24%, transparent);
-  --visitor-soft-2: color-mix(in srgb, var(--editor-bg-shell-bottom) 42%, transparent);
+  --visitor-soft: color-mix(in srgb, var(--brand-light) 24%, transparent);
+  --visitor-soft-2: color-mix(in srgb, var(--brand-light) 42%, transparent);
   --visitor-card: rgba(255, 255, 255, 0.88);
-  --visitor-border: color-mix(in srgb, var(--editor-panel-strong) 24%, transparent);
+  --visitor-border: color-mix(in srgb, var(--brand-dark) 24%, transparent);
   --visitor-btn-text: #ffffff;
   min-height: 100vh;
-  background: linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 58%, var(--editor-bg-shell-bottom) 100%);
+background: linear-gradient(
+  180deg,
+  var(--brand-light) 10%,
+  color-mix(in srgb, var(--brand-light) 100%, var(--brand-light)) 50%,
+  var(--brand-dark) 100%
+);
   color: var(--visitor-ink);
   padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
+}
+
+.visitor-page-v3::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+  180deg,
+  var(--brand-light) 0%,
+  color-mix(in srgb, var(--brand-light) 100%, var(--brand-dark)) 50%,
+  var(--brand-dark) 100%
+);
+  z-index: 0;
+}
+
+.visitor-shell,
+.visitor-gallery-shell,
+.visitor-entry-wrap {
+  position: relative;
+  z-index: 1;
 }
 
 .visitor-entry-wrap {
@@ -933,7 +979,8 @@ onBeforeUnmount(() => {
 
 .visitor-topbar h1 {
   margin: 0;
-  font-size: clamp(1.4rem, 2.6vw, 2.2rem);
+  font-size: clamp(1.15rem, 2vw, 1.7rem);
+  font-weight: 700;
   color: var(--visitor-color-dark);
 }
 
@@ -946,7 +993,6 @@ onBeforeUnmount(() => {
 .visitor-name-btn,
 .visitor-user-btn {
   pointer-events: auto;
-  border: 1px solid var(--visitor-border);
   background: var(--visitor-card);
   border-radius: 999px;
   color: var(--visitor-color-dark);
@@ -1014,7 +1060,7 @@ onBeforeUnmount(() => {
 .visitor-pill-btn {
   pointer-events: auto;
   border: 0;
-  background: linear-gradient(90deg, var(--visitor-color-dark), var(--visitor-color-light));
+  background: linear-gradient(20deg, var(--visitor-color-dark), var(--visitor-color-light));
   color: var(--visitor-btn-text);
   border-radius: 14px;
   padding: 10px 18px;
@@ -1026,35 +1072,78 @@ onBeforeUnmount(() => {
   pointer-events: auto;
   display: flex;
   justify-content: center;
-  gap: 12px;
+  gap: 16px;
   flex-wrap: wrap;
 }
 
 .visitor-action-btn {
-  min-width: 98px;
-  border: 1px solid var(--visitor-border);
-  border-radius: 10px;
-  background: var(--visitor-card);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  min-width: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
   color: var(--visitor-color-dark);
-  padding: 12px 14px;
   cursor: pointer;
   font-weight: 600;
+  font-size: 0.9rem;
+  transition: all 0.2s ease;
 }
 
-.visitor-action-btn.active {
-  background: linear-gradient(180deg, #ffffff, var(--visitor-soft));
+.visitor-action-icon {
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--visitor-color-dark) 12%, white);
+  border: 2px solid color-mix(in srgb, var(--visitor-color-dark) 8%, transparent);
+  overflow: hidden;
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+}
+
+.visitor-action-icon img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.visitor-action-label {
+  display: block;
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 0 8px;
+color: color-mix(in srgb, var(--visitor-color-dark) 85%, black);
+
+text-shadow:
+  0 0 6px rgba(255, 255, 255, 0.9),
+  0 0 10px rgba(255, 255, 255, 0.6),
+  0 0 16px rgba(255, 255, 255, 0.4);
+}
+.visitor-action-btn:hover .visitor-action-icon {
+  background: color-mix(in srgb, var(--visitor-color-dark) 18%, white);
+  transform: translateY(-3px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.15);
+}
+
+.visitor-action-btn.active .visitor-action-icon {
+  background: color-mix(in srgb, var(--visitor-color-dark) 20%, white);
   border-color: var(--visitor-color-dark);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
 }
 
 .visitor-brand-card {
   pointer-events: auto;
-  border: 1px solid var(--visitor-border);
   border-radius: 10px;
-  background: var(--visitor-card);
-  padding: 10px 12px;
+  background: white;
+  padding: 15px 20px;
   min-width: 150px;
   display: grid;
-  color: var(--visitor-color-dark);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 
 .visitor-brand-card strong {
@@ -1239,10 +1328,12 @@ onBeforeUnmount(() => {
   gap: 14px;
   padding: 18px 16px 16px;
   box-sizing: border-box;
+  /* Brand gradient: light on top, dark on bottom. Add bottom radial overlay for stronger contrast. */
   background:
-    radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.24), transparent 22%),
-    radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.18), transparent 20%),
-    linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 54%, var(--editor-bg-shell-bottom) 100%);
+    radial-gradient(circle at 10% 12%, color-mix(in srgb, var(--brand-light) 22%, transparent) 0%, transparent 22%),
+    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--brand-light) 8%, transparent) 0%, transparent 20%),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 86%, white) 0%, color-mix(in srgb, var(--brand-dark) 28%, var(--brand-light)) 60%, var(--brand-dark) 100%),
+    radial-gradient(ellipse at bottom center, color-mix(in srgb, var(--brand-dark) 36%, transparent) 0%, transparent 45%);
   color: var(--visitor-ink);
 }
 
@@ -1288,8 +1379,10 @@ onBeforeUnmount(() => {
 
 .visitor-title-card h1 {
   margin: 0;
-  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  font-size: clamp(1rem, 1.8vw, 1.35rem);
+  font-weight: 700;
   line-height: 1;
+  color: var(--brand-dark);
 }
 
 .visitor-gallery-main {
@@ -1421,6 +1514,7 @@ onBeforeUnmount(() => {
   color: #50708e;
   font-size: 0.88rem;
   line-height: 1.35;
+  line-clamp: 2;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -1469,6 +1563,19 @@ onBeforeUnmount(() => {
   flex-wrap: wrap;
 }
 
+.visitor-gallery-tab,
+.visitor-gallery-kicker,
+.visitor-gallery-copy strong,
+.visitor-gallery-copy p,
+.visitor-gallery-empty,
+.visitor-brand-card strong,
+.visitor-brand-card span {
+  text-shadow:
+    0 1px 1px rgba(255, 255, 255, 0.9),
+    0 0 8px rgba(255, 255, 255, 0.3),
+    0 0 1px rgba(0, 0, 0, 0.12);
+}
+
 .visitor-gallery-tab {
   border: 1px solid rgba(18, 58, 98, 0.16);
   border-radius: 12px;
@@ -1492,12 +1599,14 @@ onBeforeUnmount(() => {
   margin: 0 auto;
   border-radius: 22px;
   overflow: hidden;
+  /* Keep stage visually consistent with the branding gradient; stronger dark bottom */
   background:
-    radial-gradient(circle at center, rgba(255, 255, 255, 0.18), transparent 18%),
-    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 42%),
-    linear-gradient(180deg, rgba(11, 52, 89, 0.95), rgba(28, 85, 132, 0.96));
-  border: 1px solid rgba(255, 255, 255, 0.22);
-  box-shadow: 0 24px 64px rgba(11, 63, 116, 0.28);
+    radial-gradient(circle at center, color-mix(in srgb, var(--brand-light) 14%, transparent) 0%, transparent 18%),
+    radial-gradient(circle at 50% 50%, color-mix(in srgb, var(--brand-light) 8%, transparent) 0%, transparent 42%),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 86%, white) 0%, color-mix(in srgb, var(--brand-dark) 26%, var(--brand-light)) 62%, var(--brand-dark) 100%),
+    radial-gradient(ellipse at bottom center, color-mix(in srgb, var(--brand-dark) 40%, transparent) 0%, transparent 42%);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 24px 64px rgba(11, 63, 116, 0.18);
 }
 
 .visitor-vr-halo {

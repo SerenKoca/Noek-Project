@@ -78,15 +78,15 @@ async function requestWithApiFallback(makePrimaryRequest, makeFallbackRequest) {
 
 export async function getPublicRoom(roomId) {
   return requestWithApiFallback(
-    () => http.get(`/public/rooms/${roomId}`),
-    () => localApi.get(`/public/rooms/${roomId}`)
+    () => http.get(`/public/rooms/${roomId}`, { loader: { skip: true } }),
+    () => localApi.get(`/public/rooms/${roomId}`, { loader: { skip: true } })
   )
 }
 
 export async function getPublicRoomContributions(roomId) {
   return requestWithApiFallback(
-    () => http.get(`/public/rooms/${roomId}/contributions`),
-    () => localApi.get(`/public/rooms/${roomId}/contributions`)
+    () => http.get(`/public/rooms/${roomId}/contributions`, { loader: { skip: true } }),
+    () => localApi.get(`/public/rooms/${roomId}/contributions`, { loader: { skip: true } })
   )
 }
 

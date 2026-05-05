@@ -77,6 +77,22 @@ let selectedRoot = null
 
 const sceneReady = ref(false)
 const canEditTemplate = computed(() => props.canEditTemplate === true)
+// Debug/test helper: 'off' | 'canvas-red' | 'cover-red'
+const debugMode = ref('off')
+
+// expose quick debug API: call from browser console
+if (typeof window !== 'undefined') {
+  window.__threeSceneDebug = {
+    set(mode) {
+      debugMode.value = mode
+      console.info('[ThreeScene] debugMode ->', mode)
+    }
+  }
+}
+
+onMounted(() => {
+  console.info('[ThreeScene] mounted - debug API present:', !!window?.__threeSceneDebug)
+})
 
 const loader = new GLTFLoader()
 
@@ -844,6 +860,19 @@ function toColorHex(value, fallback) {
   return fallback
 }
 
+function getBrandWallHex() {
+  try {
+    if (typeof window !== 'undefined' && window.getComputedStyle) {
+      const cssVal = getComputedStyle(document.documentElement).getPropertyValue('--brand-light') || ''
+      const cleaned = String(cssVal || '').trim()
+      if (/^#[0-9a-f]{6}$/.test(cleaned)) return cleaned
+    }
+  } catch (e) {
+    // ignore
+  }
+  return DEFAULT_WALL_COLOR
+}
+
 function applyRoomColors({ floorTextureId: incomingFloorTextureId, wallTextureId: incomingWallTextureId } = {}) {
   const nextFloorTextureId = normalizeFloorTextureId(incomingFloorTextureId || floorTextureId)
   const nextWallTextureId = normalizeWallTextureId(incomingWallTextureId || wallTextureId)
@@ -871,7 +900,8 @@ function applyRoomColors({ floorTextureId: incomingFloorTextureId, wallTextureId
 
 function createScene() {
   scene = new THREE.Scene()
-  scene.background = new THREE.Color(0xf4eadf)
+  // Leave scene.background null so renderer with alpha:true is transparent
+  scene.background = null
   scene.fog = null
 
   camera = new THREE.PerspectiveCamera(36, 1, 0.1, 400)
@@ -893,11 +923,14 @@ function createScene() {
   renderer.shadowMap.type = THREE.PCFSoftShadowMap
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
-  renderer.toneMappingExposure = 1.08
+  // tune exposure for better contrast with page gradient
+  renderer.toneMappingExposure = 0.92
   renderer.domElement.style.width = '100%'
   renderer.domElement.style.height = '100%'
   renderer.domElement.style.display = 'block'
   renderer.domElement.style.cursor = 'pointer'
+  // Ensure canvas background stays transparent so underlying page gradient shows
+  renderer.domElement.style.background = 'transparent'
 
   const el = containerEl.value
   el.appendChild(renderer.domElement)
@@ -985,44 +1018,76 @@ function createScene() {
   pointer = new THREE.Vector2()
 
   // Lights (required)
-  const hemi = new THREE.HemisphereLight(0xfff5ea, 0xc7b4a1, 1.15)
-  hemi.position.set(0, 10, 0)
+  // Softer neutral lighting so the room stays readable without washing out the page gradient
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 0.78)
+  hemi.position.set(0, 80, 0)
   scene.add(hemi)
 
-  const dir = new THREE.DirectionalLight(0xffefd8, 1.35)
-  dir.position.set(-10, 18, 8)
+  const dir = new THREE.DirectionalLight(0xffffff, 1.08)
+  dir.position.set(30, 40, 10)
   dir.castShadow = true
-  dir.shadow.mapSize.set(2048, 2048)
-  dir.shadow.camera.near = 1
-  dir.shadow.camera.far = 50
-  dir.shadow.camera.left = -24
-  dir.shadow.camera.right = 24
-  dir.shadow.camera.top = 24
-  dir.shadow.camera.bottom = -24
+  dir.shadow.mapSize.set(1024, 1024)
   dir.shadow.bias = -0.0008
   scene.add(dir)
 
-  const fill = new THREE.PointLight(0xffc98a, 1.45, 75, 1.6)
-  fill.position.set(-8, 6.5, 8)
-  fill.castShadow = true
-  fill.shadow.mapSize.set(1024, 1024)
+  const fill = new THREE.PointLight(0xffecd5, 0.5, 75, 1.6)
+  fill.position.set(-12, 14, 18)
   scene.add(fill)
 
-  const warmLamp = new THREE.PointLight(0xffe0bb, 1.2, 55, 1.8)
-  warmLamp.position.set(10, 5.3, -8)
+  const warmLamp = new THREE.PointLight(0xffedd6, 0.36, 55, 1.8)
+  warmLamp.position.set(18, 10, -6)
   scene.add(warmLamp)
 
-  const cornerWarm = new THREE.PointLight(0xffc48a, 0.9, 45, 1.9)
-  cornerWarm.position.set(8, 3.2, 10)
+  const cornerWarm = new THREE.PointLight(0xffe6cb, 0.28, 45, 1.9)
+  cornerWarm.position.set(-20, 8, -18)
   scene.add(cornerWarm)
 
-  const accent = new THREE.SpotLight(0xfff0d6, 0.9, 90, Math.PI / 6, 0.45, 1.2)
+  const accent = new THREE.SpotLight(0xffffff, 0.42, 90, Math.PI / 6, 0.45, 1.2)
   accent.position.set(0, 16, 2)
   accent.target.position.set(0, 2, -10)
   accent.castShadow = true
+  scene.add(accent)
+
+  // watch debug mode to apply visual tests
+  watch(debugMode, (val) => {
+    if (!renderer || !renderer.domElement) return
+    // reset
+    renderer.domElement.style.background = 'transparent'
+    renderer.setClearColor(0x000000, 0)
+    if (scene) {
+      scene.background = null
+      scene.overrideMaterial = null
+    }
+    const existingCover = document.getElementById('three-debug-cover')
+    if (existingCover) existingCover.remove()
+
+    if (val === 'canvas-red') {
+      renderer.setClearColor(0xff0000, 1)
+      if (scene) {
+        scene.background = new THREE.Color(0xff0000)
+        scene.overrideMaterial = new THREE.MeshBasicMaterial({ color: 0xff0000 })
+      }
+      try {
+        if (containerEl?.value) containerEl.value.style.outline = '6px solid rgba(255,0,0,0.9)'
+      } catch (e) {}
+    }
+
+    if (val === 'cover-red') {
+      const cover = document.createElement('div')
+      cover.id = 'three-debug-cover'
+      cover.style.position = 'fixed'
+      cover.style.inset = '0'
+      cover.style.zIndex = '2400'
+      cover.style.pointerEvents = 'none'
+      cover.style.background = 'rgba(255,0,0,0.6)'
+      document.body.appendChild(cover)
+      try {
+        if (containerEl?.value) containerEl.value.style.outline = '6px solid rgba(255,0,0,0.9)'
+      } catch (e) {}
+    }
+  })
   accent.shadow.mapSize.set(1024, 1024)
   accent.shadow.bias = -0.0005
-  scene.add(accent)
   scene.add(accent.target)
 
   // Large room surfaces to keep borders out of view while zooming.
@@ -1038,14 +1103,15 @@ function createScene() {
 
   // Back wall
   wallTexture = createWallTexture(wallTextureId)
-  wallMaterial = createBaseMaterial(wallTexture, 0xffffff)
+  const brandWallHex = getBrandWallHex()
+  wallMaterial = createBaseMaterial(wallTexture, brandWallHex)
   wallMaterial.side = THREE.DoubleSide
 
   sideWallTexture = wallTexture
-  sideWallMaterial = createBaseMaterial(sideWallTexture, 0xffffff)
+  sideWallMaterial = createBaseMaterial(sideWallTexture, brandWallHex)
   sideWallMaterial.side = THREE.DoubleSide
 
-  tileMaterial = createBaseMaterial(createTileTexture(), DEFAULT_WALL_COLOR)
+  tileMaterial = createBaseMaterial(createTileTexture(), brandWallHex)
   tileMaterial.side = THREE.DoubleSide
 
   const backWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
@@ -2315,6 +2381,7 @@ onBeforeUnmount(() => {
   <div class="relative h-full w-full">
     <div ref="containerEl" class="h-full w-full"></div>
     <div
+      v-if="canEditTemplate"
       class="rounded bg-black/80 px-3 py-2 text-xs text-white"
       style="position: fixed; right: 14px; bottom: 18px; z-index: 2200; width: min(480px, calc(100vw - 28px)); max-height: min(78vh, 720px); overflow: auto; border: 1px solid rgba(255,255,255,0.16); box-shadow: 0 18px 40px rgba(0,0,0,0.45);"
     >
@@ -2506,6 +2573,7 @@ onBeforeUnmount(() => {
     </div>
 
     <div
+      v-if="canEditTemplate"
       class="pointer-events-none rounded bg-black/70 px-3 py-2 text-xs text-white"
       style="position: fixed; top: 108px; right: 14px; z-index: 120; min-width: 230px;"
     >
