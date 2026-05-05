@@ -1071,31 +1071,32 @@ function createScene() {
   rightWallWallpaper.receiveShadow = true
   scene.add(rightWallWallpaper)
 
-  // Left wall
-  const leftWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-  leftWallTiles.rotation.y = Math.PI / 2
-  leftWallTiles.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
-  leftWallTiles.receiveShadow = true
-  scene.add(leftWallTiles)
+  // Left wall and front wall only in VR mode
+  if (props.vrMode) {
+    const leftWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+    leftWallTiles.rotation.y = Math.PI / 2
+    leftWallTiles.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
+    leftWallTiles.receiveShadow = true
+    scene.add(leftWallTiles)
 
-  const leftWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
-  leftWallWallpaper.rotation.y = Math.PI / 2
-  leftWallWallpaper.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
-  leftWallWallpaper.receiveShadow = true
-  scene.add(leftWallWallpaper)
+    const leftWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
+    leftWallWallpaper.rotation.y = Math.PI / 2
+    leftWallWallpaper.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
+    leftWallWallpaper.receiveShadow = true
+    scene.add(leftWallWallpaper)
 
-  // Front wall
-  const frontWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-  frontWallTiles.rotation.y = Math.PI
-  frontWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, ROOM_SIZE / 2)
-  frontWallTiles.receiveShadow = true
-  scene.add(frontWallTiles)
+    const frontWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+    frontWallTiles.rotation.y = Math.PI
+    frontWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, ROOM_SIZE / 2)
+    frontWallTiles.receiveShadow = true
+    scene.add(frontWallTiles)
 
-  const frontWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
-  frontWallWallpaper.rotation.y = Math.PI
-  frontWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, ROOM_SIZE / 2)
-  frontWallWallpaper.receiveShadow = true
-  scene.add(frontWallWallpaper)
+    const frontWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
+    frontWallWallpaper.rotation.y = Math.PI
+    frontWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, ROOM_SIZE / 2)
+    frontWallWallpaper.receiveShadow = true
+    scene.add(frontWallWallpaper)
+  }
 
   // Add VR floating photos
   if (props.vrMode && props.vrItems && props.vrItems.length > 0) {
