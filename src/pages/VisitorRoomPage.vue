@@ -2,6 +2,7 @@
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
+import VR3DScene from '../components/VR3DScene.vue'
 import {
   addPublicRoomComment,
   addPublicRoomContributionComment,
@@ -34,6 +35,45 @@ const commentStateByItem = ref({})
 const audioPlayer = ref(null)
 const roomMusicState = ref({ loading: false, error: '', playing: false })
 const activePanel = ref('none')
+const galleryMode = ref('gallery')
+const roomMode = ref('room')
+const selectedCategory = computed(() => normalizeGalleryCategory(route.params.category))
+const isGalleryPage = computed(() => Boolean(selectedCategory.value))
+const isVrMode = computed(() => galleryMode.value === 'vr' && selectedCategory.value === 'photos')
+const showVrToggle = computed(() => selectedCategory.value === 'photos')
+const isRoomVrMode = computed(() => roomMode.value === 'vr' && !isGalleryPage.value)
+const galleryCategoryLabel = computed(() => {
+  const map = {
+    photos: "Foto's",
+    music: 'Muziek',
+    videos: "Video's"
+  }
+  return map[selectedCategory.value] || 'Bijdragen'
+})
+const galleryHeading = computed(() => {
+  const map = {
+    photos: 'Alle fotoherinneringen',
+    music: 'Alle muziekbijdragen',
+    videos: 'Alle videobijdragen'
+  }
+  return map[selectedCategory.value] || 'Alle bijdragen'
+})
+const galleryLead = computed(() => {
+  const map = {
+    photos: 'Bekijk de foto’s in een rustig overzicht en voeg zelf een foto toe.',
+    music: 'Luister naar muziek die herinneringen vasthoudt en vul de ruimte aan.',
+    videos: 'Bekijk alle video’s en deel een nieuwe herinnering met beeld.'
+  }
+  return map[selectedCategory.value] || 'Bekijk alle bijdragen in deze ruimte.'
+})
+const galleryActionLabel = computed(() => {
+  const map = {
+    photos: 'Voeg foto toe',
+    music: 'Voeg muziek toe',
+    videos: 'Voeg video toe'
+  }
+  return map[selectedCategory.value] || 'Voeg bijdrage toe'
+})
 
 const auth = ref(getStoredAuth())
 const isLoggedIn = computed(() => Boolean(auth.value?.token))
@@ -78,11 +118,20 @@ const panelTitle = computed(() => {
 const filteredContributions = computed(() => {
   const items = Array.isArray(contributions.value) ? contributions.value : []
 
-  if (activePanel.value === 'photos') return items.filter((item) => item.type === 'photo')
-  if (activePanel.value === 'music') return items.filter((item) => item.type === 'music_url')
-  if (activePanel.value === 'videos') return items.filter((item) => item.type === 'video_file' || item.type === 'video_url')
-  if (activePanel.value === 'candles') return items.filter((item) => item.type === 'candle')
+  if (selectedCategory.value === 'photos') return items.filter((item) => item.type === 'photo')
+  if (selectedCategory.value === 'music') return items.filter((item) => item.type === 'music_url')
+  if (selectedCategory.value === 'videos') return items.filter((item) => item.type === 'video_file' || item.type === 'video_url')
   return items
+})
+
+const roomPhotoItems = computed(() => {
+  const items = Array.isArray(contributions.value) ? contributions.value : []
+  return items.filter((item) => item.type === 'photo' && item.mediaUrl).slice(0, 12)
+})
+
+const vrGalleryItems = computed(() => {
+  const items = filteredContributions.value.filter((item) => item.type === 'photo' && item.mediaUrl)
+  return items.slice(0, 12)
 })
 
 function readStoredEntryState(roomIdValue) {
@@ -146,6 +195,47 @@ function ensureVisitorBootState() {
     persistVisitorName(visitorName.value)
   }
 
+}
+
+function normalizeGalleryCategory(rawCategory) {
+  const value = String(rawCategory || '').trim().toLowerCase()
+  if (!value) return ''
+  if (['photo', 'photos', 'foto', 'fotos'].includes(value)) return 'photos'
+  if (['music', 'muziek'].includes(value)) return 'music'
+  if (['video', 'videos', 'video\'s'].includes(value)) return 'videos'
+  return ''
+}
+
+function goToGallery(category) {
+  if (!roomId.value) return
+  router.push(`/visit/${roomId.value}/${category}`)
+}
+
+function goToOverview() {
+  if (!roomId.value) return
+  router.push(`/visit/${roomId.value}`)
+}
+
+function enterVrMode() {
+  if (selectedCategory.value !== 'photos') return
+  galleryMode.value = 'vr'
+}
+
+function exitVrMode() {
+  galleryMode.value = 'gallery'
+}
+
+function enterRoomVrMode() {
+  roomMode.value = 'vr'
+}
+
+function exitRoomVrMode() {
+  roomMode.value = 'room'
+}
+
+function openGalleryComposer() {
+  const category = selectedCategory.value || 'photos'
+  openContributionPanel(category)
 }
 
 function isImageUrl(url) {
@@ -464,6 +554,12 @@ watch(roomId, () => {
   activePanel.value = 'none'
 })
 
+watch(selectedCategory, () => {
+  activePanel.value = 'none'
+  galleryMode.value = 'gallery'
+  roomMode.value = 'room'
+})
+
 onBeforeUnmount(() => {
   stopRoomAudio()
 })
@@ -473,15 +569,131 @@ onBeforeUnmount(() => {
   <div class="visitor-page-v3">
     <div v-if="!hasEnteredRoom" class="visitor-entry-wrap">
       <div class="visitor-entry-card">
-        <div class="visitor-entry-logo">???</div>
+        <div class="visitor-entry-logo">{{ roomTitle.charAt(0) || 'N' }}</div>
         <p class="visitor-entry-copy">
           Je betreedt {{ roomTitle }}.<br>
           Waar herinneringen blijven voortleven.
         </p>
         <button type="button" class="visitor-pill-btn" :disabled="introLoading" @click="enterRoom">
-          {{ introLoading ? 'Herinneringen worden geladen ...' : 'Stap binnen' }}
+          {{ introLoading ? 'Herinneringen worden geladen...' : 'Stap binnen' }}
         </button>
       </div>
+    </div>
+
+    <div v-else-if="isGalleryPage" class="visitor-gallery-shell" :class="{ 'vr-mode-active': isVrMode }">
+      <header v-if="!isVrMode" class="visitor-gallery-topbar">
+        <button type="button" class="visitor-back-btn" @click="goToOverview">← Terug</button>
+
+        <div class="visitor-title-card">
+          <h1>{{ roomTitle }}</h1>
+        </div>
+
+        <div class="visitor-topbar-right">
+          <button type="button" class="visitor-name-btn" @click="applyVisitorName">
+            <span>{{ visitorName || 'Naam' }}</span>
+            <span class="visitor-edit">✎</span>
+          </button>
+          <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">
+            {{ isLoggedIn ? 'Profiel' : 'Inloggen' }}
+          </button>
+        </div>
+      </header>
+
+      <main class="visitor-gallery-main" :class="{ 'is-vr': isVrMode }">
+        <section v-if="!isVrMode" class="visitor-gallery-panel">
+          <div class="visitor-gallery-heading">
+            <div>
+              <p class="visitor-gallery-kicker">{{ galleryCategoryLabel }}</p>
+              <h2>{{ galleryHeading }}</h2>
+            </div>
+            <p class="visitor-gallery-lead">{{ galleryLead }}</p>
+          </div>
+
+          <div v-if="loading" class="visitor-status">Kamer laden...</div>
+          <div v-else-if="error" class="visitor-status error">{{ error }}</div>
+          <template v-else>
+            <div v-if="filteredContributions.length" class="visitor-gallery-grid">
+              <article v-for="item in filteredContributions" :key="item._id" class="visitor-gallery-card">
+                <div class="visitor-gallery-media">
+                  <img
+                    v-if="item.type === 'photo' || isImageUrl(item.mediaUrl)"
+                    :src="item.mediaUrl"
+                    :alt="item.giverName || 'Foto'"
+                    class="visitor-gallery-image"
+                  >
+                  <video
+                    v-else-if="item.type === 'video_file' || isVideoUrl(item.mediaUrl)"
+                    :src="item.mediaUrl"
+                    controls
+                    class="visitor-gallery-video"
+                  />
+                  <iframe
+                    v-else-if="getYouTubeEmbedUrl(item.externalUrl)"
+                    class="visitor-gallery-embed"
+                    :src="getYouTubeEmbedUrl(item.externalUrl)"
+                    title="YouTube"
+                  />
+                  <iframe
+                    v-else-if="getSpotifyEmbedUrl(item.externalUrl)"
+                    class="visitor-gallery-embed"
+                    :src="getSpotifyEmbedUrl(item.externalUrl)"
+                    title="Spotify"
+                  />
+                  <audio
+                    v-else-if="isAudioUrl(item.externalUrl)"
+                    :src="item.externalUrl"
+                    controls
+                    class="visitor-gallery-audio"
+                  />
+                  <div v-else class="visitor-gallery-placeholder">
+                    <strong>{{ item.giverName || 'Bezoeker' }}</strong>
+                    <span>Geen preview beschikbaar</span>
+                  </div>
+                </div>
+
+                <div class="visitor-gallery-copy">
+                  <strong>{{ item.giverName || 'Bezoeker' }}</strong>
+                  <p>{{ item.tributeText || ' ' }}</p>
+                </div>
+              </article>
+            </div>
+            <p v-else class="visitor-gallery-empty">Nog geen bijdragen in deze categorie.</p>
+          </template>
+        </section>
+
+        <VR3DScene
+          v-else
+          :items="vrGalleryItems"
+          :room-data="roomSceneData"
+          @exit="exitVrMode"
+        />
+
+        <button v-if="showVrToggle && !isVrMode" type="button" class="visitor-vr-entry-btn" @click="enterVrMode">
+          VR
+        </button>
+      </main>
+
+      <button v-if="!showVrToggle" type="button" class="visitor-gallery-add" @click="openGalleryComposer">
+        {{ galleryActionLabel }}
+      </button>
+
+      <footer v-if="!isVrMode" class="visitor-gallery-footer">
+        <div class="visitor-gallery-tabs">
+          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">Foto's</button>
+          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">Muziek</button>
+          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">Video's</button>
+          <button type="button" :class="['visitor-gallery-tab', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">Kaarsjes</button>
+          <button type="button" :class="['visitor-gallery-tab', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">Bericht</button>
+        </div>
+
+        <div class="visitor-brand-card">
+          <img v-if="brandLogoUrl" :src="brandLogoUrl" alt="Brand logo" class="visitor-brand-logo" />
+          <strong>{{ logoTitle }}</strong>
+          <span>{{ logoSubtitle }}</span>
+        </div>
+      </footer>
+
+
     </div>
 
     <div v-else class="visitor-shell">
@@ -490,30 +702,32 @@ onBeforeUnmount(() => {
         <div class="visitor-topbar-right">
           <button type="button" class="visitor-name-btn" @click="applyVisitorName">
             <span>{{ visitorName || 'Naam' }}</span>
-            <span class="visitor-edit">?</span>
+            <span class="visitor-edit">✎</span>
           </button>
-          <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">??</button>
+          <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">
+            {{ isLoggedIn ? 'Profiel' : 'Inloggen' }}
+          </button>
         </div>
       </header>
 
       <main class="visitor-stage">
-        <div class="visitor-scene-frame" v-if="!loading && !error && room">
+        <div v-if="!loading && !error && room" class="visitor-scene-frame">
           <ThreeScene class="visitor-scene" :room-data="roomSceneData" />
         </div>
         <div v-else-if="loading" class="visitor-status">Kamer laden...</div>
         <div v-else class="visitor-status error">{{ error }}</div>
 
-        <div class="visitor-candles left">??????</div>
-        <div class="visitor-candles right">??????</div>
+        <div class="visitor-candles left">🕯</div>
+        <div class="visitor-candles right">🕯</div>
       </main>
 
       <footer class="visitor-footer">
         <button type="button" class="visitor-pill-btn" @click="openContributionPanel('tutorial')">Tutorial volgen</button>
 
         <div class="visitor-action-bar">
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'photos' }]" @click="openContributionPanel('photos')">Foto's</button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'music' }]" @click="openContributionPanel('music')">Muziek</button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'videos' }]" @click="openContributionPanel('videos')">Video's</button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">Foto's</button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">Muziek</button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">Video's</button>
           <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">Kaarsjes</button>
           <button type="button" :class="['visitor-action-btn', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">Bericht</button>
         </div>
@@ -528,7 +742,7 @@ onBeforeUnmount(() => {
       <section v-if="activePanel !== 'none'" class="visitor-panel">
         <div class="visitor-panel-head">
           <strong>{{ panelTitle }}</strong>
-          <button type="button" class="visitor-close" @click="closePanel">?</button>
+          <button type="button" class="visitor-close" @click="closePanel">×</button>
         </div>
 
         <div class="visitor-panel-body">
@@ -546,9 +760,9 @@ onBeforeUnmount(() => {
 
           <template v-else-if="activePanel === 'messages'">
             <div class="item-reactions-row">
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')">?? {{ room?.roomReactions?.heartCount || 0 }}</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')">?? {{ room?.roomReactions?.supportCount || 0 }}</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">??? {{ room?.roomReactions?.candleCount || 0 }}</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')">Hart {{ room?.roomReactions?.heartCount || 0 }}</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')">Steun {{ room?.roomReactions?.supportCount || 0 }}</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">Kaars {{ room?.roomReactions?.candleCount || 0 }}</button>
             </div>
             <form class="item-comment-form" @submit.prevent="postRoomComment">
               <input v-model="roomCommentText" type="text" maxlength="500" placeholder="Laat een reactie achter voor deze kamer">
@@ -608,9 +822,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="item-reactions-row">
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">?? {{ item.reactions?.heartCount || 0 }}</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">?? {{ item.reactions?.supportCount || 0 }}</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">??? {{ item.reactions?.candleCount || 0 }}</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">Hart {{ item.reactions?.heartCount || 0 }}</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">Steun {{ item.reactions?.supportCount || 0 }}</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">Kaars {{ item.reactions?.candleCount || 0 }}</button>
                 </div>
 
                 <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
@@ -1010,6 +1224,458 @@ onBeforeUnmount(() => {
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
+}
+
+.visitor-user-btn {
+  width: auto;
+  min-width: 108px;
+  padding: 0 16px;
+}
+
+.visitor-gallery-shell {
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  gap: 14px;
+  padding: 18px 16px 16px;
+  box-sizing: border-box;
+  background:
+    radial-gradient(circle at 10% 12%, rgba(255, 255, 255, 0.24), transparent 22%),
+    radial-gradient(circle at 88% 18%, rgba(255, 255, 255, 0.18), transparent 20%),
+    linear-gradient(180deg, var(--editor-bg-shell-top) 0%, var(--editor-bg-shell-mid) 54%, var(--editor-bg-shell-bottom) 100%);
+  color: var(--visitor-ink);
+}
+
+.visitor-gallery-shell.vr-mode-active {
+  min-height: 100vh;
+  padding: 0;
+  gap: 0;
+  grid-template-rows: minmax(0, 1fr);
+  background: #0d1820;
+}
+
+.visitor-gallery-topbar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.visitor-back-btn {
+  align-self: end;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--visitor-color-dark);
+  padding: 10px 14px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 10px 28px rgba(11, 63, 116, 0.14);
+}
+
+.visitor-title-card {
+  justify-self: start;
+  align-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--visitor-color-dark);
+  box-shadow: 0 10px 28px rgba(11, 63, 116, 0.16);
+}
+
+.visitor-title-card h1 {
+  margin: 0;
+  font-size: clamp(1.15rem, 2.2vw, 1.65rem);
+  line-height: 1;
+}
+
+.visitor-gallery-main {
+  display: grid;
+  place-items: center;
+  min-height: 0;
+}
+
+.visitor-gallery-main.is-vr {
+  place-items: stretch;
+  padding: 0;
+  background: #0d1820;
+}
+
+.visitor-gallery-panel {
+  width: min(980px, 100%);
+  min-height: 100%;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 20px 52px rgba(11, 63, 116, 0.18);
+  padding: 14px;
+  display: grid;
+  gap: 14px;
+  box-sizing: border-box;
+}
+
+.visitor-gallery-heading {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: end;
+}
+
+.visitor-gallery-kicker {
+  margin: 0 0 4px;
+  color: #4f7598;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.visitor-gallery-heading h2 {
+  margin: 0;
+  color: var(--visitor-color-dark);
+  font-size: clamp(1.15rem, 2.6vw, 1.8rem);
+}
+
+.visitor-gallery-lead {
+  margin: 0;
+  max-width: 360px;
+  color: #52708e;
+  line-height: 1.45;
+  font-size: 0.95rem;
+  text-align: right;
+}
+
+.visitor-gallery-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.visitor-gallery-card {
+  display: grid;
+  gap: 8px;
+}
+
+.visitor-gallery-media {
+  aspect-ratio: 1 / 1.15;
+  border-radius: 16px;
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(221, 232, 242, 0.9), rgba(201, 218, 235, 0.95));
+  border: 1px solid rgba(18, 58, 98, 0.12);
+  box-shadow: 0 8px 20px rgba(11, 63, 116, 0.08);
+}
+
+.visitor-gallery-image,
+.visitor-gallery-video,
+.visitor-gallery-embed,
+.visitor-gallery-audio {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.visitor-gallery-image,
+.visitor-gallery-video {
+  object-fit: cover;
+}
+
+.visitor-gallery-embed {
+  border: 0;
+}
+
+.visitor-gallery-audio {
+  min-height: 100%;
+}
+
+.visitor-gallery-placeholder {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  gap: 6px;
+  padding: 16px;
+  text-align: center;
+  color: #45627d;
+}
+
+.visitor-gallery-placeholder strong {
+  color: var(--visitor-color-dark);
+}
+
+.visitor-gallery-copy {
+  padding: 0 4px 2px;
+  display: grid;
+  gap: 2px;
+  color: var(--visitor-color-dark);
+}
+
+.visitor-gallery-copy strong {
+  font-size: 0.95rem;
+}
+
+.visitor-gallery-copy p {
+  margin: 0;
+  color: #50708e;
+  font-size: 0.88rem;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.visitor-gallery-empty {
+  margin: 0;
+  color: #50708e;
+}
+
+.visitor-gallery-add {
+  justify-self: start;
+  border: 0;
+  border-radius: 14px;
+  padding: 12px 18px;
+  font-weight: 700;
+  background: linear-gradient(90deg, var(--visitor-color-dark), var(--visitor-color-light));
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(11, 63, 116, 0.18);
+  cursor: pointer;
+}
+
+.visitor-vr-entry-btn {
+  position: absolute;
+  top: 84px;
+  right: 16px;
+  z-index: 3;
+}
+
+.visitor-gallery-footer {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.visitor-gallery-footer-vr {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+
+.visitor-gallery-tabs {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.visitor-gallery-tab {
+  border: 1px solid rgba(18, 58, 98, 0.16);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--visitor-color-dark);
+  padding: 10px 14px;
+  min-width: 88px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.visitor-gallery-tab.active {
+  background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.72));
+  border-color: var(--visitor-color-dark);
+}
+
+.visitor-vr-stage {
+  position: relative;
+  min-height: min(72vh, 760px);
+  width: min(980px, 100%);
+  margin: 0 auto;
+  border-radius: 22px;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at center, rgba(255, 255, 255, 0.18), transparent 18%),
+    radial-gradient(circle at 50% 50%, rgba(255, 255, 255, 0.08), transparent 42%),
+    linear-gradient(180deg, rgba(11, 52, 89, 0.95), rgba(28, 85, 132, 0.96));
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  box-shadow: 0 24px 64px rgba(11, 63, 116, 0.28);
+}
+
+.visitor-vr-halo {
+  position: absolute;
+  inset: 12% 18%;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.22), transparent 64%);
+  filter: blur(10px);
+}
+
+.visitor-vr-core {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 2;
+  width: min(280px, 70vw);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  padding: 24px;
+  box-sizing: border-box;
+  color: #fff;
+  background: radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.08) 45%, rgba(255, 255, 255, 0.04) 60%, transparent 72%);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  backdrop-filter: blur(4px);
+}
+
+.visitor-vr-core span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.18);
+  font-size: 1.5rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.visitor-vr-core strong {
+  display: block;
+  margin-top: 12px;
+  font-size: 1.25rem;
+}
+
+.visitor-vr-core p {
+  margin: 6px 0 0;
+  color: rgba(255, 255, 255, 0.84);
+}
+
+.visitor-vr-exit {
+  margin-top: 16px;
+  border: 0;
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  color: var(--visitor-color-dark);
+  background: rgba(255, 255, 255, 0.96);
+}
+
+.visitor-vr-orbit {
+  position: absolute;
+  inset: 0;
+}
+
+.visitor-vr-card {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: clamp(120px, 14vw, 180px);
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--vr-angle))
+    translateY(calc(-1 * clamp(180px, 23vw, 280px)))
+    rotate(calc(-1 * var(--vr-angle)));
+  transform-origin: center center;
+  animation: vrFloat 6.5s ease-in-out infinite;
+  animation-delay: var(--vr-delay);
+}
+
+.visitor-vr-image {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  display: block;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.25);
+}
+
+.visitor-vr-caption {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--visitor-color-dark);
+  text-align: center;
+  box-shadow: 0 10px 18px rgba(0, 0, 0, 0.16);
+}
+
+.visitor-vr-caption strong {
+  display: block;
+  font-size: 0.86rem;
+}
+
+.visitor-vr-caption span {
+  display: block;
+  margin-top: 4px;
+  font-size: 0.76rem;
+  color: #52708e;
+}
+
+.visitor-vr-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+@keyframes vrFloat {
+  0%, 100% {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--vr-angle))
+      translateY(calc(-1 * clamp(180px, 23vw, 280px)))
+      rotate(calc(-1 * var(--vr-angle)))
+      translateY(0);
+  }
+  50% {
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--vr-angle))
+      translateY(calc(-1 * clamp(180px, 23vw, 280px)))
+      rotate(calc(-1 * var(--vr-angle)))
+      translateY(-14px);
+  }
+}
+
+@media (max-width: 960px) {
+  .visitor-gallery-topbar,
+  .visitor-gallery-footer,
+  .visitor-gallery-heading {
+    grid-template-columns: 1fr;
+  }
+
+  .visitor-gallery-lead {
+    text-align: left;
+    max-width: none;
+  }
+
+  .visitor-gallery-add {
+    justify-self: stretch;
+  }
+
+  .visitor-topbar-right {
+    justify-content: flex-end;
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 640px) {
+  .visitor-gallery-shell {
+    padding: 14px 12px 12px;
+  }
+
+  .visitor-gallery-panel {
+    padding: 12px;
+  }
+
+  .visitor-gallery-grid {
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  }
 }
 
 @media (max-width: 900px) {

@@ -128,7 +128,7 @@ const router = createRouter({
       meta: { title: 'Uitvaartondernemer' }
     },
     {
-      path: '/visit/:id',
+      path: '/visit/:id/:category?',
       name: 'visitor-room',
       component: VisitorRoomPage,
       meta: { title: 'Bezoek kamer' }

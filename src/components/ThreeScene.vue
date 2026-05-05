@@ -34,6 +34,14 @@ const props = defineProps({
   hideLocalTemplateActions: {
     type: Boolean,
     default: false
+  },
+  vrMode: {
+    type: Boolean,
+    default: false
+  },
+  vrItems: {
+    type: Array,
+    default: () => []
   }
 })
 
@@ -56,6 +64,13 @@ let currentLookYaw = 0
 let isLookDragging = false
 let lookDragStartX = 0
 let lookDragStartYaw = 0
+
+// VR camera rotation
+let vrYaw = 0
+let vrPitch = 0
+let vrIsDragging = false
+let vrDragStartX = 0
+let vrDragStartY = 0
 
 const selectableRoots = []
 let selectedRoot = null
@@ -861,8 +876,15 @@ function createScene() {
 
   camera = new THREE.PerspectiveCamera(36, 1, 0.1, 400)
   camera.up.set(0, 1, 0)
-  camera.position.copy(START_CAMERA)
-  camera.lookAt(FIXED_TARGET)
+  
+  // VR mode: position camera at eye level in center of room
+  if (props.vrMode) {
+    camera.position.set(0, 12, 0)
+    camera.lookAt(0, 12, 1)
+  } else {
+    camera.position.copy(START_CAMERA)
+    camera.lookAt(FIXED_TARGET)
+  }
 
   renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
@@ -883,26 +905,63 @@ function createScene() {
   orbit = new OrbitControls(camera, renderer.domElement)
   orbit.enableDamping = true
   orbit.enablePan = false
-  orbit.enableRotate = false
-  orbit.enableZoom = true
+  orbit.enableZoom = !props.vrMode  // Disable zoom in VR mode
   orbit.dampingFactor = 0.08
   orbit.zoomSpeed = 2.2
-  orbit.minDistance = ZOOM_NEAR_DISTANCE
-  orbit.maxDistance = ZOOM_FAR_DISTANCE
-  orbit.zoomToCursor = false
-  orbit.mouseButtons = {
-    LEFT: THREE.MOUSE.NONE,
-    MIDDLE: THREE.MOUSE.NONE,
-    RIGHT: THREE.MOUSE.NONE
+  
+  if (props.vrMode) {
+    // VR mode: disable OrbitControls, use custom rotation
+    orbit.enabled = false
+    
+    // Custom VR mouse handlers
+    const onVRMouseDown = (e) => {
+      vrIsDragging = true
+      vrDragStartX = e.clientX
+      vrDragStartY = e.clientY
+    }
+    
+    const onVRMouseMove = (e) => {
+      if (!vrIsDragging) return
+      const deltaX = e.clientX - vrDragStartX
+      const deltaY = e.clientY - vrDragStartY
+      
+      vrYaw -= deltaX * 0.01
+      vrPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, vrPitch - deltaY * 0.01))
+      
+      vrDragStartX = e.clientX
+      vrDragStartY = e.clientY
+    }
+    
+    const onVRMouseUp = () => {
+      vrIsDragging = false
+    }
+    
+    renderer.domElement.addEventListener('mousedown', onVRMouseDown)
+    renderer.domElement.addEventListener('mousemove', onVRMouseMove)
+    renderer.domElement.addEventListener('mouseup', onVRMouseUp)
+    renderer.domElement.addEventListener('mouseleave', onVRMouseUp)
+  } else {
+    // Normal mode: keep existing settings
+    orbit.enableRotate = false
+    orbit.minDistance = ZOOM_NEAR_DISTANCE
+    orbit.maxDistance = ZOOM_FAR_DISTANCE
+    orbit.target.copy(FIXED_TARGET)
+    orbit.mouseButtons = {
+      LEFT: THREE.MOUSE.NONE,
+      MIDDLE: THREE.MOUSE.NONE,
+      RIGHT: THREE.MOUSE.NONE
+    }
   }
-  orbit.screenSpacePanning = false
-  orbit.target.copy(FIXED_TARGET)
-  orbit.update()
-  const dirX = FIXED_TARGET.x - START_CAMERA.x
-  const dirZ = FIXED_TARGET.z - START_CAMERA.z
-  initialAzimuth = Math.atan2(dirX, dirZ)
-  currentLookYaw = initialAzimuth
-  syncTargetToCurrentYaw()
+  
+  if (!props.vrMode) {
+    orbit.screenSpacePanning = false
+    orbit.update()
+    const dirX = FIXED_TARGET.x - START_CAMERA.x
+    const dirZ = FIXED_TARGET.z - START_CAMERA.z
+    initialAzimuth = Math.atan2(dirX, dirZ)
+    currentLookYaw = initialAzimuth
+    syncTargetToCurrentYaw()
+  }
   updateCameraDebug()
 
   transform = new TransformControls(camera, renderer.domElement)
@@ -1012,8 +1071,43 @@ function createScene() {
   rightWallWallpaper.receiveShadow = true
   scene.add(rightWallWallpaper)
 
-  initializeFurnitureSlots()
-  hydrateCuratedDefaultFurniture()
+  // Left wall
+  const leftWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+  leftWallTiles.rotation.y = Math.PI / 2
+  leftWallTiles.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
+  leftWallTiles.receiveShadow = true
+  scene.add(leftWallTiles)
+
+  const leftWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
+  leftWallWallpaper.rotation.y = Math.PI / 2
+  leftWallWallpaper.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
+  leftWallWallpaper.receiveShadow = true
+  scene.add(leftWallWallpaper)
+
+  // Front wall
+  const frontWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
+  frontWallTiles.rotation.y = Math.PI
+  frontWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, ROOM_SIZE / 2)
+  frontWallTiles.receiveShadow = true
+  scene.add(frontWallTiles)
+
+  const frontWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
+  frontWallWallpaper.rotation.y = Math.PI
+  frontWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, ROOM_SIZE / 2)
+  frontWallWallpaper.receiveShadow = true
+  scene.add(frontWallWallpaper)
+
+  // Add VR floating photos
+  if (props.vrMode && props.vrItems && props.vrItems.length > 0) {
+    addVRPhotos()
+  }
+
+  // Only add furniture in non-VR mode
+  if (!props.vrMode) {
+    initializeFurnitureSlots()
+    hydrateCuratedDefaultFurniture()
+  }
+  
   deselect()
 
   // Event handlers
@@ -1026,6 +1120,75 @@ function createScene() {
   window.addEventListener('resize', resize)
 
   animate()
+}
+
+function addVRPhotos() {
+  const items = props.vrItems || []
+  const count = Math.min(items.length, 12)
+  if (count === 0) return
+
+  items.slice(0, 12).forEach((item, index) => {
+    if (!item.mediaUrl) return
+
+    const angle = (index / count) * Math.PI * 2
+    const elevation = (index % 2) * 1.5 - 0.75
+    const radius = 6
+
+    const x = Math.cos(angle) * radius
+    const y = 12 + elevation  // Match camera height
+    const z = Math.sin(angle) * radius
+
+    const textureLoader = new THREE.TextureLoader()
+    textureLoader.load(item.mediaUrl, (texture) => {
+      texture.colorSpace = THREE.SRGBColorSpace
+
+      const geoPhoto = new THREE.PlaneGeometry(2, 2.7)
+      const matPhoto = new THREE.MeshStandardMaterial({
+        map: texture,
+        metalness: 0.1,
+        roughness: 0.5,
+        side: THREE.DoubleSide
+      })
+
+      const photoMesh = new THREE.Mesh(geoPhoto, matPhoto)
+      photoMesh.position.set(x, y, z)
+      photoMesh.lookAt(0, y, 0)
+
+      photoMesh.userData = {
+        angle,
+        baseY: y,
+        radius,
+        elevation,
+        index
+      }
+
+      photoMesh.castShadow = true
+      photoMesh.receiveShadow = true
+
+      scene.add(photoMesh)
+    })
+  })
+}
+
+function animateVRPhotos() {
+  if (!scene) return
+  
+  const time = Date.now() * 0.0008
+  
+  scene.traverse((obj) => {
+    if (!obj.userData || obj.userData.baseY === undefined) return
+    
+    const { angle, radius, baseY } = obj.userData
+    const delay = obj.userData.index * 0.15
+    const float = Math.sin(time + delay) * 0.5
+    const sway = Math.cos(time * 0.5 + delay) * 0.3
+
+    const x = Math.cos(angle) * (radius + sway)
+    const y = baseY + float
+    const z = Math.sin(angle) * (radius + sway)
+
+    obj.position.set(x, y, z)
+  })
 }
 
 function resize() {
@@ -1043,27 +1206,54 @@ function resize() {
 function animate() {
   if (!renderer) return
   renderer.setAnimationLoop(() => {
-    // Restore the previous frame's synthetic Y offset before OrbitControls updates.
-    if (lastCameraYOffset !== 0) {
-      camera.position.y -= lastCameraYOffset
-      lastCameraYOffset = 0
-    }
+    // VR mode: keep camera centered and handle rotation
+    if (props.vrMode) {
+      // Always keep camera at center
+      camera.position.set(0, 12, 0)
+      
+      // Calculate look direction based on yaw and pitch
+      const direction = new THREE.Vector3(
+        Math.sin(vrYaw) * Math.cos(vrPitch),
+        Math.sin(vrPitch),
+        Math.cos(vrYaw) * Math.cos(vrPitch)
+      )
+      
+      // Look in the direction
+      camera.lookAt(
+        camera.position.x + direction.x * 10,
+        camera.position.y + direction.y * 10,
+        camera.position.z + direction.z * 10
+      )
+    } else {
+      // Normal mode: existing logic
+      // Restore the previous frame's synthetic Y offset before OrbitControls updates.
+      if (lastCameraYOffset !== 0) {
+        camera.position.y -= lastCameraYOffset
+        lastCameraYOffset = 0
+      }
 
-    syncTargetToCurrentYaw()
-    orbit?.update()
-    updateCameraVerticalDrift()
-    syncTargetToCurrentYaw()
+      syncTargetToCurrentYaw()
+      orbit?.update()
+      updateCameraVerticalDrift()
+      syncTargetToCurrentYaw()
 
-    // Safety fallback: keep camera/target finite so the scene never disappears.
-    if (!Number.isFinite(camera.position.x) || !Number.isFinite(camera.position.y) || !Number.isFinite(camera.position.z)) {
-      camera.position.copy(START_CAMERA)
-    }
-    if (!Number.isFinite(orbit.target.x) || !Number.isFinite(orbit.target.y) || !Number.isFinite(orbit.target.z)) {
-      orbit.target.copy(FIXED_TARGET)
+      // Safety fallback: keep camera/target finite so the scene never disappears.
+      if (!Number.isFinite(camera.position.x) || !Number.isFinite(camera.position.y) || !Number.isFinite(camera.position.z)) {
+        camera.position.copy(START_CAMERA)
+      }
+      if (!Number.isFinite(orbit.target.x) || !Number.isFinite(orbit.target.y) || !Number.isFinite(orbit.target.z)) {
+        orbit.target.copy(FIXED_TARGET)
+      }
     }
 
     updateCameraDebug()
     updateSelectedAnchor()
+    
+    // Animate VR photos
+    if (props.vrMode) {
+      animateVRPhotos()
+    }
+    
     renderer.render(scene, camera)
   })
 }
