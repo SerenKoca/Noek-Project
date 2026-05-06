@@ -1019,30 +1019,30 @@ function createScene() {
 
   // Lights (required)
   // Softer neutral lighting so the room stays readable without washing out the page gradient
-  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 0.78)
+  const hemi = new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 1.1)
   hemi.position.set(0, 80, 0)
   scene.add(hemi)
 
-  const dir = new THREE.DirectionalLight(0xffffff, 1.08)
+  const dir = new THREE.DirectionalLight(0xffffff, 1.5)
   dir.position.set(30, 40, 10)
   dir.castShadow = true
   dir.shadow.mapSize.set(1024, 1024)
   dir.shadow.bias = -0.0008
   scene.add(dir)
 
-  const fill = new THREE.PointLight(0xffecd5, 0.5, 75, 1.6)
+  const fill = new THREE.PointLight(0xffecd5, 0.75, 75, 1.6)
   fill.position.set(-12, 14, 18)
   scene.add(fill)
 
-  const warmLamp = new THREE.PointLight(0xffedd6, 0.36, 55, 1.8)
+  const warmLamp = new THREE.PointLight(0xffedd6, 0.55, 55, 1.8)
   warmLamp.position.set(18, 10, -6)
   scene.add(warmLamp)
 
-  const cornerWarm = new THREE.PointLight(0xffe6cb, 0.28, 45, 1.9)
+  const cornerWarm = new THREE.PointLight(0xffe6cb, 0.45, 45, 1.9)
   cornerWarm.position.set(-20, 8, -18)
   scene.add(cornerWarm)
 
-  const accent = new THREE.SpotLight(0xffffff, 0.42, 90, Math.PI / 6, 0.45, 1.2)
+  const accent = new THREE.SpotLight(0xffffff, 0.65, 90, Math.PI / 6, 0.45, 1.2)
   accent.position.set(0, 16, 2)
   accent.target.position.set(0, 2, -10)
   accent.castShadow = true

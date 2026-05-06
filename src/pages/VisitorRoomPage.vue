@@ -886,9 +886,10 @@ onBeforeUnmount(() => {
   min-height: 100vh;
 background: linear-gradient(
   180deg,
-  var(--brand-light) 10%,
-  color-mix(in srgb, var(--brand-light) 100%, var(--brand-light)) 50%,
-  var(--brand-dark) 100%
+  white 0%,
+  color-mix(in srgb, var(--brand-light) 72%, white) 28%,
+  color-mix(in srgb, var(--brand-light) 64%, white) 60%,
+  color-mix(in srgb, var(--brand-dark) 48%, var(--brand-light)) 100%
 );
   color: var(--visitor-ink);
   padding: 0;
@@ -903,9 +904,10 @@ background: linear-gradient(
   pointer-events: none;
   background: linear-gradient(
   180deg,
-  var(--brand-light) 0%,
-  color-mix(in srgb, var(--brand-light) 100%, var(--brand-dark)) 50%,
-  var(--brand-dark) 100%
+  rgba(255, 255, 255, 0) 0%,
+  rgba(255, 255, 255, 0) 30%,
+  color-mix(in srgb, var(--brand-dark) 12%, transparent) 60%,
+  color-mix(in srgb, var(--brand-dark) 24%, transparent) 100%
 );
   z-index: 0;
 }
