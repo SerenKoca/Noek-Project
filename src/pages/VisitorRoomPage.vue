@@ -724,31 +724,31 @@ onBeforeUnmount(() => {
         <div class="visitor-action-bar">
           <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">
             <div class="visitor-action-icon">
-              <img src="/img/icons/icon_foto.svg" alt="Foto's" />
+              <div class="icon-shape icon-foto"></div>
             </div>
             <span class="visitor-action-label">Foto's</span>
           </button>
           <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">
             <div class="visitor-action-icon">
-              <img src="/img/icons/icon_muziek.svg" alt="Muziek" />
+              <div class="icon-shape icon-muziek"></div>
             </div>
             <span class="visitor-action-label">Muziek</span>
           </button>
           <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">
             <div class="visitor-action-icon">
-              <img src="/img/icons/icon_video.svg" alt="Video's" />
+              <div class="icon-shape icon-video"></div>
             </div>
             <span class="visitor-action-label">Video's</span>
           </button>
           <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">
             <div class="visitor-action-icon">
-              <img src="/img/icons/icon_kaars.svg" alt="Kaarsjes" />
+              <div class="icon-shape icon-kaars"></div>
             </div>
             <span class="visitor-action-label">Kaarsjes</span>
           </button>
           <button type="button" :class="['visitor-action-btn', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">
             <div class="visitor-action-icon">
-              <img src="/img/icons/icon_bericht.svg" alt="Bericht" />
+              <div class="icon-shape icon-message"></div>
             </div>
             <span class="visitor-action-label">Bericht</span>
           </button>
@@ -947,6 +947,7 @@ background: linear-gradient(
   max-width: 160px;
   max-height: 44px;
   object-fit: contain;
+
 }
 
 .visitor-entry-logo {
@@ -1103,15 +1104,57 @@ background: linear-gradient(
   justify-content: center;
   border-radius: 14px;
   background: color-mix(in srgb, var(--visitor-color-dark) 12%, white);
+  color: var(--visitor-color-dark);
   border: 2px solid color-mix(in srgb, var(--visitor-color-dark) 8%, transparent);
   overflow: hidden;
   box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
 }
 
+.icon-shape {
+  width: 40px;
+  height: 40px;
+
+  background-color: var(--visitor-color-dark);
+
+  -webkit-mask-position: center;
+  -webkit-mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+
+  mask-position: center;
+  mask-size: contain;
+  mask-repeat: no-repeat;
+}
+
+.icon-message {
+  -webkit-mask-image: url('/img/icons/icon_bericht.svg');
+  mask-image: url('/img/icons/icon_bericht.svg');
+}
+
+.icon-kaars {
+  -webkit-mask-image: url('/img/icons/icon_kaars.svg');
+  mask-image: url('/img/icons/icon_kaars.svg');
+}
+
+.icon-video {
+  -webkit-mask-image: url('/img/icons/icon_video.svg');
+  mask-image: url('/img/icons/icon_video.svg');
+}
+
+.icon-muziek {
+  -webkit-mask-image: url('/img/icons/icon_muziek.svg');
+  mask-image: url('/img/icons/icon_muziek.svg');
+}
+
+.icon-foto {
+  -webkit-mask-image: url('/img/icons/icon_foto.svg');
+  mask-image: url('/img/icons/icon_foto.svg');
+} 
+
 .visitor-action-icon img {
   width: 40px;
   height: 40px;
   object-fit: contain;
+  color: var(--visitor-color-dark);
 }
 
 .visitor-action-label {
