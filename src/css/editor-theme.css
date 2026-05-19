@@ -838,8 +838,9 @@ body {
 }
 
 .primary-btn {
-  background: var(--editor-brand);
-  color: white;
+  background: linear-gradient(90deg, var(--editor-brand), var(--editor-primary-hover));
+  color: var(--editor-btn-text, #fff);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--editor-brand) 18%, transparent);
 }
 
 .primary-btn:hover {
@@ -884,14 +885,52 @@ body {
 }
 
 .modal-card {
-  width: min(520px, 100%);
+  width: min(720px, 100%);
   border: 1px solid var(--editor-border);
   border-radius: 12px;
-  background: #f9fcff;
+  background: color-mix(in srgb, white 86%, var(--editor-panel) 14%);
   color: var(--editor-text);
   padding: 16px;
   display: grid;
   gap: 10px;
+}
+
+/* Create-room modal style when shown on home page */
+.home-page-v2 .modal-card {
+  width: min(880px, 92vw);
+  background: linear-gradient(180deg, color-mix(in srgb, white 8%, var(--editor-brand) 92%), var(--editor-brand));
+  color: #fff;
+  border-radius: 12px;
+  padding: 26px;
+  box-shadow: 0 30px 80px rgba(8, 32, 64, 0.6);
+}
+
+.home-page-v2 .modal-card .modal-actions {
+  justify-content: space-between;
+}
+
+.home-page-v2 .modal-card .choose-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: stretch;
+}
+
+.home-page-v2 .modal-card .choose-card {
+  background: color-mix(in srgb, white 90%, var(--editor-panel) 10%);
+  color: #0b3a63;
+  border-radius: 10px;
+  padding: 18px;
+  display: grid;
+  gap: 10px;
+  align-items: center;
+  justify-items: center;
+}
+
+.home-page-v2 .modal-card .choose-card svg {
+  width: 96px;
+  height: 96px;
+  fill: var(--editor-brand);
 }
 
 .modal-card h3 {
@@ -1553,6 +1592,29 @@ body {
   padding: 16px;
   display: grid;
   gap: 10px;
+}
+
+/* Templates selection list styling */
+.settings-left-v2 .template-list {
+  display: grid;
+  gap: 14px;
+  max-height: calc(72vh - 120px);
+  overflow-y: auto;
+  padding-right: 8px;
+}
+
+.settings-left-v2 .template-card {
+  border: 3px solid color-mix(in srgb, var(--editor-brand) 12%, white);
+  border-radius: 12px;
+  background: color-mix(in srgb, white 92%, var(--editor-panel) 8%);
+  padding: 16px;
+}
+
+.settings-right-v2 .preview-panel {
+  border-radius: 12px;
+  background: #fff;
+  padding: 18px;
+  border: 1px solid var(--editor-border);
 }
 
 .settings-left-v2 h3,

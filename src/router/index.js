@@ -100,6 +100,13 @@ const router = createRouter({
       meta: { title: 'Kamer instellingen' }
     },
     {
+      path: '/rooms/create',
+      name: 'create-room',
+      component: () => import('../pages/CreateRoomPage.vue'),
+      beforeEnter: requireEditor,
+      meta: { title: 'Nieuwe kamer' }
+    },
+    {
       path: '/rooms/:id/editor',
       name: 'room-editor',
       component: EditorPage,
