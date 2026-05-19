@@ -385,7 +385,7 @@ watch(allowedSubCategories, (list) => {
       />
 
       <SidebarSubNav
-        v-if="!isColorCategory"
+        v-if="true"
         :active-category="activeCategory"
         :active-sub-category="activeSubCategory"
         :allowed-sub-categories="allowedSubCategories"
