@@ -275,6 +275,23 @@ body {
   max-height: 560px;
   overflow: hidden;
   min-width: 0;
+  color: var(--editor-text);
+}
+
+.editor-sidebar-shell .editor-assets-title,
+.editor-sidebar-shell .editor-sub-title,
+.editor-sidebar-shell .editor-back-btn,
+.editor-sidebar-shell .editor-assets-btn span:last-child,
+.editor-sidebar-shell .editor-sub-item,
+.editor-sidebar-shell .editor-action-btn,
+.editor-sidebar-shell .editor-loading,
+.editor-sidebar-shell .editor-sound-meta strong,
+.editor-sidebar-shell .editor-sound-meta span,
+.editor-sidebar-shell .editor-color-preset-btn,
+.editor-sidebar-shell .editor-texture-header,
+.editor-sidebar-shell .editor-texture-header span,
+.editor-sidebar-shell .editor-texture-header p {
+  color: var(--editor-text);
 }
 
 .editor-sidebar-grid.is-colors .editor-models-panel {
@@ -471,6 +488,13 @@ body {
   cursor: pointer;
 }
 
+.editor-sidebar-shell .editor-action-btn:hover,
+.editor-sidebar-shell .editor-model-tile:hover,
+.editor-sidebar-shell .editor-sub-item:hover,
+.editor-sidebar-shell .editor-color-preset-btn:hover {
+  color: var(--editor-text);
+}
+
 .editor-action-btn:disabled,
 .editor-mini-btn:disabled {
   opacity: 0.5;
@@ -537,6 +561,13 @@ body {
 
 .editor-colors-panel {
   gap: 8px;
+}
+
+.editor-colors-panel .editor-sub-item,
+.editor-colors-panel .editor-texture-header,
+.editor-colors-panel .editor-texture-header span,
+.editor-colors-panel .editor-texture-header p {
+  color: var(--editor-text);
 }
 
 .editor-color-targets {

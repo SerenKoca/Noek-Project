@@ -117,7 +117,7 @@ function applyPresetTexture(textureId) {
 <style scoped>
 .editor-texture-header {
   margin: 4px 0 10px;
-  color: rgba(255, 248, 239, 0.88);
+  color: rgba(7, 38, 72, 0.92);
 }
 
 .editor-texture-header span {
@@ -130,7 +130,7 @@ function applyPresetTexture(textureId) {
   margin: 6px 0 0;
   font-size: 0.8rem;
   line-height: 1.35;
-  color: rgba(255, 248, 239, 0.72);
+  color: rgba(7, 38, 72, 0.68);
 }
 
 .editor-texture-grid {
@@ -166,6 +166,10 @@ function applyPresetTexture(textureId) {
   font-weight: 600;
   text-align: left;
   backdrop-filter: blur(4px);
+}
+
+.editor-texture-targets .editor-sub-item {
+  color: rgba(7, 38, 72, 0.95);
 }
 
 .editor-texture-card:hover {
