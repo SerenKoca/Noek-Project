@@ -1,6 +1,7 @@
 <script setup>
-import { onMounted } from 'vue'
+import { computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
+import ThreeScene from '../components/ThreeScene.vue'
 import { useNoekState } from '../composables/useNoekState.js'
 
 const router = useRouter()
@@ -12,6 +13,7 @@ onMounted(async () => {
     await router.replace('/login')
     return
   }
+
   await state.loadRooms()
 })
 
@@ -25,6 +27,7 @@ async function openEditorRoute(room) {
     await router.push(`/rooms/${room._id}/editor`)
     return
   }
+
   await router.push('/rooms/new/editor')
 }
 
@@ -63,79 +66,157 @@ async function copyVisitLink(room) {
     window.prompt('Kopieer deze link', visitUrl)
   }
 }
+
+const branding = computed(() => state.brandingState.value || {})
+const userLabel = computed(() => {
+  const displayName = String(state.authState.value?.user?.displayName || '').trim()
+  if (displayName) return displayName
+
+  const email = String(state.authState.value?.user?.email || '').trim()
+  if (email) return email.split('@')[0]
+
+  return 'Doris'
+})
+
+const userInitial = computed(() => {
+  const label = userLabel.value.trim()
+  return label ? label.charAt(0).toUpperCase() : 'D'
+})
+
+function getRoomUpdatedAt(room) {
+  return room?.updatedAt || room?.createdAt || null
+}
+
+function formatRelativeDate(value) {
+  if (!value) return 'onbekend'
+
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return 'onbekend'
+
+  const diffMs = Date.now() - date.getTime()
+  if (diffMs < 60_000) return 'zojuist'
+
+  const diffDays = Math.max(0, Math.floor(diffMs / 86_400_000))
+  if (diffDays <= 0) return 'vandaag'
+  if (diffDays === 1) return '1 dag geleden'
+  return `${diffDays} dagen geleden`
+}
+
+function roomSubtitle(room) {
+  return `Bewerkt: ${formatRelativeDate(getRoomUpdatedAt(room))}`
+}
+
+function roomCardStyle(room) {
+  const appearance = room?.sceneData?.appearance || {}
+  return {
+    '--room-preview-wall': appearance.wallColor || '#dce8f6',
+    '--room-preview-floor': appearance.floorColor || '#d6b78b'
+  }
+}
+
+function openNotifications() {
+  window.alert('Je hebt nog geen nieuwe meldingen.')
+}
 </script>
 
 <template>
   <div class="editor-page is-home">
-    <div class="home-page-v2">
-      <header class="home-topbar-v2">
-        <div class="home-brand-v2">
+    <div class="home-page-v2 editor-home-shell">
+      <header class="home-topbar-v2 editor-home-topbar">
+        <div class="home-brand-v2 editor-home-brand">
           <img
-            v-if="state.brandingState.value?.logoUrl"
-            :src="state.brandingState.value.logoUrl"
+            v-if="branding.logoUrl"
+            :src="branding.logoUrl"
             alt="Brand logo"
-            style="height: 40px; max-width: 180px; object-fit: contain;"
+            class="editor-home-brand-logo"
           />
-          <strong v-else>{{ state.brandingState.value?.directorName || 'Noek' }}</strong>
-          <span>Uitvaartzorg</span>
+          <div v-else class="editor-home-brand-text">
+            <strong>{{ branding.directorName || 'Thibaut DELA' }}</strong>
+            <span>Uitvaartzorg</span>
+          </div>
         </div>
-        <div class="home-user-v2">
-          <span>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
-          <span class="role-badge">{{ state.authState.value?.user?.role || 'editor' }}</span>
-          <button type="button" class="secondary-btn" @click="openProfile">Profiel</button>
-          <button type="button" class="secondary-btn" @click="logout">Uitloggen</button>
+
+        <div class="editor-home-topbar-actions">
+          <button type="button" class="editor-home-bell-btn" @click="openNotifications" aria-label="Meldingen">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 22a2.4 2.4 0 0 0 2.35-1.9H9.65A2.4 2.4 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2Zm-3 0H8v-5a4 4 0 1 1 8 0v5Z" />
+            </svg>
+            <span class="editor-home-badge">1</span>
+          </button>
+
+          <button type="button" class="editor-home-user-btn" @click="openProfile" :title="userLabel">
+            <span class="editor-home-user-initial">{{ userInitial }}</span>
+            <span class="editor-home-user-name">{{ userLabel }}</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="editor-home-user-icon">
+              <path d="M12 12.1a4.2 4.2 0 1 0-4.2-4.2 4.2 4.2 0 0 0 4.2 4.2Zm0 2c-4.4 0-8 2.5-8 5.6v1.2h16v-1.2c0-3.1-3.6-5.6-8-5.6Z" />
+            </svg>
+          </button>
         </div>
       </header>
 
-      <section class="home-main-v2">
-        <div class="home-main-header-v2">
-          <div>
-            <h2>Jouw kamers</h2>
-            <p>Klik op een kamer om te openen, of ga via instellingen naar alle bijdragen.</p>
+      <main class="editor-home-main">
+        <section class="editor-home-hero">
+          <div class="editor-home-hero-copy">
+            <p class="editor-home-kicker">Editor dashboard</p>
+            <h1>Hallo {{ userLabel }},</h1>
+            <p>We zijn hier om ruimte te bieden voor verdriet en zijn verschillende vormen.</p>
           </div>
-          <div class="home-actions">
+        </section>
+
+        <section class="editor-home-rooms">
+          <div class="home-main-header-v2 editor-home-rooms-head">
+            <h2>Uw kamers:</h2>
             <button
               type="button"
-              class="primary-btn"
+              class="primary-btn editor-home-create-btn"
               :disabled="state.rooms.value.length >= 2"
               :title="state.rooms.value.length >= 2 ? 'Elk account mag maar 2 kamers hebben.' : ''"
               @click="openEditorRoute(null)"
             >
-              Nieuwe kamer
+              + Maak een kamer
             </button>
-            <button type="button" class="secondary-btn" @click="state.loadRooms">Ververs</button>
           </div>
-        </div>
 
-        <p v-if="state.rooms.value.length >= 2" class="room-contribution-empty error">
-          Elk account mag maar 2 kamers hebben.
-        </p>
+          <p v-if="state.rooms.value.length >= 2" class="room-contribution-empty error editor-home-limit">
+            Elk account mag maar 2 kamers hebben.
+          </p>
 
-        <div v-if="state.rooms.value.length === 0" class="room-empty">
-          <div class="empty-icon">📭</div>
-          <h3>Nog geen kamers</h3>
-          <p>Maak je eerste kamer om te beginnen.</p>
-        </div>
+          <div v-if="state.rooms.value.length === 0" class="room-empty editor-home-empty">
+            <div class="empty-icon">🏠</div>
+            <h3>Nog geen kamers</h3>
+            <p>Maak je eerste kamer om te beginnen.</p>
+          </div>
 
-        <div v-else class="room-grid room-grid-v2">
-          <article v-for="room in state.rooms.value" :key="room._id" class="room-card room-card-v2">
-            <button type="button" class="room-main-btn" @click="openEditorRoute(room)">
-              <div class="room-icon">🏠</div>
-              <div class="room-info">
-                <strong>{{ room.name }}</strong>
-                <div class="room-meta">Aangemaakt: {{ new Date(room.createdAt).toLocaleString('nl-NL') }}</div>
-              </div>
-            </button>
+          <div v-else class="editor-home-room-list">
+            <article v-for="room in state.rooms.value" :key="room._id" class="editor-home-room-card" :style="roomCardStyle(room)">
+              <button type="button" class="editor-home-room-main" @click="openEditorRoute(room)">
+                <div class="editor-home-room-preview">
+                  <ThreeScene
+                    v-if="room?.sceneData"
+                    class="editor-home-room-scene"
+                    :room-data="room.sceneData"
+                  />
+                  <div v-else class="editor-home-room-fallback">
+                    <span>{{ (room.name || 'Kamer').charAt(0).toUpperCase() }}</span>
+                  </div>
+                </div>
 
-            <div class="room-actions-row room-actions-row-v2">
-              <button type="button" class="secondary-btn" @click="openSettingsRoute(room)">Instellingen</button>
-              <button type="button" class="primary-btn" @click="openEditorRoute(room)">Open kamer</button>
-              <button type="button" class="secondary-btn" @click="copyVisitLink(room)">Kopieer link</button>
-              <button type="button" class="danger-btn" @click="state.onDeleteRoom(room)">Verwijder</button>
-            </div>
-          </article>
-        </div>
-      </section>
+                <div class="editor-home-room-copy">
+                  <strong>{{ room.name }}</strong>
+                  <div class="editor-home-room-meta">{{ roomSubtitle(room) }}</div>
+                  <div class="editor-home-room-link">link kamer</div>
+                </div>
+              </button>
+
+              <button type="button" class="editor-home-room-settings" @click.stop="openSettingsRoute(room)" aria-label="Instellingen openen">
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M19.14 12.94a7.9 7.9 0 0 0 .06-.94 7.9 7.9 0 0 0-.06-.94l2.06-1.61a.5.5 0 0 0 .12-.64l-2-3.46a.5.5 0 0 0-.6-.22l-2.43.98a7.7 7.7 0 0 0-1.63-.94l-.37-2.58A.5.5 0 0 0 13.8 2H10.2a.5.5 0 0 0-.49.43l-.37 2.58a7.7 7.7 0 0 0-1.63.94l-2.43-.98a.5.5 0 0 0-.6.22l-2 3.46a.5.5 0 0 0 .12.64l2.06 1.61a7.9 7.9 0 0 0 0 1.88L2.8 14.55a.5.5 0 0 0-.12.64l2 3.46a.5.5 0 0 0 .6.22l2.43-.98c.5.38 1.04.7 1.63.94l.37 2.58a.5.5 0 0 0 .49.43h3.6a.5.5 0 0 0 .49-.43l.37-2.58c.59-.24 1.13-.56 1.63-.94l2.43.98a.5.5 0 0 0 .6-.22l2-3.46a.5.5 0 0 0-.12-.64l-2.06-1.61c.04-.31.06-.62.06-.94s-.02-.63-.06-.94ZM12 15.5A3.5 3.5 0 1 1 15.5 12 3.5 3.5 0 0 1 12 15.5Z" />
+                </svg>
+              </button>
+            </article>
+          </div>
+        </section>
+      </main>
 
       <div v-if="state.deleteRoomModal.value.open" class="modal-backdrop" @click.self="state.closeDeleteRoomModal">
         <div class="modal-card" role="dialog" aria-modal="true" aria-label="Kamer verwijderen bevestigen">
