@@ -947,6 +947,7 @@ body {
   border-radius: 8px;
   padding: 10px;
   font: inherit;
+  color: var(--editor-text);
 }
 
 .modal-actions {
