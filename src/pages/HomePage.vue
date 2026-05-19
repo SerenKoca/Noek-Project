@@ -124,26 +124,20 @@ function openNotifications() {
     <div class="home-page-v2 editor-home-shell">
       <header class="home-topbar-v2 editor-home-topbar">
         <div class="home-brand-v2 editor-home-brand">
-          <img
-            v-if="branding.logoUrl"
-            :src="branding.logoUrl"
-            alt="Brand logo"
-            class="editor-home-brand-logo"
-          />
+          <div v-if="branding.logoUrl" class="editor-home-brand-logo-wrap">
+            <img
+              :src="branding.logoUrl"
+              alt="Brand logo"
+              class="editor-home-brand-logo"
+            />
+          </div>
           <div v-else class="editor-home-brand-text">
             <strong>{{ branding.directorName || 'Thibaut DELA' }}</strong>
             <span>Uitvaartzorg</span>
           </div>
         </div>
 
-        <div class="editor-home-topbar-actions">
-          <button type="button" class="editor-home-bell-btn" @click="openNotifications" aria-label="Meldingen">
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 22a2.4 2.4 0 0 0 2.35-1.9H9.65A2.4 2.4 0 0 0 12 22Zm7-6V11a7 7 0 1 0-14 0v5l-2 2v1h18v-1l-2-2Zm-3 0H8v-5a4 4 0 1 1 8 0v5Z" />
-            </svg>
-            <span class="editor-home-badge">1</span>
-          </button>
-
+          <div class="editor-home-topbar-actions">
           <button type="button" class="editor-home-user-btn" @click="openProfile" :title="userLabel">
             <span class="editor-home-user-initial">{{ userInitial }}</span>
             <span class="editor-home-user-name">{{ userLabel }}</span>
