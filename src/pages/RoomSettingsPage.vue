@@ -1,367 +1,245 @@
 <script setup>
-import { computed, onMounted, watch } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { ref, onMounted, computed } from 'vue'
+import ContributionsOverlay from '../components/ContributionsOverlay.vue'
+import { useRouter, useRoute } from 'vue-router'
+import ThreeScene from '../components/ThreeScene.vue'
+import EditorBrand from '../components/EditorBrand.vue'
+import { getRoomTemplate, saveRoom } from '../services/roomService.js'
 import { useNoekState } from '../composables/useNoekState.js'
 
-const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
 
+const branding = computed(() => state.brandingState.value || {})
+const userLabel = computed(() => {
+  const displayName = String(state.authState.value?.user?.displayName || '').trim()
+  if (displayName) return displayName
+  const email = String(state.authState.value?.user?.email || '').trim()
+  if (email) return email.split('@')[0]
+  return 'Doris'
+})
+const userInitial = computed(() => { const label = userLabel.value.trim(); return label ? label.charAt(0).toUpperCase() : 'D' })
+
+const templateScene = ref(null)
+const roomName = ref('Naam kamer')
+const collaboratorsEnabled = ref(false)
+const collaborators = ref([])
+const newCollaborator = ref('')
+const creating = ref(false)
+const showContributions = ref(false)
+const route = useRoute()
 const roomId = computed(() => String(route.params.id || ''))
 
-function isImageUrl(url) {
-  return /\.(png|jpe?g|gif|webp|avif|bmp|svg)(\?.*)?$/i.test(String(url || '').trim())
-}
-
-function isVideoUrl(url) {
-  return /\.(mp4|webm|ogg|mov|m4v)(\?.*)?$/i.test(String(url || '').trim())
-}
-
-function extractYouTubeVideoId(rawUrl) {
-  const input = String(rawUrl || '').trim()
-  if (!input) return ''
-
-  try {
-    const url = new URL(input)
-    const host = url.hostname.replace(/^www\./, '').toLowerCase()
-
-    if (host === 'youtu.be') {
-      return url.pathname.split('/').filter(Boolean)[0] || ''
-    }
-
-    if (host === 'youtube.com' || host === 'm.youtube.com') {
-      const v = url.searchParams.get('v') || ''
-      if (v) return v
-
-      const parts = url.pathname.split('/').filter(Boolean)
-      const embedIndex = parts.findIndex((part) => part === 'embed' || part === 'shorts')
-      return embedIndex >= 0 ? (parts[embedIndex + 1] || '') : ''
-    }
-  } catch {
-    return ''
-  }
-
-  return ''
-}
-
-function getYouTubeEmbedUrl(rawUrl) {
-  const id = extractYouTubeVideoId(rawUrl)
-  return id ? `https://www.youtube.com/embed/${id}` : ''
-}
-
-function getSpotifyEmbedUrl(rawUrl) {
-  const input = String(rawUrl || '').trim()
-  if (!input) return ''
-
-  try {
-    const url = new URL(input)
-    const host = url.hostname.replace(/^www\./, '').toLowerCase()
-    if (host !== 'open.spotify.com') return ''
-
-    const parts = url.pathname.split('/').filter(Boolean)
-    if (parts.length >= 2) {
-      return `https://open.spotify.com/embed/${parts[0]}/${parts[1]}`
-    }
-  } catch {
-    return ''
-  }
-
-  return ''
-}
-
-async function loadSettingsRoomByRoute() {
+onMounted(async () => {
   await state.bootstrap()
-  if (!state.authState.value?.token) {
-    await router.replace('/login')
-    return
+  try {
+    const res = await getRoomTemplate({ skipLoader: true })
+    templateScene.value = res?.sceneData || null
+  } catch (e) {
+    templateScene.value = null
   }
+})
 
-  if (state.rooms.value.length === 0) {
+function addCollaborator() {
+  const email = (newCollaborator.value || '').trim()
+  if (!email) return
+  collaborators.value.push({ email })
+  newCollaborator.value = ''
+}
+
+async function createFromTemplate() {
+  if (creating.value) return
+  creating.value = true
+  try {
+    const saved = await saveRoom({ name: roomName.value || 'Nieuwe kamer', sceneData: templateScene.value })
     await state.loadRooms()
+    await router.push(`/rooms/${saved._id}/editor`)
+  } catch (err) {
+    console.error(err)
+    window.alert('Kamer aanmaken mislukt.')
+  } finally {
+    creating.value = false
   }
-
-  const room = state.getRoomById(roomId.value)
-  if (!room) {
-    await router.replace('/home')
-    return
-  }
-
-  await state.openRoomSettings(room)
 }
 
-onMounted(loadSettingsRoomByRoute)
-watch(roomId, loadSettingsRoomByRoute)
-
-async function goHome() {
-  state.showHome()
-  await router.push('/home')
+function goBack() {
+  router.push('/home')
 }
 
-async function goEditor(room) {
-  await state.openEditor(room)
-  await router.push(`/rooms/${room._id}/editor`)
+function openProfile() {
+  router.push('/profile')
 }
+
+function openContributions() { showContributions.value = true }
+function closeContributions() { showContributions.value = false }
 </script>
 
 <template>
   <div class="editor-page is-home">
-    <div class="settings-page-v2" v-if="state.settingsRoom.value">
-      <header class="settings-header-v2">
-        <button type="button" class="secondary-btn" @click="goHome">Back</button>
-        <div class="settings-header-center-v2">
-          <div class="settings-step-v2">Stap 2 van 3</div>
-          <h2>Instellingen kamer: {{ state.settingsRoom.value.name }}</h2>
+    <header class="home-topbar-v2 editor-home-topbar">
+      <div class="home-brand-v2 editor-home-brand">
+        <div v-if="branding.logoUrl" class="editor-home-brand-logo-wrap">
+          <img :src="branding.logoUrl" alt="Brand logo" class="editor-home-brand-logo" />
         </div>
-        <button type="button" class="primary-btn" @click="goEditor(state.settingsRoom.value)">Naar kamer</button>
+        <div v-else class="editor-home-brand-text">
+          <strong>{{ branding.directorName || 'Thibaut DELA' }}</strong>
+          <span>Uitvaartzorg</span>
+        </div>
+      </div>
+
+      <div class="editor-home-topbar-actions">
+        <button type="button" class="editor-home-user-btn" @click="openProfile" :title="userLabel">
+          <span class="editor-home-user-initial">{{ userInitial }}</span>
+          <span class="editor-home-user-name">{{ userLabel }}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true" class="editor-home-user-icon"><path d="M12 12.1a4.2 4.2 0 1 0-4.2-4.2 4.2 4.2 0 0 0 4.2 4.2Zm0 2c-4.4 0-8 2.5-8 5.6v1.2h16v-1.2c0-3.1-3.6-5.6-8-5.6Z"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <div class="settings-page-v2 create-room-v2 editor-home-shell">
+      <header class="settings-header-v2">
+        <h1>Instellingen kamer</h1>
       </header>
 
-      <section class="settings-content-v2">
-        <div class="settings-left-v2">
-          <h3>Bijdragen toevoegen</h3>
+      <section class="settings-content-v2 two-column">
+        <div class="settings-left-v2 left-column">
+          <input v-model="roomName" class="create-room-name big" placeholder="Naam kamer" />
 
-          <form class="contribution-form" @submit.prevent="state.addCandleContribution(state.settingsRoom.value)">
-            <h4>Nieuw kaarsje toevoegen</h4>
-            <div class="contribution-giver">Van: <strong>{{ state.autoGiverName.value || '-' }}</strong></div>
-            <textarea
-              v-model="state.newCandleForm.value.tributeText"
-              rows="3"
-              placeholder="Klein tekstje (max 150 woorden)"
-            />
-            <div class="contribution-form-meta">
-              <span>{{ state.countWords(state.newCandleForm.value.tributeText) }}/150 woorden</span>
-              <button
-                type="submit"
-                class="primary-btn"
-                :disabled="state.contributionCreateState.value.loading || state.countWords(state.newCandleForm.value.tributeText) > 150"
-              >
-                {{ state.contributionCreateState.value.loading ? 'Opslaan...' : 'Kaarsje toevoegen' }}
-              </button>
-            </div>
-          </form>
-
-          <form class="contribution-form" @submit.prevent="state.addMusicUrlContribution(state.settingsRoom.value)">
-            <h4>Muzieklink toevoegen</h4>
-            <div class="contribution-giver">Van: <strong>{{ state.autoGiverName.value || '-' }}</strong></div>
-            <input
-              v-model="state.newMusicUrlForm.value.externalUrl"
-              type="url"
-              placeholder="YouTube of Spotify URL"
-            />
-            <div v-if="state.detectedMusicPlatform.value === 'youtube' && state.newMusicUrlForm.value.externalUrl" class="youtube-preview-wrap">
-              <iframe
-                v-if="state.musicYoutubeEmbedUrl.value"
-                class="youtube-preview-frame"
-                :src="state.musicYoutubeEmbedUrl.value"
-                title="YouTube preview"
-                loading="lazy"
-                referrerpolicy="strict-origin-when-cross-origin"
-                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                allowfullscreen
-              />
-              <div v-else class="room-contribution-empty error">Geen geldige YouTube-link voor preview.</div>
-            </div>
-            <div v-if="state.detectedMusicPlatform.value === 'spotify' && state.newMusicUrlForm.value.externalUrl" class="spotify-preview-wrap">
-              <iframe
-                v-if="state.musicSpotifyEmbedUrl.value"
-                class="spotify-preview-frame"
-                :src="state.musicSpotifyEmbedUrl.value"
-                title="Spotify preview"
-                loading="lazy"
-                referrerpolicy="strict-origin-when-cross-origin"
-                allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-              />
-              <div v-else class="room-contribution-empty error">Geen geldige Spotify-link voor preview.</div>
-            </div>
-            <textarea
-              v-model="state.newMusicUrlForm.value.tributeText"
-              rows="3"
-              placeholder="Klein tekstje (max 150 woorden)"
-            />
-            <div class="contribution-form-meta">
-              <span>{{ state.countWords(state.newMusicUrlForm.value.tributeText) }}/150 woorden</span>
-              <button
-                type="submit"
-                class="primary-btn"
-                :disabled="state.contributionCreateState.value.loading || state.countWords(state.newMusicUrlForm.value.tributeText) > 150"
-              >
-                {{ state.contributionCreateState.value.loading ? 'Opslaan...' : 'Muzieklink toevoegen' }}
-              </button>
-            </div>
-          </form>
-
-          <form class="contribution-form" @submit.prevent="state.addPhotoFileContribution(state.settingsRoom.value)">
-            <h4>Foto uploaden</h4>
-            <input :key="state.photoInputKey.value" type="file" accept="image/*" @change="state.handlePhotoFileChange" />
-            <textarea
-              v-model="state.newPhotoFileForm.value.tributeText"
-              rows="3"
-              placeholder="Klein tekstje (max 150 woorden)"
-            />
-            <div class="contribution-form-meta">
-              <span>{{ state.countWords(state.newPhotoFileForm.value.tributeText) }}/150 woorden</span>
-              <button type="submit" class="primary-btn" :disabled="state.photoUploadState.value.loading">
-                {{ state.photoUploadState.value.loading ? 'Uploaden...' : 'Foto uploaden' }}
-              </button>
-            </div>
-            <div v-if="state.photoUploadState.value.error" class="room-contribution-empty error">{{ state.photoUploadState.value.error }}</div>
-          </form>
-
-          <div v-if="state.contributionCreateState.value.error" class="room-contribution-empty error">{{ state.contributionCreateState.value.error }}</div>
-          <div v-else-if="state.contributionCreateState.value.success" class="room-contribution-empty success">{{ state.contributionCreateState.value.success }}</div>
+          <div class="preview-shell large">
+            <ThreeScene v-if="templateScene" :room-data="templateScene" />
+            <div v-else class="room-empty compact-empty">Geen preview beschikbaar</div>
+          </div>
         </div>
 
-        <div class="settings-right-v2">
-          <h3>Overzicht van alle elementen in deze kamer</h3>
-
-          <div v-if="state.contributionLoadState.value.loadingRoomId === state.settingsRoom.value._id" class="room-contribution-empty">
-            Elementen laden...
+        <div class="settings-right-v2 right-column">
+          <h3 class="settings-title">Instellingen kamer</h3>
+          <div class="setting-row spaced">
+            <div>
+              <div class="setting-label">Samenwerken</div>
+              <div class="setting-sub">Nodig mensen uit om mee je kamer te bewerken</div>
+            </div>
+            <div class="switch-wrap">
+              <label class="switch">
+                <input type="checkbox" v-model="collaboratorsEnabled" />
+                <span class="slider" />
+              </label>
+              <div class="switch-text">{{ collaboratorsEnabled ? 'Aan' : 'Uit' }}</div>
+            </div>
           </div>
-          <div v-else-if="state.contributionLoadState.value.error" class="room-contribution-empty error">
-            {{ state.contributionLoadState.value.error }}
+
+          <div class="collaborators-card" v-show="collaboratorsEnabled">
+            <div class="collaborator-top">
+              <div>
+                <div class="collab-name">Naam bijdrager 1</div>
+                <div class="collab-email">bijdrager@gmail.com</div>
+              </div>
+              <button type="button" class="close-x" @click="collaborators.splice(0,1)">✕</button>
+            </div>
+
+            <div class="collaborator-add">
+              <input v-model="newCollaborator" placeholder="Example@gmail.com" />
+              <button type="button" class="primary-btn small" @click="addCollaborator">Toevoegen</button>
+            </div>
           </div>
-          <div v-else-if="(state.roomContributions.value[state.settingsRoom.value._id] || []).length === 0" class="room-contribution-empty">
-            Nog geen foto's, video's of andere bijdragen toegevoegd.
+
+          <button type="button" class="primary-btn wide" style="margin-top:18px" @click="openContributions">Bekijk bijdrages van de kamer</button>
+
+          <div class="bottom-actions">
+            <button type="button" class="text-back" @click="goBack"></button>
+            <button type="button" class="primary-btn big" @click="createFromTemplate">Verder ›</button>
           </div>
-          <ul v-else class="room-contribution-items">
-            <li v-for="item in state.roomContributions.value[state.settingsRoom.value._id]" :key="item._id" class="room-contribution-item">
-              <div><strong>Type:</strong> {{ item.type }}</div>
-              <div><strong>Gever:</strong> {{ item.giverName || '-' }}</div>
-              <div><strong>Tekst:</strong> {{ item.tributeText || '-' }}</div>
-              <div><strong>Media URL:</strong> {{ item.mediaUrl || '-' }}</div>
-              <div><strong>Externe URL:</strong> {{ item.externalUrl || '-' }}</div>
-              <div><strong>Platform:</strong> {{ item.platform || 'none' }}</div>
-
-              <div v-if="item.mediaUrl" class="contribution-preview">
-                <img v-if="item.type === 'photo' || isImageUrl(item.mediaUrl)" :src="item.mediaUrl" alt="Foto bijdrage" class="contribution-preview-image" />
-                <video
-                  v-else-if="item.type === 'video_file' || isVideoUrl(item.mediaUrl)"
-                  :src="item.mediaUrl"
-                  controls
-                  preload="metadata"
-                  class="contribution-preview-video"
-                />
-              </div>
-
-              <div v-if="item.externalUrl" class="contribution-preview">
-                <iframe
-                  v-if="item.type === 'video_url' && getYouTubeEmbedUrl(item.externalUrl)"
-                  class="contribution-preview-embed"
-                  :src="getYouTubeEmbedUrl(item.externalUrl)"
-                  title="Video bijdrage"
-                  loading="lazy"
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-                  allowfullscreen
-                />
-                <iframe
-                  v-else-if="item.type === 'music_url' && getSpotifyEmbedUrl(item.externalUrl)"
-                  class="contribution-preview-embed"
-                  :src="getSpotifyEmbedUrl(item.externalUrl)"
-                  title="Muziek bijdrage"
-                  loading="lazy"
-                  referrerpolicy="strict-origin-when-cross-origin"
-                  allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture"
-                />
-                <audio
-                  v-else-if="item.type === 'music_url'"
-                  class="contribution-preview-audio"
-                  :src="item.externalUrl"
-                  controls
-                />
-                <a v-else :href="item.externalUrl" target="_blank" rel="noopener noreferrer">Open link</a>
-              </div>
-
-              <div class="item-reactions-row">
-                <strong>Reacties:</strong>
-                <button
-                  type="button"
-                  class="reaction-chip"
-                  :class="{ active: state.getUserReaction(item) === 'heart' }"
-                  @click="state.reactOnContribution(state.settingsRoom.value._id, item._id, 'heart')"
-                >
-                  ❤️ {{ item.reactions?.heartCount || 0 }}
-                </button>
-                <button
-                  type="button"
-                  class="reaction-chip"
-                  :class="{ active: state.getUserReaction(item) === 'support' }"
-                  @click="state.reactOnContribution(state.settingsRoom.value._id, item._id, 'support')"
-                >
-                  🤍 {{ item.reactions?.supportCount || 0 }}
-                </button>
-                <button
-                  type="button"
-                  class="reaction-chip"
-                  :class="{ active: state.getUserReaction(item) === 'candle' }"
-                  @click="state.reactOnContribution(state.settingsRoom.value._id, item._id, 'candle')"
-                >
-                  🕯️ {{ item.reactions?.candleCount || 0 }}
-                </button>
-              </div>
-
-              <form class="item-comment-form" @submit.prevent="state.submitContributionComment(state.settingsRoom.value._id, item._id)">
-                <input
-                  v-model="state.commentDrafts.value[item._id]"
-                  type="text"
-                  maxlength="500"
-                  placeholder="Laat een reactie achter..."
-                />
-                <button type="submit" class="secondary-btn" :disabled="state.commentStateByItem.value[item._id]?.loading">
-                  {{ state.commentStateByItem.value[item._id]?.loading ? 'Bezig...' : 'Plaats reactie' }}
-                </button>
-              </form>
-
-              <div v-if="state.commentStateByItem.value[item._id]?.error" class="room-contribution-empty error">
-                {{ state.commentStateByItem.value[item._id].error }}
-              </div>
-
-              <div class="item-comments-list">
-                <strong>Comments ({{ item.comments?.length || 0 }}):</strong>
-                <div v-if="!item.comments?.length" class="room-contribution-empty">Nog geen comments.</div>
-                <ul v-else class="item-comments-items">
-                  <li v-for="comment in item.comments" :key="comment._id || comment.createdAt" class="item-comment-entry">
-                    <span class="item-comment-author">{{ comment.displayName || 'Gebruiker' }}:</span>
-                    <span>{{ comment.text }}</span>
-                  </li>
-                </ul>
-              </div>
-            </li>
-          </ul>
         </div>
       </section>
     </div>
   </div>
+  <ContributionsOverlay v-if="showContributions" :roomId="roomId" @close="closeContributions" />
 </template>
 
-<style src="./styles/settings-page.css"></style>
-
 <style scoped>
-.contribution-preview {
-  margin-top: 8px;
-}
-
-.contribution-preview-image,
-.contribution-preview-video,
-.contribution-preview-embed {
+.create-room-name {
   width: 100%;
-  max-width: 460px;
-  border-radius: 10px;
-  border: 1px solid rgba(92, 113, 125, 0.28);
-  background: #fff;
+  padding: 22px 18px;
+  font-size: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--editor-border);
+  background: color-mix(in srgb, white 92%, var(--editor-panel) 8%);
+  margin-bottom: 18px;
 }
-
-.contribution-preview-image,
-.contribution-preview-video {
-  max-height: 270px;
-  object-fit: cover;
+.create-room-name.big {
+  width: 70%;
+  font-size: 2.6rem;
+  padding: 22px 24px;
+  background: #e9f2fb;
+  border-radius: 14px;
+  box-shadow: none;
 }
-
-.contribution-preview-embed {
-  aspect-ratio: 16 / 9;
+.preview-shell {
+  border-radius: 12px;
+  background: rgba(255,255,255,0.9);
+  padding: 18px;
+  border: 1px solid var(--editor-border);
+  min-height: 320px;
 }
+.preview-shell.large { min-height: 360px; display:flex; align-items:center; justify-content:center }
+.collaborators-card { background: #eef8ff; padding: 16px; border-radius: 12px; margin-top: 12px }
+.collaborator-top { display:flex; justify-content:space-between; align-items:flex-start }
+.collab-name { font-weight:600 }
+.collab-email { font-size:0.9rem; color: #345 }
+.collaborator-add { display:flex; gap:8px; margin-top:12px }
+.collaborator-add input { flex:1; padding:10px; border-radius:8px; border:1px solid var(--editor-border) }
+.switch { display:inline-block }
+.switch input { display:none }
+.slider { display:inline-block; width:56px; height:30px; background:#dfe8f3; border-radius:999px; position:relative }
+.slider::after { content:''; position:absolute; width:22px; height:22px; border-radius:50%; background:#fff; top:4px; left:4px; box-shadow:0 2px 6px rgba(8,63,115,0.12); transition:left 0.18s }
+.switch input:checked + .slider { background: var(--editor-brand) }
+.switch input:checked + .slider::after { left:30px }
+.switch-wrap { display:flex; align-items:center; gap:10px }
+.switch-text { font-size:0.95rem; color:#2b4b6b }
+.settings-title { margin-top:0; margin-bottom:8px }
+.primary-btn.wide { width:100%; padding:14px 18px }
+.primary-btn.big { padding:18px 36px; font-size:1.25rem }
+.primary-btn.small { padding:8px 14px; font-size:0.95rem }
+.bottom-actions { display:flex; justify-content:space-between; align-items:center; margin-top:28px }
+.text-back { background:transparent; border:none; font-weight:700; font-size:1.05rem }
 
-.contribution-preview-audio {
-  width: 100%;
-  max-width: 460px;
+/* Topbar */
+.create-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 48px; background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light, #d7ebff) 80%, white), #f2f9ff); border-bottom:1px solid color-mix(in srgb, var(--brand-dark, #0c4f82) 10%, white) }
+.topbar-right { display:flex; align-items:center; gap:12px }
+.icon-btn { background:transparent; border:0; width:44px; height:44px; border-radius:999px; display:grid; place-items:center; cursor:pointer; box-shadow:0 6px 18px #0b3f7420 }
+.profile { padding:8px 12px; background:var(--editor-brand); color:#fff; border-radius:10px; font-weight:600 }
+
+/* Two column layout */
+.settings-content-v2.two-column { display:grid; grid-template-columns: 1fr 1fr; gap:48px; align-items:start; padding:40px 48px; max-width:1600px; margin:0 auto; box-sizing:border-box }
+.left-column { display:flex; flex-direction:column; gap:28px; align-items:flex-start }
+.right-column { display:flex; flex-direction:column }
+
+/* Make columns occupy roughly half the viewport */
+.left-column, .right-column { min-width: 0 }
+.preview-shell.large { min-height: 380px; width: 100%; max-width: 640px; background: transparent; border: none; padding: 0 }
+.create-room-name.big { width: 72%; background: #eef6fb; border: none }
+.collaborators-card { width: 84%; background: color-mix(in srgb, var(--brand-light, #d7ebff) 88%, white); border: none; box-shadow: none }
+.primary-btn.wide { max-width: 480px; margin-left:0 }
+
+/* Progress bars */
+.progress-bars { display:flex; gap:10px; align-items:center; margin-bottom:8px }
+.progress-bars .bar { width:120px; height:8px; border-radius:999px; background: #e6eef8; display:block }
+.progress-bars .bar.filled { background: linear-gradient(90deg, var(--editor-brand), color-mix(in srgb, var(--editor-brand) 30%, white)) }
+
+/* Adjustments for exact look */
+.create-room-v2 { background: linear-gradient(180deg,var(--editor-bg-shell-top, #f6f7f8) 0%,var(--editor-bg-shell-mid, #eff4fa) 58%,var(--editor-bg-shell-bottom, #9fc0e1) 100%); padding:0 }
+.settings-header-v2 { display:flex; justify-content:center; padding-top:18px; }
+.settings-header-center-v2 { text-align:center }
+.settings-step-v2 { font-weight:600; margin-top:6px }
+
+.collaborators-card { background: color-mix(in srgb, var(--brand-light, #d7ebff) 70%, white); padding: 14px; border-radius: 12px; margin-top: 12px; border:1px solid var(--editor-border) }
+.collaborator-top { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:8px }
+.close-x { background:#ffffff; border:0; border-radius:10px; padding:6px 8px; box-shadow:0 6px 12px #0b3f7420 }
+.collaborator-add input { background: white; border-radius:8px; border:1px solid var(--editor-border); padding:12px }
+
+.primary-btn.wide { background: linear-gradient(90deg, var(--editor-brand), color-mix(in srgb, var(--editor-brand) 40%, white)); color:#fff; border:0 }
+.primary-btn.big { background: linear-gradient(90deg, var(--editor-brand), color-mix(in srgb, var(--editor-brand) 40%, white)); color:#fff; border:0 }
+
+@media (max-width: 900px) {
+  .settings-content-v2.two-column { grid-template-columns: 1fr; padding:28px }
 }
 </style>
