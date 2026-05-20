@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import ThreeScene from '../components/ThreeScene.vue'
@@ -8,12 +8,15 @@ import EditorRoomName from '../components/EditorRoomName.vue'
 import EditorBrand from '../components/EditorBrand.vue'
 import EditorHistoryControls from '../components/EditorHistoryControls.vue'
 import SceneOverlays from '../components/SceneOverlays.vue'
+import ShareSuccessModal from '../components/ShareSuccessModal.vue'
 import { useNoekState } from '../composables/useNoekState.js'
 
 const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
 const showRoomReactions = false
+const showShareModal = ref(false)
+const shareRoomData = ref({ roomName: '', visitUrl: '', directorName: '' })
 const TEMPLATE_OWNER_EMAIL = String(import.meta.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
 const canEditTemplate = computed(() => {
   const email = String(state.authState.value?.user?.email || '').trim().toLowerCase()
@@ -64,17 +67,15 @@ async function shareCurrentRoom() {
   }
 
   const visitUrl = buildVisitUrl(roomId)
-  try {
-    if (navigator?.clipboard?.writeText) {
-      await navigator.clipboard.writeText(visitUrl)
-      window.alert('Publieke link gekopieerd.')
-      return
-    }
-  } catch {
-    // fallback below
-  }
+  const roomName = state.currentRoom.value?.name || 'deze kamer'
+  const directorName = state.brandingState.value?.directorName || 'Thibaut DELA'
 
-  window.prompt('Kopieer deze link', visitUrl)
+  shareRoomData.value = {
+    roomName,
+    visitUrl,
+    directorName,
+  }
+  showShareModal.value = true
 }
 
 async function openSettings() {
@@ -220,6 +221,14 @@ async function openSettings() {
         </div>
       </div>
     </div>
+
+    <ShareSuccessModal
+      v-if="showShareModal"
+      :room-name="shareRoomData.roomName"
+      :visit-url="shareRoomData.visitUrl"
+      :director-name="shareRoomData.directorName"
+      @close="showShareModal = false"
+    />
   </div>
 </template>
 
