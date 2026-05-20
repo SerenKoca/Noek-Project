@@ -96,21 +96,6 @@ function downloadQR() {
                   </svg>
                 </div>
               </div>
-              <div class="share-qr-item">
-                <div class="share-qr-branding">
-                  <div class="share-qr-text">{{ directorName }}</div>
-                  <div class="share-qr-subtext">Uitvaartzorg</div>
-                </div>
-                <div class="share-qr-placeholder">
-                  <svg viewBox="0 0 100 100">
-                    <rect width="100" height="100" fill="#f0f0f0" />
-                    <rect x="10" y="10" width="30" height="30" fill="#000" />
-                    <rect x="60" y="10" width="30" height="30" fill="#000" />
-                    <rect x="10" y="60" width="30" height="30" fill="#000" />
-                    <circle cx="50" cy="50" r="15" fill="#000" opacity="0.3" />
-                  </svg>
-                </div>
-              </div>
             </div>
             <button class="share-download-btn" @click="downloadQR">Download QR Code</button>
           </div>
@@ -135,7 +120,7 @@ function downloadQR() {
 }
 
 .share-modal-content {
-  background: white;
+  background: #e9f2fb;
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   max-width: 900px;
@@ -223,6 +208,7 @@ function downloadQR() {
   font-size: 13px;
   font-family: monospace;
   background: #f9f9f9;
+  color: #000;
 }
 
 .share-copy-btn {
@@ -303,6 +289,7 @@ function downloadQR() {
   flex-direction: column;
   gap: 20px;
   width: 100%;
+  align-items: center;
 }
 
 .share-qr-item {
