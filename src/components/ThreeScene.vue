@@ -2381,13 +2381,6 @@ onBeforeUnmount(() => {
   <div class="relative h-full w-full">
     <div ref="containerEl" class="h-full w-full"></div>
 
-    <div
-      v-if="canEditTemplate"
-      class="pointer-events-none rounded bg-black/70 px-3 py-2 text-xs text-white"
-      style="position: fixed; top: 108px; right: 14px; z-index: 120; min-width: 230px;"
-    >
-      <div>Camera: {{ cameraCoords }}</div>
-      <div>Target: {{ targetCoords }}</div>
-    </div>
+    <!-- Camera/target coordinates overlay removed -->
   </div>
 </template>
