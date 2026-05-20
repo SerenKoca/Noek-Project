@@ -208,7 +208,14 @@ function openTemplates() {
 
           <div v-else class="editor-home-room-list">
             <article v-for="room in state.rooms.value" :key="room._id" class="editor-home-room-card" :style="roomCardStyle(room)">
-              <button type="button" class="editor-home-room-main" @click="openEditorRoute(room)">
+              <div
+                class="editor-home-room-main"
+                role="button"
+                tabindex="0"
+                @click="openEditorRoute(room)"
+                @keydown.enter.prevent="openEditorRoute(room)"
+                @keydown.space.prevent="openEditorRoute(room)"
+              >
                 <div class="editor-home-room-preview">
                   <ThreeScene
                     v-if="room?.sceneData"
@@ -223,9 +230,19 @@ function openTemplates() {
                 <div class="editor-home-room-copy">
                   <strong>{{ room.name }}</strong>
                   <div class="editor-home-room-meta">{{ roomSubtitle(room) }}</div>
-                  <div class="editor-home-room-link">link kamer</div>
+                  <button
+                    type="button"
+                    class="editor-home-room-link"
+                    @click.stop="copyVisitLink(room)"
+                    :aria-label="`Link van ${room.name || 'kamer'} kopiëren`"
+                  >
+                    <svg viewBox="0 0 24 24" aria-hidden="true">
+                      <path d="M16.5 3A4.5 4.5 0 0 1 21 7.5v6A4.5 4.5 0 0 1 16.5 18H15v-2h1.5A2.5 2.5 0 0 0 19 13.5v-6A2.5 2.5 0 0 0 16.5 5H15V3h1.5ZM7.5 6H9v2H7.5A2.5 2.5 0 0 0 5 10.5v6A2.5 2.5 0 0 0 7.5 19H9v2H7.5A4.5 4.5 0 0 1 3 16.5v-6A4.5 4.5 0 0 1 7.5 6ZM8 11h8v2H8v-2Z" />
+                    </svg>
+                    <span>link kamer</span>
+                  </button>
                 </div>
-              </button>
+              </div>
 
               <button type="button" class="editor-home-room-delete" @click.stop="state.onDeleteRoom(room)" aria-label="Kamer verwijderen">
                 <svg viewBox="0 0 24 24" aria-hidden="true">
