@@ -63,7 +63,12 @@ async function createFromTemplate() {
 }
 
 function goBack() {
-  router.push('/home')
+  const id = roomId.value || ''
+  if (!id) {
+    router.push('/home')
+    return
+  }
+  router.push(`/rooms/${id}/editor`)
 }
 
 function openProfile() {
@@ -146,7 +151,7 @@ function closeContributions() { showContributions.value = false }
 
           <div class="bottom-actions">
             <button type="button" class="text-back" @click="goBack"></button>
-            <button type="button" class="primary-btn big" @click="createFromTemplate">Terug naar kamer</button>
+            <button type="button" class="primary-btn big" @click="goBack">Terug naar kamer</button>
           </div>
         </div>
       </section>
