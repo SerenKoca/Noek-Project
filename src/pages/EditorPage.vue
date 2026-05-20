@@ -81,13 +81,9 @@ async function shareCurrentRoom() {
 <template>
   <div class="editor-page is-editor">
     <div class="editor-shell">
-      <button type="button" class="home-icon-btn" @click="backToHome" title="Terug naar home">
-        🏠
-      </button>
-
       <EditorTopLeftControls
         @settings="state.onToolbarAction"
-        @home="state.onToolbarAction"
+        @home="backToHome"
         @save="state.onSave"
         @share="shareCurrentRoom"
       />
