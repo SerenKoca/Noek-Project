@@ -95,6 +95,7 @@ const mediaFile = ref(null)
 const logoTitle = ref('Thibaut DELA')
 const logoSubtitle = ref('Uitvaartzorg')
 const brandLogoUrl = ref('')
+const entryLogoSrc = computed(() => brandLogoUrl.value || '/img/logo-noek.svg')
 
 const roomSceneData = computed(() => room.value?.sceneData || null)
 
@@ -569,14 +570,33 @@ onBeforeUnmount(() => {
   <div class="visitor-page-v3">
     <div v-if="!hasEnteredRoom" class="visitor-entry-wrap">
       <div class="visitor-entry-card">
-        <div class="visitor-entry-logo">{{ roomTitle.charAt(0) || 'N' }}</div>
-        <p class="visitor-entry-copy">
-          Je betreedt {{ roomTitle }}.<br>
-          Waar herinneringen blijven voortleven.
-        </p>
-        <button type="button" class="visitor-pill-btn" :disabled="introLoading" @click="enterRoom">
-          {{ introLoading ? 'Herinneringen worden geladen...' : 'Stap binnen' }}
-        </button>
+        <div class="visitor-entry-hero">
+          <div class="visitor-entry-logo">
+            <img :src="entryLogoSrc" alt="Brand logo" class="visitor-entry-logo-image" />
+          </div>
+
+          
+
+          <div class="visitor-entry-candle-scene" aria-hidden="true">
+            <div class="visitor-entry-candle is-large">
+              <span class="visitor-entry-candle-flame"></span>
+              <span class="visitor-entry-candle-wax"></span>
+            </div>
+            <div class="visitor-entry-candle is-small">
+              <span class="visitor-entry-candle-flame"></span>
+              <span class="visitor-entry-candle-wax"></span>
+            </div>
+          </div>
+
+          <p class="visitor-entry-copy">
+            Je betreedt <strong>{{ roomTitle }}</strong>.<br>
+            Waar herinneringen blijven voortleven.
+          </p>
+
+          <button type="button" class="visitor-entry-button" :disabled="introLoading" @click="enterRoom">
+            {{ introLoading ? 'Herinneringen worden geladen...' : 'Stap binnen' }}
+          </button>
+        </div>
       </div>
     </div>
 
@@ -920,7 +940,7 @@ background: linear-gradient(
 }
 
 .visitor-entry-wrap {
-  height: 100%;
+  min-height: 100vh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -928,19 +948,51 @@ background: linear-gradient(
   overflow: hidden;
 }
 
+.visitor-entry-wrap::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: url('/img/background-element.svg');
+  background-repeat: no-repeat;
+  background-position: left -120px bottom -70px;
+  background-size: min(900px, 72vw);
+  opacity: 0.22;
+}
+
 .visitor-entry-card {
-  width: min(660px, 100%);
-  min-height: 360px;
-  border-radius: 18px;
-  background: var(--visitor-card);
+  width: min(760px, 100%);
+  min-height: 420px;
+  border-radius: 28px;
+  background: rgba(255, 255, 255, 0.84);
   border: 1px solid var(--visitor-border);
-  box-shadow: 0 18px 44px rgba(11, 63, 116, 0.16);
+  box-shadow: 0 24px 54px rgba(11, 63, 116, 0.18);
   display: grid;
-  align-content: center;
+  place-items: center;
+  padding: 34px 28px;
+  backdrop-filter: blur(4px);
+  position: relative;
+  overflow: hidden;
+}
+
+.visitor-entry-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% 88%, color-mix(in srgb, var(--brand-light) 16%, transparent) 0%, transparent 28%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.18) 0%, rgba(255, 255, 255, 0.06) 100%);
+}
+
+.visitor-entry-hero {
+  position: relative;
+  z-index: 1;
+  width: min(520px, 100%);
+  display: grid;
   justify-items: center;
   gap: 18px;
   text-align: center;
-  padding: 26px;
 }
 
 .visitor-brand-logo {
@@ -951,13 +1003,151 @@ background: linear-gradient(
 }
 
 .visitor-entry-logo {
-  font-size: 56px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 78px;
+}
+
+.visitor-entry-logo-image {
+  width: min(180px, 52vw);
+  height: auto;
+  display: block;
 }
 
 .visitor-entry-copy {
   margin: 0;
+  font-size: 1.02rem;
+  line-height: 1.4;
+  color: var(--visitor-color-dark);
+  max-width: 46ch;
+  margin-top: 4px;
+}
+
+.visitor-entry-copy strong {
+  font-weight: 700;
+}
+
+.visitor-entry-candle-scene {
+  margin-top: 10px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  gap: 18px;
+  min-height: 160px;
+  width: 100%;
+  position: relative;
+}
+
+.visitor-entry-candle-scene::before {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(220px, 70%);
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(34, 52, 70, 0.2) 0%, rgba(34, 52, 70, 0) 72%);
+}
+
+.visitor-entry-candle {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.visitor-entry-candle-flame {
+  position: relative;
+  width: 34px;
+  height: 50px;
+  border-radius: 55% 55% 68% 68% / 72% 72% 42% 42%;
+  background: radial-gradient(circle at 52% 24%, #fff2bf 0%, #f6be2c 44%, #d97a06 100%);
+  box-shadow:
+    0 4px 10px rgba(209, 119, 12, 0.34),
+    0 0 16px rgba(246, 177, 43, 0.28);
+  transform-origin: 50% 80%;
+  animation: visitor-entry-flame-flicker 2.3s ease-in-out infinite;
+}
+
+.visitor-entry-candle.is-small .visitor-entry-candle-flame {
+  width: 28px;
+  height: 42px;
+  animation-delay: 0.5s;
+}
+
+.visitor-entry-candle-wax {
+  position: relative;
+  margin-top: 10px;
+  border-radius: 24px 24px 28px 28px;
+  background:
+    linear-gradient(180deg, #fffdfa 0%, #fff6e7 22%, #fbefd9 64%, #f1e0bf 100%);
+  border: 1px solid rgba(219, 192, 146, 0.46);
+  box-shadow:
+    inset -8px 0 12px rgba(203, 166, 109, 0.25),
+    inset 0 7px 10px rgba(255, 255, 255, 0.7),
+    0 10px 16px rgba(46, 33, 71, 0.2);
+}
+
+.visitor-entry-candle.is-large .visitor-entry-candle-wax {
+  width: 102px;
+  height: 136px;
+}
+
+.visitor-entry-candle.is-small .visitor-entry-candle-wax {
+  width: 74px;
+  height: 98px;
+  border-radius: 24px 24px 28px 28px;
+}
+
+.visitor-entry-button {
+  margin-top: 4px;
+  border: 0;
+  border-radius: 999px;
+  min-width: min(280px, 100%);
+  padding: 16px 26px;
+  font: inherit;
   font-size: 1.05rem;
-  line-height: 1.6;
+  font-weight: 700;
+  color: #fff;
+  cursor: pointer;
+  background: linear-gradient(90deg, var(--visitor-color-dark), color-mix(in srgb, var(--visitor-color-light) 62%, var(--visitor-color-dark)));
+  box-shadow: 0 14px 28px rgba(11, 63, 116, 0.22);
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.visitor-entry-button:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 18px 34px rgba(11, 63, 116, 0.24);
+  filter: brightness(1.03);
+}
+
+.visitor-entry-button:disabled {
+  cursor: wait;
+  opacity: 0.9;
+}
+
+@keyframes visitor-entry-flame-flicker {
+  0% {
+    transform: translateX(0) rotate(-2deg) scale(1);
+    filter: brightness(1);
+  }
+
+  30% {
+    transform: translateX(1px) rotate(2deg) scale(1.04, 0.97);
+    filter: brightness(1.06);
+  }
+
+  60% {
+    transform: translateX(-1px) rotate(-1deg) scale(0.98, 1.03);
+    filter: brightness(0.97);
+  }
+
+  100% {
+    transform: translateX(0) rotate(-2deg) scale(1);
+    filter: brightness(1);
+  }
 }
 
 .visitor-shell {
