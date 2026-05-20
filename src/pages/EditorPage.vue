@@ -76,13 +76,20 @@ async function shareCurrentRoom() {
 
   window.prompt('Kopieer deze link', visitUrl)
 }
+
+async function openSettings() {
+  const roomId = state.currentRoom.value?._id || String(route.params.id || '')
+  if (!roomId) return
+  await state.openRoomSettings(state.currentRoom.value || state.getRoomById(roomId))
+  await router.push(`/rooms/${roomId}/settings`)
+}
 </script>
 
 <template>
   <div class="editor-page is-editor">
     <div class="editor-shell">
       <EditorTopLeftControls
-        @settings="state.onToolbarAction"
+        @settings="openSettings"
         @home="backToHome"
         @save="state.onSave"
         @share="shareCurrentRoom"

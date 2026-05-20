@@ -146,7 +146,7 @@ function closeContributions() { showContributions.value = false }
 
           <div class="bottom-actions">
             <button type="button" class="text-back" @click="goBack"></button>
-            <button type="button" class="primary-btn big" @click="createFromTemplate">Verder ›</button>
+            <button type="button" class="primary-btn big" @click="createFromTemplate">Terug naar kamer</button>
           </div>
         </div>
       </section>
