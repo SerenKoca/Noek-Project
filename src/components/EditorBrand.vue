@@ -18,18 +18,25 @@ defineProps({
 <template>
   <div class="editor-brand">
     <img v-if="logoUrl" :src="logoUrl" alt="Brand logo" class="editor-brand-logo" />
-    <div class="editor-brand-name">{{ name }}</div>
-    <div class="editor-brand-sub">{{ sub }}</div>
   </div>
 </template>
 
 <style scoped>
+.editor-brand {
+  background: #fff;
+  padding: 6px 8px;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.08);
+}
+
 .editor-brand-logo {
-  height: 42px;
-  max-width: 210px;
+  height: 56px;
+  width: auto;
+  max-width: 220px;
   object-fit: contain;
   display: block;
-  margin-left: auto;
-  margin-bottom: 6px;
 }
 </style>
