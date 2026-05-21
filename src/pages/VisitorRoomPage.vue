@@ -93,6 +93,8 @@ const externalUrl = ref('')
 const mediaUrl = ref('')
 const roomCommentText = ref('')
 const mediaFile = ref(null)
+const mediaPreviewUrl = ref('')
+const photosStep = ref(1)
 
 const logoTitle = ref('Thibaut DELA')
 const logoSubtitle = ref('Uitvaartzorg')
@@ -302,14 +304,52 @@ function exitRoomVrMode() {
   roomMode.value = 'room'
 }
 
-function openGalleryComposer() {
+async function openGalleryComposer() {
   const category = selectedCategory.value || 'photos'
   if (category === 'photos') {
-    // return to room overview and open the three-step photo composer
-    goToOverview()
-    // small panel mode showing the 3-step boxes
-    activePanel.value = 'photos-steps'
-    submitState.value = { loading: false, error: '', success: '' }
+    if (!roomId.value) return
+    // set a session flag and navigate back to the room overview so the
+    // newly mounted page can open the steps panel reliably
+    try {
+      const payload = JSON.stringify({ panel: 'photos-steps', ts: Date.now() })
+      sessionStorage.setItem('noek_open_panel', payload)
+    } catch (e) {}
+
+    // If we're already on the room path, open immediately without navigating
+    try {
+      const targetPath = `/visit/${roomId.value}`
+      if (route.path === targetPath) {
+        try {
+          const raw = sessionStorage.getItem('noek_open_panel')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            const age = Date.now() - Number(parsed?.ts || 0)
+            if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) {
+              sessionStorage.removeItem('noek_open_panel')
+              activePanel.value = 'photos-steps'
+              return
+            }
+          }
+        } catch (e) {}
+      }
+
+      await router.push({ path: `/visit/${roomId.value}` })
+
+      // After navigation, try to open the panel (component may stay mounted)
+      try {
+        const raw = sessionStorage.getItem('noek_open_panel')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - Number(parsed?.ts || 0)
+          if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) {
+            sessionStorage.removeItem('noek_open_panel')
+            activePanel.value = 'photos-steps'
+          }
+        }
+      } catch (e) {}
+    } catch (e) {
+      // ignore navigation errors
+    }
   } else {
     openContributionPanel(category)
   }
@@ -484,7 +524,53 @@ async function openProfile() {
 }
 
 function onMediaFileChange(event) {
-  mediaFile.value = event?.target?.files?.[0] || null
+  const file = event?.target?.files?.[0] || null
+  if (file) {
+    mediaFile.value = file
+    try { if (mediaPreviewUrl.value) URL.revokeObjectURL(mediaPreviewUrl.value) } catch (e) {}
+    mediaPreviewUrl.value = URL.createObjectURL(file)
+  } else {
+    mediaFile.value = null
+    try { if (mediaPreviewUrl.value) URL.revokeObjectURL(mediaPreviewUrl.value) } catch (e) {}
+    mediaPreviewUrl.value = ''
+  }
+}
+
+function openUploadPicker() {
+  const el = document.querySelector('#photos-steps-file-input')
+  if (el) el.click()
+}
+
+function removeMediaFile() {
+  mediaFile.value = null
+  try { if (mediaPreviewUrl.value) URL.revokeObjectURL(mediaPreviewUrl.value) } catch (e) {}
+  mediaPreviewUrl.value = ''
+}
+
+function handlePanelBack() {
+  if (activePanel.value === 'photos-steps' && photosStep.value > 1) {
+    photosStep.value = Math.max(1, photosStep.value - 1)
+    return
+  }
+  closePanel()
+}
+
+function nextPhotosStep() {
+  if (!mediaFile.value) {
+    // prompt file picker if no file selected
+    openUploadPicker()
+    return
+  }
+  if (photosStep.value < 3) photosStep.value += 1
+}
+
+async function postPhotoAndClose() {
+  type.value = 'photo'
+  await addContribution()
+  if (submitState.value.success) {
+    photosStep.value = 1
+    closePanel()
+  }
 }
 
 async function uploadToCloudinary(file, resourceType) {
@@ -624,15 +710,81 @@ onMounted(async () => {
       error.value = 'Kon kamer niet laden.'
     }
   }
+
+    // If sessionStorage included a recent request to open the photo-steps panel, open it now
+    try {
+      const raw = sessionStorage.getItem('noek_open_panel')
+      if (raw) {
+        try {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - Number(parsed?.ts || 0)
+          if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) {
+            sessionStorage.removeItem('noek_open_panel')
+            setTimeout(() => {
+              activePanel.value = 'photos-steps'
+            }, 80)
+          }
+        } catch (e) {
+          // malformed value, remove
+          try { sessionStorage.removeItem('noek_open_panel') } catch (e) {}
+        }
+      }
+    } catch (e) {}
+
+    // Also support opening via query param as a fallback
+    try {
+      const openFlag = String(route.query?.open || '')
+      if (openFlag === 'photos-steps') {
+        setTimeout(() => {
+          activePanel.value = 'photos-steps'
+        }, 80)
+        const q = { ...route.query }
+        delete q.open
+        router.replace({ path: route.path, query: q }).catch(() => {})
+      }
+    } catch (e) {}
+})
+
+watch(activePanel, (val) => {
+  if (val === 'photos-steps') {
+    photosStep.value = 1
+    type.value = 'photo'
+  }
 })
 
 watch(roomId, () => {
   hasEnteredRoom.value = readStoredEntryState(roomId.value)
-  activePanel.value = 'none'
+  try {
+    const raw = sessionStorage.getItem('noek_open_panel')
+    let keep = false
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const age = Date.now() - Number(parsed?.ts || 0)
+        if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) keep = true
+      } catch (e) {}
+    }
+    if (!keep) activePanel.value = 'none'
+  } catch (e) {
+    activePanel.value = 'none'
+  }
 })
 
 watch(selectedCategory, () => {
-  activePanel.value = 'none'
+  try {
+    const raw = sessionStorage.getItem('noek_open_panel')
+    let keep = false
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw)
+        const age = Date.now() - Number(parsed?.ts || 0)
+        if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) keep = true
+      } catch (e) {}
+    }
+    if (!keep) activePanel.value = 'none'
+  } catch (e) {
+    activePanel.value = 'none'
+  }
   galleryMode.value = 'gallery'
   galleryPage.value = 0
   gallerySelectedId.value = ''
@@ -1021,10 +1173,16 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" class="visitor-panel">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' }]">
         <div class="visitor-panel-head">
-          <strong>{{ panelTitle }}</strong>
-          <button type="button" class="visitor-close" @click="closePanel">×</button>
+            <div class="panel-head-left">
+            <button v-if="activePanel === 'photos-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
+            <strong v-else>{{ panelTitle }}</strong>
+          </div>
+          <div class="panel-head-right">
+            <small v-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
+            <button v-else type="button" class="visitor-close" @click="closePanel">×</button>
+          </div>
         </div>
 
         <div class="visitor-panel-body">
@@ -1059,33 +1217,49 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else-if="activePanel === 'photos-steps'">
-            <div class="add-steps">
-              <div class="step-box">
-                <div class="step-icon">1</div>
-                <div class="step-content">
-                  <strong>Media</strong>
-                  <p>Foto</p>
+            <div class="steps-container">
+              <div class="steps-progress">
+                <div class="steps-track">
+                  <span v-for="n in 3" :key="n" :class="['step-seg', { active: n <= photosStep }]" />
                 </div>
               </div>
-              <div class="step-box">
-                <div class="step-icon">2</div>
-                <div class="step-content">
-                  <strong>Upload</strong>
-                  <p>Kies bestand of sleep hier</p>
+              <div class="steps-body">
+                <div class="steps-title"><strong>Media</strong></div>
+                <div class="steps-subtitle">Foto</div>
+                <p class="steps-desc">Upload hier een foto dat voor jou iets betekend.</p>
+
+                <div v-if="mediaFile" class="upload-meta">
+                  <span class="upload-filename">{{ mediaFile.name }}</span>
+                  <button type="button" class="upload-delete" @click="removeMediaFile">🗑️<span class="sr-only">Delete</span></button>
                 </div>
-              </div>
-              <div class="step-box">
-                <div class="step-icon">3</div>
-                <div class="step-content">
-                  <strong>Plaatsen</strong>
-                  <p>Voeg boodschap toe en publiceer</p>
+                <div class="upload-box" role="button" tabindex="0" @click="openUploadPicker">
+                  <input id="photos-steps-file-input" type="file" accept="image/*" @change="onMediaFileChange" style="display:none">
+                  <template v-if="!mediaPreviewUrl">
+                    <svg width="120" height="80" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <rect x="1" y="3" width="22" height="12" rx="2" fill="#0A5270" opacity="0.08"/>
+                      <path d="M4 10l3-3 2 2 3-4 4 6H4z" fill="#0A5270" opacity="0.18"/>
+                    </svg>
+                  </template>
+                  <template v-else>
+                    <div class="upload-preview">
+                      <img :src="mediaPreviewUrl" alt="Preview" />
+                    </div>
+                  </template>
                 </div>
-              </div>
-              <div class="panel-actions">
-                <button type="button" class="visitor-pill-btn" @click="closePanel">Verder</button>
+
+                <template v-if="photosStep === 2">
+                  <hr class="steps-sep" />
+                  <label class="panel-field">
+                    <span>Schrijf hier een boodschap (optioneel)</span>
+                    <textarea v-model="tributeText" rows="4" maxlength="1000" placeholder=""></textarea>
+                  </label>
+                </template>
+                <div class="panel-actions">
+                  <button v-if="photosStep === 1" type="button" class="visitor-pill-btn" @click="nextPhotosStep">Verder</button>
+                  <button v-else-if="photosStep === 2" type="button" class="visitor-pill-btn" @click="postPhotoAndClose">Posten</button>
+                </div>
               </div>
             </div>
-            
           </template>
 
           <template v-else>
@@ -1158,6 +1332,8 @@ onBeforeUnmount(() => {
             <p v-else class="visitor-status">Nog geen bijdragen in deze categorie.</p>
           </template>
         </div>
+
+        <!-- no pinned footer: posting occurs inline under the message in step 2 -->
       </section>
 
       <p v-if="profileHint" class="visitor-profile-hint">{{ profileHint }}</p>
@@ -1705,6 +1881,123 @@ text-shadow:
   border-radius: 14px;
   box-shadow: 0 24px 56px rgba(11, 63, 116, 0.2);
   z-index: 50;
+}
+
+.visitor-panel--side {
+  left: 14px;
+  right: auto;
+  top: 84px;
+  bottom: 20px;
+  transform: none;
+  width: min(360px, 92vw);
+  max-height: calc(100vh - 80px);
+  background: linear-gradient(180deg, #eaf6fb 0%, #eef7fb 100%);
+  border: none;
+  box-shadow: 0 30px 60px rgba(11, 63, 116, 0.18);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.visitor-panel--side .visitor-panel-head {
+  background: transparent;
+  padding: 22px 18px 8px 18px;
+  border-bottom: none;
+  align-items: center;
+}
+
+.panel-head-left { display:flex; gap:10px; align-items:center }
+.panel-head-right { display:flex; gap:8px; align-items:center }
+.visitor-back { background:transparent; border:0; color:#073b57; font-weight:700; cursor:pointer }
+.panel-head-right small { color:#073b57; font-weight:700 }
+
+.steps-container { display:flex; flex-direction:column; gap:12px }
+.steps-progress { padding: 0 6px; margin-top: 6px }
+.steps-track { width: 160px; height: 8px; background: rgba(7,59,87,0.08); border-radius: 8px; display:flex; gap:6px; padding:4px }
+.step-seg { flex:1; height:100%; background: rgba(255,255,255,0.6); border-radius: 6px }
+.step-seg.active { background: linear-gradient(90deg,#072b4c,#1a6b9a) }
+
+.visitor-panel--side .visitor-panel-body {
+  padding: 12px 18px 18px 18px;
+  overflow: auto;
+  flex: 1 1 auto;
+}
+
+.panel-footer { padding: 12px 18px; border-top: 1px solid rgba(7,59,87,0.06); background: transparent }
+.panel-footer-inner { max-width:100%; }
+.panel-footer .visitor-pill-btn { width:100% }
+
+.add-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #073b57;
+}
+
+.add-steps .step-box {
+  display: none;
+}
+
+.add-steps .step-box:first-child .step-content strong {
+  font-size: 1.8rem;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.add-steps .step-box .step-content p {
+  margin: 0 0 12px 0;
+  color: #567a8f;
+}
+
+.add-steps .panel-actions {
+  margin-top: 12px;
+}
+
+.add-steps .step-icon {
+  display: inline-block;
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: linear-gradient(180deg,#073b57,#1a6b9a);
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 10px;
+}
+
+.add-steps .upload-box {
+  background: #fff;
+  border-radius: 12px;
+  padding: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px dashed rgba(7,59,87,0.12);
+}
+
+.steps-body { display:flex; flex-direction:column; gap:12px }
+.steps-title strong { font-size: 1.9rem; color:#073b57 }
+.steps-subtitle { font-size: 1rem; color:#083b57; font-weight:700 }
+.steps-desc { color:#4f6b7a; margin:4px 0 8px 0 }
+.upload-box { height: 120px; padding: 32px; border-radius: 14px; box-shadow: 0 6px 18px rgba(10,82,112,0.06) }
+.upload-box svg { width: 140px; height: 96px }
+
+.upload-preview img { width: 140px; max-width: 100%; height: auto; border-radius: 12px; object-fit: cover; display:block }
+.upload-box { height: auto; max-height: 220px; overflow: hidden }
+.upload-meta { display:flex; align-items:center; gap:12px; margin-bottom:8px; justify-content:space-between }
+.upload-filename { color:#173b52; font-size:0.95rem }
+.upload-delete { background:transparent; border:0; cursor:pointer; color:#0a5270 }
+.sr-only { position:absolute; left:-9999px }
+
+.steps-sep { border:0; height:1px; background: linear-gradient(90deg, rgba(10,82,112,0.06), rgba(10,82,112,0.04)); margin:12px 0 }
+
+.add-steps .upload-box img{ max-width: 120px }
+
+.visitor-panel--side .visitor-pill-btn {
+  width: 100%;
+  border-radius: 12px;
+  padding: 12px 16px;
 }
 
 .visitor-panel-head {
