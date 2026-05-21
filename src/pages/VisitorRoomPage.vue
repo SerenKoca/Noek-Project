@@ -111,6 +111,7 @@ const panelTitle = computed(() => {
     photos: "Foto's",
     music: 'Muziek',
     videos: "Video's",
+    'photos-steps': 'Media',
     candles: 'Kaarsjes',
     messages: 'Bericht',
     tutorial: 'Tutorial'
@@ -303,7 +304,15 @@ function exitRoomVrMode() {
 
 function openGalleryComposer() {
   const category = selectedCategory.value || 'photos'
-  openContributionPanel(category)
+  if (category === 'photos') {
+    // return to room overview and open the three-step photo composer
+    goToOverview()
+    // small panel mode showing the 3-step boxes
+    activePanel.value = 'photos-steps'
+    submitState.value = { loading: false, error: '', success: '' }
+  } else {
+    openContributionPanel(category)
+  }
 }
 
 function isImageUrl(url) {
@@ -1049,6 +1058,36 @@ onBeforeUnmount(() => {
             </ul>
           </template>
 
+          <template v-else-if="activePanel === 'photos-steps'">
+            <div class="add-steps">
+              <div class="step-box">
+                <div class="step-icon">1</div>
+                <div class="step-content">
+                  <strong>Media</strong>
+                  <p>Foto</p>
+                </div>
+              </div>
+              <div class="step-box">
+                <div class="step-icon">2</div>
+                <div class="step-content">
+                  <strong>Upload</strong>
+                  <p>Kies bestand of sleep hier</p>
+                </div>
+              </div>
+              <div class="step-box">
+                <div class="step-icon">3</div>
+                <div class="step-content">
+                  <strong>Plaatsen</strong>
+                  <p>Voeg boodschap toe en publiceer</p>
+                </div>
+              </div>
+              <div class="panel-actions">
+                <button type="button" class="visitor-pill-btn" @click="closePanel">Verder</button>
+              </div>
+            </div>
+            
+          </template>
+
           <template v-else>
             <label class="panel-field">
               <span>Jouw naam</span>
@@ -1207,6 +1246,33 @@ background: linear-gradient(
   position: relative;
   overflow: hidden;
 }
+
+.add-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.add-steps .step-box {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  background: #f6fbff;
+  padding: 12px;
+  border-radius: 10px;
+  box-shadow: 0 6px 18px rgba(11,63,116,0.06);
+}
+.add-steps .step-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #eaf6ff;
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+  color: #0b4b80;
+}
+.add-steps .step-content p{ margin:0; color:#52768a; font-size:0.9rem }
+.panel-actions { margin-top:12px }
 
 .visitor-entry-card::before {
   content: '';
@@ -2131,6 +2197,7 @@ text-shadow:
   line-height: 1;
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(11,63,116,0.12);
+  z-index: 60;
 }
 
 .visitor-gallery-lightbox-info {
@@ -2436,13 +2503,13 @@ text-shadow:
 .visitor-gallery-lightbox-media {
   position: relative;
   border-radius: 14px;
-  background: #fff;
-  border: 1px solid rgba(12, 53, 91, 0.06);
+  background: transparent;
+  border: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 22px 46px 22px 22px;
-  min-height: 480px;
+  padding: 12px 18px 12px 12px;
+  min-height: 360px;
   max-height: calc(100vh - 180px);
   overflow: hidden;
 }
@@ -2453,8 +2520,9 @@ text-shadow:
 .visitor-gallery-lightbox-audio {
   width: auto;
   height: auto;
-  max-width: calc(100% - 40px);
-  max-height: calc(100vh - 280px);
+  /* make images slightly smaller so the close button remains visible */
+  max-width: calc(100% - 120px);
+  max-height: calc(100vh - 320px);
   border-radius: 12px;
   object-fit: contain;
 }
