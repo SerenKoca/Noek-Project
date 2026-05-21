@@ -95,9 +95,12 @@ const roomCommentText = ref('')
 const mediaFile = ref(null)
 const mediaPreviewUrl = ref('')
 const photosStep = ref(1)
+const videoStep = ref(1)
 const musicStep = ref(1)
 const musicUrlInput = ref('')
 const musicPreviewEmbed = ref('')
+const videoUrlInput = ref('')
+const videoPreviewEmbed = ref('')
 
 const logoTitle = ref('Thibaut DELA')
 const logoSubtitle = ref('Uitvaartzorg')
@@ -413,6 +416,62 @@ async function openGalleryComposer(cat) {
     } catch (e) {
       // ignore navigation errors
     }
+  } else if (category === 'videos') {
+    if (!roomId.value) return
+    try {
+      const payload = JSON.stringify({ panel: 'videos-steps', ts: Date.now() })
+      sessionStorage.setItem('noek_open_panel', payload)
+    } catch (e) {}
+
+    try {
+      const targetPath = `/visit/${roomId.value}`
+      if (route.path === targetPath) {
+        try {
+          const raw = sessionStorage.getItem('noek_open_panel')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            const age = Date.now() - Number(parsed?.ts || 0)
+            if (parsed?.panel === 'videos-steps' && age >= 0 && age < 5000) {
+              sessionStorage.removeItem('noek_open_panel')
+              closeGalleryItem()
+              galleryReactionsOpen.value = false
+              galleryMode.value = 'gallery'
+              activePanel.value = 'videos-steps'
+              videoStep.value = 1
+              videoUrlInput.value = ''
+              videoPreviewEmbed.value = ''
+              type.value = 'video_file'
+              submitState.value = { loading: false, error: '', success: '' }
+              return
+            }
+          }
+        } catch (e) {}
+      }
+
+      await router.push({ path: `/visit/${roomId.value}` })
+
+      try {
+        const raw = sessionStorage.getItem('noek_open_panel')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - Number(parsed?.ts || 0)
+          if (parsed?.panel === 'videos-steps' && age >= 0 && age < 5000) {
+            sessionStorage.removeItem('noek_open_panel')
+            closeGalleryItem()
+            galleryReactionsOpen.value = false
+            galleryMode.value = 'gallery'
+            activePanel.value = 'videos-steps'
+            videoStep.value = 1
+            videoUrlInput.value = ''
+            videoPreviewEmbed.value = ''
+            type.value = 'video_file'
+            submitState.value = { loading: false, error: '', success: '' }
+          }
+        }
+      } catch (e) {}
+    } catch (e) {
+      // ignore navigation errors
+    }
   } else {
     openContributionPanel(category)
   }
@@ -661,7 +720,52 @@ function handlePanelBack() {
     musicStep.value = Math.max(1, musicStep.value - 1)
     return
   }
+  if (activePanel.value === 'videos-steps' && videoStep.value > 1) {
+    videoStep.value = Math.max(1, videoStep.value - 1)
+    return
+  }
   closePanel()
+}
+
+function openVideoUploadPicker() {
+  const el = document.querySelector('#videos-steps-file-input')
+  if (el) el.click()
+}
+
+function openVideoPreview() {
+  const url = String(videoUrlInput.value || '').trim()
+  if (!url && !mediaFile.value) return
+  if (url) externalUrl.value = url
+  const you = getYouTubeEmbedUrl(url)
+  if (you) {
+    videoPreviewEmbed.value = you
+  } else {
+    videoPreviewEmbed.value = ''
+  }
+  videoStep.value = 2
+}
+
+function clearVideoPreview() {
+  videoUrlInput.value = ''
+  externalUrl.value = ''
+  videoPreviewEmbed.value = ''
+  videoStep.value = 1
+}
+
+async function postVideoAndClose() {
+  // if a file is present, post as video_file, otherwise as video_url
+  if (mediaFile.value) {
+    type.value = 'video_file'
+  } else {
+    type.value = 'video_url'
+    externalUrl.value = String(videoUrlInput.value || externalUrl.value || '').trim()
+  }
+  await addContribution()
+  if (submitState.value.success) {
+    videoStep.value = 1
+    clearVideoPreview()
+    closePanel()
+  }
 }
 
 function nextPhotosStep() {
@@ -827,7 +931,7 @@ onMounted(async () => {
         try {
           const parsed = JSON.parse(raw)
           const age = Date.now() - Number(parsed?.ts || 0)
-          if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) {
+          if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) {
             sessionStorage.removeItem('noek_open_panel')
             setTimeout(() => {
               activePanel.value = parsed.panel
@@ -843,7 +947,7 @@ onMounted(async () => {
     // Also support opening via query param as a fallback
     try {
       const openFlag = String(route.query?.open || '')
-      if (openFlag === 'photos-steps' || openFlag === 'music-steps') {
+      if (openFlag === 'photos-steps' || openFlag === 'music-steps' || openFlag === 'videos-steps') {
         setTimeout(() => {
           activePanel.value = openFlag
         }, 80)
@@ -856,7 +960,7 @@ onMounted(async () => {
 
 watch(() => route.query.open, (openFlag) => {
   const value = String(openFlag || '')
-  if (value === 'photos-steps' || value === 'music-steps') {
+  if (value === 'photos-steps' || value === 'music-steps' || value === 'videos-steps') {
     const panel = value
     setTimeout(() => {
       activePanel.value = panel
@@ -874,6 +978,9 @@ watch(activePanel, (val) => {
   } else if (val === 'music-steps') {
     musicStep.value = 1
     type.value = 'music_url'
+  } else if (val === 'videos-steps') {
+    videoStep.value = 1
+    type.value = 'video_file'
   }
 })
 
@@ -886,7 +993,7 @@ watch(roomId, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     if (!keep) activePanel.value = 'none'
@@ -903,7 +1010,7 @@ watch(selectedCategory, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     if (!keep) activePanel.value = 'none'
@@ -1299,7 +1406,7 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' }]">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' }]">
         <div class="visitor-panel-head">
             <div class="panel-head-left">
             <button v-if="activePanel === 'photos-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
@@ -1308,6 +1415,7 @@ onBeforeUnmount(() => {
           <div class="panel-head-right">
             <small v-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
             <small v-else-if="activePanel === 'music-steps'">Stap {{ musicStep }} van 3</small>
+            <small v-else-if="activePanel === 'videos-steps'">Stap {{ videoStep }} van 3</small>
             <button v-else type="button" class="visitor-close" @click="closePanel">×</button>
           </div>
         </div>
@@ -1375,6 +1483,71 @@ onBeforeUnmount(() => {
                 </div>
               </div>
             </div>
+            </template>
+
+            <template v-else-if="activePanel === 'videos-steps'">
+              <div class="steps-container">
+                <div class="steps-progress">
+                  <div class="steps-track">
+                    <span v-for="n in 3" :key="n" :class="['step-seg', { active: n <= videoStep }]" />
+                  </div>
+                </div>
+                <div class="steps-body">
+                  <div class="steps-title"><strong>Media</strong></div>
+                  <div class="steps-subtitle">Video</div>
+                  <p class="steps-desc">Plaats je video bestand hier of upload een video link</p>
+
+                  <template v-if="videoStep === 1">
+                    <div class="upload-meta" v-if="mediaFile">
+                      <span class="upload-filename">{{ mediaFile.name }}</span>
+                      <button type="button" class="upload-delete" @click="removeMediaFile">🗑️<span class="sr-only">Delete</span></button>
+                    </div>
+                    <div class="upload-box" role="button" tabindex="0" @click="openVideoUploadPicker">
+                      <input id="videos-steps-file-input" type="file" accept="video/*,audio/*" @change="onMediaFileChange" style="display:none">
+                      <template v-if="!mediaPreviewUrl">
+                        <svg width="120" height="80" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                          <rect x="1" y="3" width="22" height="12" rx="2" fill="#0A5270" opacity="0.08"/>
+                          <path d="M4 10l3-3 2 2 3-4 4 6H4z" fill="#0A5270" opacity="0.18"/>
+                        </svg>
+                        <div class="upload-hint">Ondersteunde bestanden: MP3, WAV, MP4 (max. 50mb)</div>
+                      </template>
+                      <template v-else>
+                        <div class="upload-preview">
+                          <video v-if="mediaFile && mediaFile.type && mediaFile.type.startsWith('video')" :src="mediaPreviewUrl" controls style="max-width:100%;height:auto;border-radius:8px"></video>
+                          <img v-else :src="mediaPreviewUrl" alt="Preview" />
+                        </div>
+                      </template>
+                    </div>
+
+                    <hr class="steps-sep" />
+                    <label class="panel-field">
+                      <span>Upload hier een URL</span>
+                      <input class="music-url-input" v-model="videoUrlInput" type="url" placeholder="Plaats video URL hier">
+                    </label>
+                  </template>
+
+                  <template v-else-if="videoStep === 2">
+                    <div class="music-preview-box">
+                      <template v-if="videoPreviewEmbed">
+                        <iframe :src="videoPreviewEmbed" frameborder="0" allowfullscreen style="width:100%;height:140px;border-radius:8px"></iframe>
+                      </template>
+                      <template v-else>
+                        <div class="music-no-preview">Voorbeeld niet beschikbaar voor deze link</div>
+                      </template>
+                    </div>
+                    <hr class="steps-sep" />
+                    <label class="panel-field">
+                      <span>Schrijf hier een boodschap (optioneel)</span>
+                      <textarea v-model="tributeText" rows="4" maxlength="1000" placeholder=""></textarea>
+                    </label>
+                  </template>
+
+                  <div class="panel-actions">
+                    <button v-if="videoStep === 1" type="button" class="visitor-pill-btn" @click="openVideoPreview">Verder</button>
+                    <button v-else-if="videoStep === 2" type="button" class="visitor-pill-btn" @click="postVideoAndClose">Posten</button>
+                  </div>
+                </div>
+              </div>
           </template>
 
           <template v-else-if="activePanel === 'messages'">
