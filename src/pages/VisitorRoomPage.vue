@@ -36,7 +36,9 @@ const audioPlayer = ref(null)
 const roomMusicState = ref({ loading: false, error: '', playing: false })
 const activePanel = ref('none')
 const galleryMode = ref('gallery')
+const galleryPage = ref(0)
 const roomMode = ref('room')
+const gallerySelectedId = ref('')
 const selectedCategory = computed(() => normalizeGalleryCategory(route.params.category))
 const isGalleryPage = computed(() => Boolean(selectedCategory.value))
 const isVrMode = computed(() => galleryMode.value === 'vr' && selectedCategory.value === 'photos')
@@ -123,6 +125,34 @@ const filteredContributions = computed(() => {
   if (selectedCategory.value === 'music') return items.filter((item) => item.type === 'music_url')
   if (selectedCategory.value === 'videos') return items.filter((item) => item.type === 'video_file' || item.type === 'video_url')
   return items
+})
+
+const galleryPageSize = computed(() => (selectedCategory.value === 'photos' ? 8 : 4))
+
+const galleryPageCount = computed(() => {
+  const total = filteredContributions.value.length
+  if (!total) return 1
+  return Math.max(1, Math.ceil(total / galleryPageSize.value))
+})
+
+const pagedContributions = computed(() => {
+  const size = galleryPageSize.value
+  const page = Math.min(galleryPage.value, galleryPageCount.value - 1)
+  const start = page * size
+  return filteredContributions.value.slice(start, start + size)
+})
+
+const hasMultipleGalleryPages = computed(() => filteredContributions.value.length > galleryPageSize.value)
+
+const gallerySelectedIndex = computed(() => {
+  const id = String(gallerySelectedId.value || '').trim()
+  if (!id) return -1
+  return filteredContributions.value.findIndex((item) => String(item?._id || '') === id)
+})
+
+const gallerySelectedItem = computed(() => {
+  if (gallerySelectedIndex.value < 0) return null
+  return filteredContributions.value[gallerySelectedIndex.value] || null
 })
 
 const roomPhotoItems = computed(() => {
@@ -220,6 +250,35 @@ function goToOverview() {
 function enterVrMode() {
   if (selectedCategory.value !== 'photos') return
   galleryMode.value = 'vr'
+}
+
+function goToNextGalleryPage() {
+  if (!hasMultipleGalleryPages.value) return
+  galleryPage.value = (galleryPage.value + 1) % galleryPageCount.value
+}
+
+function openGalleryItem(item) {
+  if (!item?._id) return
+  gallerySelectedId.value = String(item._id)
+}
+
+function closeGalleryItem() {
+  gallerySelectedId.value = ''
+}
+
+function goToNextGalleryItem() {
+  if (!filteredContributions.value.length) return
+
+  const currentIndex = gallerySelectedIndex.value
+  if (currentIndex < 0) {
+    const first = filteredContributions.value[0]
+    gallerySelectedId.value = String(first?._id || '')
+    return
+  }
+
+  const nextIndex = (currentIndex + 1) % filteredContributions.value.length
+  const nextItem = filteredContributions.value[nextIndex]
+  gallerySelectedId.value = String(nextItem?._id || '')
 }
 
 function exitVrMode() {
@@ -558,7 +617,24 @@ watch(roomId, () => {
 watch(selectedCategory, () => {
   activePanel.value = 'none'
   galleryMode.value = 'gallery'
+  galleryPage.value = 0
+  gallerySelectedId.value = ''
   roomMode.value = 'room'
+})
+
+watch(filteredContributions, () => {
+  if (galleryPage.value > galleryPageCount.value - 1) {
+    galleryPage.value = Math.max(0, galleryPageCount.value - 1)
+  }
+
+  if (!filteredContributions.value.length) {
+    gallerySelectedId.value = ''
+    return
+  }
+
+  if (gallerySelectedIndex.value < 0 && gallerySelectedId.value) {
+    gallerySelectedId.value = ''
+  }
 })
 
 onBeforeUnmount(() => {
@@ -602,8 +678,6 @@ onBeforeUnmount(() => {
 
     <div v-else-if="isGalleryPage" class="visitor-gallery-shell" :class="{ 'vr-mode-active': isVrMode }">
       <header v-if="!isVrMode" class="visitor-gallery-topbar">
-        <button type="button" class="visitor-back-btn" @click="goToOverview">← Terug</button>
-
         <div class="visitor-title-card">
           <h1>{{ roomTitle }}</h1>
         </div>
@@ -620,65 +694,161 @@ onBeforeUnmount(() => {
       </header>
 
       <main class="visitor-gallery-main" :class="{ 'is-vr': isVrMode }">
-        <section v-if="!isVrMode" class="visitor-gallery-panel">
-          <div class="visitor-gallery-heading">
-            <div>
-              <p class="visitor-gallery-kicker">{{ galleryCategoryLabel }}</p>
-              <h2>{{ galleryHeading }}</h2>
+        <section v-if="!isVrMode" class="visitor-gallery-frame">
+          <button type="button" class="visitor-back-btn visitor-back-btn-gallery" @click="goToOverview">← Terug</button>
+
+          <div class="visitor-gallery-candle left" aria-hidden="true">
+            <div class="visitor-entry-candle is-large">
+              <span class="visitor-entry-candle-flame"></span>
+              <span class="visitor-entry-candle-wax"></span>
             </div>
-            <p class="visitor-gallery-lead">{{ galleryLead }}</p>
+            <div class="visitor-entry-candle is-small">
+              <span class="visitor-entry-candle-flame"></span>
+              <span class="visitor-entry-candle-wax"></span>
+            </div>
           </div>
 
-          <div v-if="loading" class="visitor-status">Kamer laden...</div>
-          <div v-else-if="error" class="visitor-status error">{{ error }}</div>
-          <template v-else>
-            <div v-if="filteredContributions.length" class="visitor-gallery-grid">
-              <article v-for="item in filteredContributions" :key="item._id" class="visitor-gallery-card">
-                <div class="visitor-gallery-media">
+          <div class="visitor-gallery-panel">
+            <div class="visitor-gallery-heading">
+              <div>
+                <p class="visitor-gallery-kicker">{{ galleryCategoryLabel }}</p>
+                <h2>{{ galleryHeading }}</h2>
+              </div>
+            </div>
+
+            <div v-if="loading" class="visitor-status">Kamer laden...</div>
+            <div v-else-if="error" class="visitor-status error">{{ error }}</div>
+            <template v-else>
+              <div v-if="filteredContributions.length" class="visitor-gallery-grid" :class="{ 'is-media': selectedCategory !== 'photos' }">
+                <article
+                  v-for="(item, index) in pagedContributions"
+                  :key="item._id || index"
+                  class="visitor-gallery-card"
+                  :class="selectedCategory === 'photos' ? `tile-${(index % 7) + 1}` : 'visitor-gallery-media-card'"
+                  @click="openGalleryItem(item)"
+                >
+                  <div class="visitor-gallery-media">
+                    <img
+                      v-if="item.type === 'photo' || isImageUrl(item.mediaUrl)"
+                      :src="item.mediaUrl"
+                      :alt="item.giverName || 'Foto'"
+                      class="visitor-gallery-image"
+                    >
+                    <video
+                      v-else-if="item.type === 'video_file' || isVideoUrl(item.mediaUrl)"
+                      :src="item.mediaUrl"
+                      controls
+                      class="visitor-gallery-video"
+                    />
+                    <iframe
+                      v-else-if="getYouTubeEmbedUrl(item.externalUrl)"
+                      class="visitor-gallery-embed"
+                      :src="getYouTubeEmbedUrl(item.externalUrl)"
+                      title="YouTube"
+                    />
+                    <iframe
+                      v-else-if="getSpotifyEmbedUrl(item.externalUrl)"
+                      class="visitor-gallery-embed"
+                      :src="getSpotifyEmbedUrl(item.externalUrl)"
+                      title="Spotify"
+                    />
+                    <audio
+                      v-else-if="isAudioUrl(item.externalUrl)"
+                      :src="item.externalUrl"
+                      controls
+                      class="visitor-gallery-audio"
+                    />
+                    <div v-else class="visitor-gallery-placeholder">
+                      <strong>{{ item.giverName || 'Bezoeker' }}</strong>
+                      <span>Geen preview beschikbaar</span>
+                    </div>
+                  </div>
+
+                  <div v-if="selectedCategory !== 'photos'" class="visitor-gallery-copy">
+                    <strong>{{ item.giverName || 'Bezoeker' }}</strong>
+                    <p>{{ item.tributeText || ' ' }}</p>
+                  </div>
+                </article>
+              </div>
+              <p v-else class="visitor-gallery-empty">Nog geen bijdragen in deze categorie.</p>
+            </template>
+
+            <div v-if="gallerySelectedItem" class="visitor-gallery-lightbox" @click.self="closeGalleryItem">
+              <div class="visitor-gallery-lightbox-card">
+                <button type="button" class="visitor-gallery-lightbox-close" @click="closeGalleryItem">×</button>
+
+                <aside class="visitor-gallery-lightbox-info">
+                  <h3>{{ galleryCategoryLabel.toLowerCase() }} van {{ gallerySelectedItem.giverName || 'naam' }}</h3>
+                  <p class="visitor-gallery-lightbox-label">Hun boodschap:</p>
+                  <div class="visitor-gallery-lightbox-message">{{ gallerySelectedItem.tributeText || 'Geen boodschap toegevoegd.' }}</div>
+
+                  <div class="visitor-gallery-lightbox-reactions" style="position:relative">
+                    <div class="visitor-gallery-reaction-toggle">
+                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span>{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
+                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span>{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
+                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span>{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
+                    </div>
+                  </div>
+                </aside>
+
+                <div class="visitor-gallery-lightbox-media">
                   <img
-                    v-if="item.type === 'photo' || isImageUrl(item.mediaUrl)"
-                    :src="item.mediaUrl"
-                    :alt="item.giverName || 'Foto'"
-                    class="visitor-gallery-image"
+                    v-if="gallerySelectedItem.type === 'photo' || isImageUrl(gallerySelectedItem.mediaUrl)"
+                    :src="gallerySelectedItem.mediaUrl"
+                    :alt="gallerySelectedItem.giverName || 'Foto'"
+                    class="visitor-gallery-lightbox-image"
                   >
                   <video
-                    v-else-if="item.type === 'video_file' || isVideoUrl(item.mediaUrl)"
-                    :src="item.mediaUrl"
+                    v-else-if="gallerySelectedItem.type === 'video_file' || isVideoUrl(gallerySelectedItem.mediaUrl)"
+                    :src="gallerySelectedItem.mediaUrl"
                     controls
-                    class="visitor-gallery-video"
+                    class="visitor-gallery-lightbox-video"
                   />
                   <iframe
-                    v-else-if="getYouTubeEmbedUrl(item.externalUrl)"
-                    class="visitor-gallery-embed"
-                    :src="getYouTubeEmbedUrl(item.externalUrl)"
+                    v-else-if="getYouTubeEmbedUrl(gallerySelectedItem.externalUrl)"
+                    class="visitor-gallery-lightbox-embed"
+                    :src="getYouTubeEmbedUrl(gallerySelectedItem.externalUrl)"
                     title="YouTube"
                   />
                   <iframe
-                    v-else-if="getSpotifyEmbedUrl(item.externalUrl)"
-                    class="visitor-gallery-embed"
-                    :src="getSpotifyEmbedUrl(item.externalUrl)"
+                    v-else-if="getSpotifyEmbedUrl(gallerySelectedItem.externalUrl)"
+                    class="visitor-gallery-lightbox-embed"
+                    :src="getSpotifyEmbedUrl(gallerySelectedItem.externalUrl)"
                     title="Spotify"
                   />
                   <audio
-                    v-else-if="isAudioUrl(item.externalUrl)"
-                    :src="item.externalUrl"
+                    v-else-if="isAudioUrl(gallerySelectedItem.externalUrl)"
+                    :src="gallerySelectedItem.externalUrl"
                     controls
-                    class="visitor-gallery-audio"
+                    class="visitor-gallery-lightbox-audio"
                   />
                   <div v-else class="visitor-gallery-placeholder">
-                    <strong>{{ item.giverName || 'Bezoeker' }}</strong>
+                    <strong>{{ gallerySelectedItem.giverName || 'Bezoeker' }}</strong>
                     <span>Geen preview beschikbaar</span>
                   </div>
-                </div>
 
-                <div class="visitor-gallery-copy">
-                  <strong>{{ item.giverName || 'Bezoeker' }}</strong>
-                  <p>{{ item.tributeText || ' ' }}</p>
+                  <button type="button" class="visitor-gallery-lightbox-next" @click="goToNextGalleryItem">›</button>
                 </div>
-              </article>
+              </div>
             </div>
-            <p v-else class="visitor-gallery-empty">Nog geen bijdragen in deze categorie.</p>
-          </template>
+          </div>
+
+          <button
+            type="button"
+            class="visitor-gallery-next"
+            :disabled="!hasMultipleGalleryPages"
+            aria-label="Volgende items"
+            @click="goToNextGalleryPage"
+          >
+            ▶
+          </button>
+
+          <div class="visitor-gallery-candle right" aria-hidden="true">
+            <div class="visitor-entry-candle is-small">
+              <span class="visitor-entry-candle-flame"></span>
+              <span class="visitor-entry-candle-wax"></span>
+            </div>
+          </div>
         </section>
 
         <VR3DScene
@@ -693,17 +863,42 @@ onBeforeUnmount(() => {
         </button>
       </main>
 
-      <button v-if="!showVrToggle" type="button" class="visitor-gallery-add" @click="openGalleryComposer">
-        {{ galleryActionLabel }}
-      </button>
-
       <footer v-if="!isVrMode" class="visitor-gallery-footer">
-        <div class="visitor-gallery-tabs">
-          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">Foto's</button>
-          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">Muziek</button>
-          <button type="button" :class="['visitor-gallery-tab', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">Video's</button>
-          <button type="button" :class="['visitor-gallery-tab', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">Kaarsjes</button>
-          <button type="button" :class="['visitor-gallery-tab', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">Bericht</button>
+        <button type="button" class="visitor-gallery-add" @click="openGalleryComposer">
+          {{ galleryActionLabel }}
+        </button>
+
+        <div class="visitor-action-bar visitor-gallery-tabs">
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'photos' }]" @click="goToGallery('photos')">
+            <div class="visitor-action-icon">
+              <div class="icon-shape icon-foto"></div>
+            </div>
+            <span class="visitor-action-label">Foto's</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'music' }]" @click="goToGallery('music')">
+            <div class="visitor-action-icon">
+              <div class="icon-shape icon-muziek"></div>
+            </div>
+            <span class="visitor-action-label">Muziek</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">
+            <div class="visitor-action-icon">
+              <div class="icon-shape icon-video"></div>
+            </div>
+            <span class="visitor-action-label">Video's</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">
+            <div class="visitor-action-icon">
+              <div class="icon-shape icon-kaars"></div>
+            </div>
+            <span class="visitor-action-label">Kaarsjes</span>
+          </button>
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'messages' }]" @click="openContributionPanel('messages')">
+            <div class="visitor-action-icon">
+              <div class="icon-shape icon-message"></div>
+            </div>
+            <span class="visitor-action-label">Bericht</span>
+          </button>
         </div>
 
         <div class="visitor-brand-card">
@@ -1245,9 +1440,14 @@ background: linear-gradient(
   z-index: 2;
   pointer-events: none;
   display: grid;
-  grid-template-columns: auto 1fr auto;
+  grid-template-columns: 1fr auto 1fr;
   gap: 16px;
   align-items: end;
+}
+
+.visitor-footer > .visitor-pill-btn {
+  grid-column: 1;
+  justify-self: start;
 }
 
 .visitor-pill-btn {
@@ -1263,6 +1463,8 @@ background: linear-gradient(
 
 .visitor-action-bar {
   pointer-events: auto;
+  grid-column: 2;
+  justify-self: center;
   display: flex;
   justify-content: center;
   gap: 16px;
@@ -1373,6 +1575,7 @@ text-shadow:
 
 .visitor-brand-card {
   pointer-events: auto;
+  justify-self: end;
   border-radius: 10px;
   background: white;
   padding: 15px 20px;
@@ -1560,15 +1763,13 @@ text-shadow:
   min-height: 100vh;
   display: grid;
   grid-template-rows: auto minmax(0, 1fr) auto;
-  gap: 14px;
-  padding: 18px 16px 16px;
+  gap: 12px;
+  padding: 18px 16px 12px;
   box-sizing: border-box;
-  /* Brand gradient: light on top, dark on bottom. Add bottom radial overlay for stronger contrast. */
   background:
-    radial-gradient(circle at 10% 12%, color-mix(in srgb, var(--brand-light) 22%, transparent) 0%, transparent 22%),
-    radial-gradient(circle at 88% 18%, color-mix(in srgb, var(--brand-light) 8%, transparent) 0%, transparent 20%),
-    linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 86%, white) 0%, color-mix(in srgb, var(--brand-dark) 28%, var(--brand-light)) 60%, var(--brand-dark) 100%),
-    radial-gradient(ellipse at bottom center, color-mix(in srgb, var(--brand-dark) 36%, transparent) 0%, transparent 45%);
+    radial-gradient(circle at 8% 100%, rgba(255, 222, 106, 0.38) 0%, rgba(255, 222, 106, 0) 17%),
+    radial-gradient(circle at 92% 100%, rgba(255, 200, 94, 0.34) 0%, rgba(255, 200, 94, 0) 16%),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-dark) 78%, #0a4f84) 0%, color-mix(in srgb, var(--brand-light) 42%, #5e93c6) 100%);
   color: var(--visitor-ink);
 }
 
@@ -1582,9 +1783,9 @@ text-shadow:
 
 .visitor-gallery-topbar {
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
 }
 
 .visitor-back-btn {
@@ -1597,6 +1798,13 @@ text-shadow:
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 28px rgba(11, 63, 116, 0.14);
+}
+
+.visitor-back-btn-gallery {
+  position: absolute;
+  left: 0;
+  top: 0;
+  z-index: 2;
 }
 
 .visitor-title-card {
@@ -1622,7 +1830,7 @@ text-shadow:
 
 .visitor-gallery-main {
   display: grid;
-  place-items: center;
+  place-items: stretch;
   min-height: 0;
 }
 
@@ -1632,30 +1840,79 @@ text-shadow:
   background: #0d1820;
 }
 
-.visitor-gallery-panel {
-  width: min(980px, 100%);
+.visitor-gallery-frame {
+  position: relative;
   min-height: 100%;
-  background: rgba(255, 255, 255, 0.96);
-  border-radius: 16px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 20px 52px rgba(11, 63, 116, 0.18);
-  padding: 14px;
+  width: 100%;
   display: grid;
-  gap: 14px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  align-content: center;
+  gap: 16px;
+  padding: 0 6px;
+}
+
+.visitor-gallery-panel {
+  width: min(1150px, calc(100vw - 180px));
+  margin: 0 auto;
+  min-height: min(560px, calc(100vh - 240px));
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.9);
+  box-shadow: 0 24px 52px rgba(11, 63, 116, 0.22);
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+  align-content: start;
+  grid-auto-rows: max-content;
   box-sizing: border-box;
+}
+
+.visitor-gallery-candle {
+  position: absolute;
+  bottom: 10px;
+  width: 190px;
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  filter: drop-shadow(0 0 28px rgba(255, 207, 94, 0.42));
+}
+
+.visitor-gallery-candle.left {
+  left: 18px;
+}
+
+.visitor-gallery-candle.right {
+  right: 28px;
+}
+
+.visitor-gallery-candle .visitor-entry-candle {
+  transform-origin: center bottom;
+  transform: scale(0.82);
+}
+
+.visitor-gallery-candle.right .visitor-entry-candle {
+  transform: scale(0.9);
+}
+
+.visitor-gallery-candle .visitor-entry-candle-wax {
+  box-shadow:
+    inset -6px 0 10px rgba(203, 166, 109, 0.22),
+    inset 0 5px 8px rgba(255, 255, 255, 0.72),
+    0 8px 12px rgba(46, 33, 71, 0.16);
 }
 
 .visitor-gallery-heading {
   display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: end;
+  justify-content: flex-start;
+  align-items: center;
+  padding: 6px 6px 0;
 }
 
 .visitor-gallery-kicker {
-  margin: 0 0 4px;
+  margin: 0 0 2px;
   color: #4f7598;
-  font-size: 0.86rem;
+  font-size: 0.8rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.08em;
@@ -1664,31 +1921,63 @@ text-shadow:
 .visitor-gallery-heading h2 {
   margin: 0;
   color: var(--visitor-color-dark);
-  font-size: clamp(1.15rem, 2.6vw, 1.8rem);
-}
-
-.visitor-gallery-lead {
-  margin: 0;
-  max-width: 360px;
-  color: #52708e;
-  line-height: 1.45;
-  font-size: 0.95rem;
-  text-align: right;
+  font-size: clamp(1rem, 2.1vw, 1.4rem);
 }
 
 .visitor-gallery-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-auto-rows: 74px;
+  gap: 8px;
+  min-height: 0;
+  overflow: auto;
+  padding: 2px;
+}
+
+.visitor-gallery-grid.is-media {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-auto-rows: minmax(180px, auto);
 }
 
 .visitor-gallery-card {
+  display: block;
+}
+
+.visitor-gallery-card.tile-1,
+.visitor-gallery-card.tile-4 {
+  grid-column: span 3;
+  grid-row: span 2;
+}
+
+.visitor-gallery-card.tile-2,
+.visitor-gallery-card.tile-5 {
+  grid-column: span 3;
+  grid-row: span 3;
+}
+
+.visitor-gallery-card.tile-3,
+.visitor-gallery-card.tile-6 {
+  grid-column: span 2;
+  grid-row: span 2;
+}
+
+.visitor-gallery-card.tile-7 {
+  grid-column: span 4;
+  grid-row: span 2;
+}
+
+.visitor-gallery-media-card {
   display: grid;
   gap: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(18, 58, 98, 0.12);
+  background: rgba(242, 248, 255, 0.85);
 }
 
 .visitor-gallery-media {
-  aspect-ratio: 1 / 1.15;
+  width: 100%;
+  height: 100%;
   border-radius: 16px;
   overflow: hidden;
   background: linear-gradient(180deg, rgba(221, 232, 242, 0.9), rgba(201, 218, 235, 0.95));
@@ -1715,7 +2004,7 @@ text-shadow:
 }
 
 .visitor-gallery-audio {
-  min-height: 100%;
+  min-height: 90px;
 }
 
 .visitor-gallery-placeholder {
@@ -1757,20 +2046,234 @@ text-shadow:
 }
 
 .visitor-gallery-empty {
-  margin: 0;
+  margin: 12px 0;
   color: #50708e;
 }
 
-.visitor-gallery-add {
-  justify-self: start;
+.visitor-gallery-lightbox {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(5, 22, 39, 0.48);
+  display: grid;
+  place-items: center;
+  z-index: 9999;
+  padding: 28px;
+}
+
+.visitor-gallery-lightbox-card {
+  position: relative;
+  width: min(1160px, calc(100% - 80px));
+  min-height: min(720px, calc(100% - 120px));
+  max-height: calc(100vh - 120px);
+  background: #f8fafb;
+  border-radius: 18px;
+  box-shadow: 0 40px 80px rgba(6, 28, 46, 0.28);
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  gap: 26px;
+  padding: 24px 26px 28px 22px;
+  align-items: start;
+  overflow: hidden;
+}
+
+.visitor-gallery-lightbox-close {
+  position: absolute;
+  right: 18px;
+  top: 18px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
   border: 0;
+  background: #ffffff;
+  color: #0b4b80;
+  font-size: 1.6rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(11,63,116,0.12);
+}
+
+.visitor-gallery-lightbox-info {
+  background: #eaf6ff;
   border-radius: 14px;
-  padding: 12px 18px;
+  padding: 18px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  height: 100%;
+}
+
+.visitor-gallery-lightbox-info h3 {
+  margin: 0;
+  font-size: 2.2rem;
+  line-height: 1.02;
+  color: #0b4b80;
+  font-weight: 800;
+}
+
+.visitor-gallery-lightbox-label {
+  margin: 0;
+  color: #1a3550;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.visitor-gallery-lightbox-message {
+  min-height: 160px;
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 14px;
+  color: #2b485f;
+  font-size: 1rem;
+  height: auto;
+}
+
+.visitor-gallery-lightbox-reactions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.visitor-gallery-reaction-btn {
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #0b4b80;
+  font-size: 1.2rem;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+}
+
+.visitor-gallery-reaction-btn span {
+  min-width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #0b4b80;
+  color: #fff;
+  font-size: 0.66rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visitor-gallery-comment-form {
+  margin-top: 2px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+}
+
+.visitor-gallery-comment-form input {
+  border: 1px solid rgba(11, 75, 128, 0.18);
+  border-radius: 8px;
+  padding: 9px 10px;
+}
+
+.visitor-gallery-comment-form button {
+  border: 0;
+  border-radius: 8px;
+  background: #0b4b80;
+  color: #fff;
+  padding: 0 12px;
+  cursor: pointer;
+}
+
+.visitor-gallery-lightbox-media {
+  position: relative;
+  border-radius: 14px;
+  background: #fff;
+  border: 1px solid rgba(12, 53, 91, 0.06);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 22px 46px 22px 22px;
+  min-height: 480px;
+  max-height: calc(100vh - 180px);
+  overflow: hidden;
+}
+
+.visitor-gallery-lightbox-image,
+.visitor-gallery-lightbox-video,
+.visitor-gallery-lightbox-embed,
+.visitor-gallery-lightbox-audio {
+  width: auto;
+  height: auto;
+  max-width: calc(100% - 40px);
+  max-height: calc(100vh - 280px);
+  border-radius: 12px;
+  object-fit: contain;
+}
+
+/* ensure img/video elements never overflow and keep aspect ratio */
+.visitor-gallery-lightbox-image img,
+.visitor-gallery-lightbox-video video,
+.visitor-gallery-lightbox-embed iframe {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.visitor-gallery-lightbox-embed {
+  border: 0;
+}
+
+.visitor-gallery-lightbox-next {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: transparent;
+  color: #0b4b80;
+  font-size: 2.6rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.visitor-gallery-next {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  border: 0;
+  background: rgba(255, 255, 255, 0.22);
+  color: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  box-shadow: 0 8px 26px rgba(11, 63, 116, 0.2);
+}
+
+.visitor-gallery-next:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.visitor-gallery-add {
+  grid-column: 1;
+  justify-self: start;
+  align-self: center;
+  border: 0;
+  border-radius: 999px;
+  padding: 12px 20px;
   font-weight: 700;
-  background: linear-gradient(90deg, var(--visitor-color-dark), var(--visitor-color-light));
+  background: linear-gradient(90deg, #0b4b80, #145f9a);
   color: #fff;
   box-shadow: 0 12px 26px rgba(11, 63, 116, 0.18);
   cursor: pointer;
+}
+
+.visitor-gallery-add::before {
+  content: '+';
+  margin-right: 8px;
+  font-size: 1.15rem;
 }
 
 .visitor-vr-entry-btn {
@@ -1778,13 +2281,69 @@ text-shadow:
   top: 84px;
   right: 16px;
   z-index: 3;
+  min-width: 108px;
+  min-height: 58px;
+  padding: 0 24px;
+  border: 1px solid transparent;
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(235, 245, 255, 0.98) 100%) padding-box,
+    linear-gradient(120deg, #ffffff 0%, #7ad6ff 45%, #ffffff 100%) border-box;
+  color: #0a4170;
+  font-size: 1.08rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.9);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.22),
+    0 14px 28px rgba(11, 63, 116, 0.24),
+    0 0 24px rgba(122, 214, 255, 0.45);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+  animation: visitorVrPulse 2.4s ease-in-out infinite;
+}
+
+.visitor-vr-entry-btn::before {
+  content: '✦';
+  margin-right: 8px;
+  font-size: 0.9rem;
+  color: #1c88c8;
+}
+
+.visitor-vr-entry-btn:hover {
+  transform: translateY(-2px) scale(1.02);
+  filter: brightness(1.03);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.34),
+    0 18px 34px rgba(11, 63, 116, 0.28),
+    0 0 30px rgba(122, 214, 255, 0.58);
+}
+
+.visitor-vr-entry-btn:active {
+  transform: translateY(0) scale(0.99);
+}
+
+@keyframes visitorVrPulse {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 2px rgba(255, 255, 255, 0.22),
+      0 14px 28px rgba(11, 63, 116, 0.24),
+      0 0 24px rgba(122, 214, 255, 0.45);
+  }
+  50% {
+    box-shadow:
+      0 0 0 3px rgba(255, 255, 255, 0.35),
+      0 16px 30px rgba(11, 63, 116, 0.26),
+      0 0 34px rgba(122, 214, 255, 0.62);
+  }
 }
 
 .visitor-gallery-footer {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: 1fr auto 1fr;
   gap: 12px;
-  align-items: end;
+  align-items: center;
 }
 
 .visitor-gallery-footer-vr {
@@ -1792,13 +2351,19 @@ text-shadow:
 }
 
 .visitor-gallery-tabs {
+  grid-column: 2;
+  justify-self: center;
   display: flex;
   justify-content: center;
-  gap: 10px;
+  gap: 14px;
   flex-wrap: wrap;
 }
 
-.visitor-gallery-tab,
+.visitor-gallery-footer > .visitor-brand-card {
+  grid-column: 3;
+  justify-self: end;
+}
+
 .visitor-gallery-kicker,
 .visitor-gallery-copy strong,
 .visitor-gallery-copy p,
@@ -1809,22 +2374,6 @@ text-shadow:
     0 1px 1px rgba(255, 255, 255, 0.9),
     0 0 8px rgba(255, 255, 255, 0.3),
     0 0 1px rgba(0, 0, 0, 0.12);
-}
-
-.visitor-gallery-tab {
-  border: 1px solid rgba(18, 58, 98, 0.16);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.95);
-  color: var(--visitor-color-dark);
-  padding: 10px 14px;
-  min-width: 88px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.visitor-gallery-tab.active {
-  background: linear-gradient(180deg, #ffffff, rgba(255, 255, 255, 0.72));
-  border-color: var(--visitor-color-dark);
 }
 
 .visitor-vr-stage {
@@ -2000,6 +2549,22 @@ text-shadow:
 
   .visitor-gallery-add {
     justify-self: stretch;
+  }
+
+  .visitor-gallery-lightbox-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    width: min(720px, calc(100% - 10px));
+    min-height: 0;
+    padding-top: 48px;
+  }
+
+  .visitor-gallery-lightbox-info h3 {
+    font-size: 1.4rem;
+  }
+
+  .visitor-gallery-lightbox-media {
+    min-height: 240px;
   }
 
   .visitor-topbar-right {
