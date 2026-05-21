@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import VR3DScene from '../components/VR3DScene.vue'
@@ -95,6 +95,9 @@ const roomCommentText = ref('')
 const mediaFile = ref(null)
 const mediaPreviewUrl = ref('')
 const photosStep = ref(1)
+const musicStep = ref(1)
+const musicUrlInput = ref('')
+const musicPreviewEmbed = ref('')
 
 const logoTitle = ref('Thibaut DELA')
 const logoSubtitle = ref('Uitvaartzorg')
@@ -304,8 +307,9 @@ function exitRoomVrMode() {
   roomMode.value = 'room'
 }
 
-async function openGalleryComposer() {
-  const category = selectedCategory.value || 'photos'
+async function openGalleryComposer(cat) {
+  const category = String(cat || selectedCategory.value || 'photos')
+  try { console.log('openGalleryComposer called, category=', category, 'route.path=', route.path) } catch (e) {}
   if (category === 'photos') {
     if (!roomId.value) return
     // set a session flag and navigate back to the room overview so the
@@ -344,6 +348,65 @@ async function openGalleryComposer() {
           if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) {
             sessionStorage.removeItem('noek_open_panel')
             activePanel.value = 'photos-steps'
+          }
+        }
+      } catch (e) {}
+    } catch (e) {
+      // ignore navigation errors
+    }
+  } else if (category === 'music') {
+    if (!roomId.value) return
+    // mirror photos flow: set session flag and navigate to room overview
+    try {
+      const payload = JSON.stringify({ panel: 'music-steps', ts: Date.now() })
+      sessionStorage.setItem('noek_open_panel', payload)
+    } catch (e) {}
+
+    // If we're already on the room path, open immediately without navigating
+    try {
+      const targetPath = `/visit/${roomId.value}`
+      if (route.path === targetPath) {
+        try {
+          const raw = sessionStorage.getItem('noek_open_panel')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            const age = Date.now() - Number(parsed?.ts || 0)
+            if (parsed?.panel === 'music-steps' && age >= 0 && age < 5000) {
+              sessionStorage.removeItem('noek_open_panel')
+              closeGalleryItem()
+              galleryReactionsOpen.value = false
+              galleryMode.value = 'gallery'
+              activePanel.value = 'music-steps'
+              musicStep.value = 1
+              musicUrlInput.value = ''
+              musicPreviewEmbed.value = ''
+              type.value = 'music_url'
+              submitState.value = { loading: false, error: '', success: '' }
+              return
+            }
+          }
+        } catch (e) {}
+      }
+
+      await router.push({ path: `/visit/${roomId.value}` })
+
+      // After navigation, try to open the panel (component may stay mounted)
+      try {
+        const raw = sessionStorage.getItem('noek_open_panel')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - Number(parsed?.ts || 0)
+          if (parsed?.panel === 'music-steps' && age >= 0 && age < 5000) {
+            sessionStorage.removeItem('noek_open_panel')
+            closeGalleryItem()
+            galleryReactionsOpen.value = false
+            galleryMode.value = 'gallery'
+            activePanel.value = 'music-steps'
+            musicStep.value = 1
+            musicUrlInput.value = ''
+            musicPreviewEmbed.value = ''
+            type.value = 'music_url'
+            submitState.value = { loading: false, error: '', success: '' }
           }
         }
       } catch (e) {}
@@ -424,7 +487,15 @@ function resolveMusicPlatform(rawUrl) {
 }
 
 function openContributionPanel(panel) {
-  activePanel.value = panel
+  // Use step flows for music and photos
+  if (panel === 'music') {
+    activePanel.value = 'music-steps'
+    musicStep.value = 1
+    musicUrlInput.value = ''
+    musicPreviewEmbed.value = ''
+  } else {
+    activePanel.value = panel
+  }
   submitState.value = { loading: false, error: '', success: '' }
 
   const map = {
@@ -547,9 +618,47 @@ function removeMediaFile() {
   mediaPreviewUrl.value = ''
 }
 
+function openMusicPreview() {
+  const url = String(musicUrlInput.value || '').trim()
+  if (!url) return
+  externalUrl.value = url
+  const spotify = getSpotifyEmbedUrl(url)
+  const you = getYouTubeEmbedUrl(url)
+  if (spotify) {
+    musicPreviewEmbed.value = spotify
+  } else if (you) {
+    musicPreviewEmbed.value = you
+  } else {
+    musicPreviewEmbed.value = ''
+  }
+  musicStep.value = 2
+}
+
+function clearMusicPreview() {
+  musicUrlInput.value = ''
+  externalUrl.value = ''
+  musicPreviewEmbed.value = ''
+  musicStep.value = 1
+}
+
+async function postMusicAndClose() {
+  type.value = 'music_url'
+  externalUrl.value = String(musicUrlInput.value || externalUrl.value || '').trim()
+  await addContribution()
+  if (submitState.value.success) {
+    musicStep.value = 1
+    clearMusicPreview()
+    closePanel()
+  }
+}
+
 function handlePanelBack() {
   if (activePanel.value === 'photos-steps' && photosStep.value > 1) {
     photosStep.value = Math.max(1, photosStep.value - 1)
+    return
+  }
+  if (activePanel.value === 'music-steps' && musicStep.value > 1) {
+    musicStep.value = Math.max(1, musicStep.value - 1)
     return
   }
   closePanel()
@@ -711,17 +820,17 @@ onMounted(async () => {
     }
   }
 
-    // If sessionStorage included a recent request to open the photo-steps panel, open it now
+    // If sessionStorage included a recent request to open the step panel, open it now
     try {
       const raw = sessionStorage.getItem('noek_open_panel')
       if (raw) {
         try {
           const parsed = JSON.parse(raw)
           const age = Date.now() - Number(parsed?.ts || 0)
-          if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) {
+          if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) {
             sessionStorage.removeItem('noek_open_panel')
             setTimeout(() => {
-              activePanel.value = 'photos-steps'
+              activePanel.value = parsed.panel
             }, 80)
           }
         } catch (e) {
@@ -734,9 +843,9 @@ onMounted(async () => {
     // Also support opening via query param as a fallback
     try {
       const openFlag = String(route.query?.open || '')
-      if (openFlag === 'photos-steps') {
+      if (openFlag === 'photos-steps' || openFlag === 'music-steps') {
         setTimeout(() => {
-          activePanel.value = 'photos-steps'
+          activePanel.value = openFlag
         }, 80)
         const q = { ...route.query }
         delete q.open
@@ -745,10 +854,26 @@ onMounted(async () => {
     } catch (e) {}
 })
 
+watch(() => route.query.open, (openFlag) => {
+  const value = String(openFlag || '')
+  if (value === 'photos-steps' || value === 'music-steps') {
+    const panel = value
+    setTimeout(() => {
+      activePanel.value = panel
+    }, 0)
+    const q = { ...route.query }
+    delete q.open
+    router.replace({ path: route.path, query: q }).catch(() => {})
+  }
+})
+
 watch(activePanel, (val) => {
   if (val === 'photos-steps') {
     photosStep.value = 1
     type.value = 'photo'
+  } else if (val === 'music-steps') {
+    musicStep.value = 1
+    type.value = 'music_url'
   }
 })
 
@@ -761,7 +886,7 @@ watch(roomId, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     if (!keep) activePanel.value = 'none'
@@ -778,7 +903,7 @@ watch(selectedCategory, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if (parsed?.panel === 'photos-steps' && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     if (!keep) activePanel.value = 'none'
@@ -1063,7 +1188,7 @@ onBeforeUnmount(() => {
       </main>
 
       <footer v-if="!isVrMode" class="visitor-gallery-footer">
-        <button type="button" class="visitor-gallery-add" @click="openGalleryComposer">
+        <button type="button" class="visitor-gallery-add" @click="openGalleryComposer(selectedCategory)">
           {{ galleryActionLabel }}
         </button>
 
@@ -1080,6 +1205,7 @@ onBeforeUnmount(() => {
             </div>
             <span class="visitor-action-label">Muziek</span>
           </button>
+          
           <button type="button" :class="['visitor-action-btn', { active: selectedCategory === 'videos' }]" @click="goToGallery('videos')">
             <div class="visitor-action-icon">
               <div class="icon-shape icon-video"></div>
@@ -1173,7 +1299,7 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' }]">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' }]">
         <div class="visitor-panel-head">
             <div class="panel-head-left">
             <button v-if="activePanel === 'photos-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
@@ -1181,8 +1307,19 @@ onBeforeUnmount(() => {
           </div>
           <div class="panel-head-right">
             <small v-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
+            <small v-else-if="activePanel === 'music-steps'">Stap {{ musicStep }} van 3</small>
             <button v-else type="button" class="visitor-close" @click="closePanel">×</button>
           </div>
+        </div>
+
+        <!-- DEBUG OVERLAY - remove after debugging -->
+        <div class="debug-overlay" aria-hidden="false">
+          <div><strong>DEBUG</strong></div>
+          <div>activePanel: {{ activePanel }}</div>
+          <div>selectedCategory: {{ selectedCategory }}</div>
+          <div>route: {{ route.path }}</div>
+          <div>gallerySelectedId: {{ gallerySelectedId }}</div>
+          <div>galleryReactionsOpen: {{ galleryReactionsOpen }}</div>
         </div>
 
         <div class="visitor-panel-body">
@@ -1195,6 +1332,48 @@ onBeforeUnmount(() => {
               <button type="button" class="visitor-pill-btn" @click="enableRoomSound">Geluid afspelen</button>
               <span v-if="roomMusicState.playing">Kamergeluid speelt</span>
               <span v-else-if="roomMusicState.error">{{ roomMusicState.error }}</span>
+            </div>
+          </template>
+
+          <template v-else-if="activePanel === 'music-steps'">
+            <div class="steps-container">
+              <div class="steps-progress">
+                <div class="steps-track">
+                  <span v-for="n in 3" :key="n" :class="['step-seg', { active: n <= musicStep }]"></span>
+                </div>
+              </div>
+              <div class="steps-body">
+                <div class="steps-title"><strong>Media</strong></div>
+                <div class="steps-subtitle">muziek</div>
+                <p class="steps-desc">Upload vanuit je playlist</p>
+
+                <template v-if="musicStep === 1">
+                  <label class="panel-field">
+                    <input class="music-url-input" v-model="musicUrlInput" type="url" placeholder="Plaats video URL hier">
+                  </label>
+                </template>
+
+                <template v-else-if="musicStep === 2">
+                  <div class="music-preview-box">
+                    <template v-if="musicPreviewEmbed">
+                      <iframe :src="musicPreviewEmbed" frameborder="0" allowfullscreen style="width:100%;height:140px;border-radius:8px"></iframe>
+                    </template>
+                    <template v-else>
+                      <div class="music-no-preview">Voorbeeld niet beschikbaar voor deze link</div>
+                    </template>
+                  </div>
+                  <hr class="steps-sep" />
+                  <label class="panel-field">
+                    <span>Schrijf hier een boodschap (optioneel)</span>
+                    <textarea v-model="tributeText" rows="4" maxlength="1000" placeholder=""></textarea>
+                  </label>
+                </template>
+
+                <div class="panel-actions">
+                  <button v-if="musicStep === 1" type="button" class="visitor-pill-btn" @click="openMusicPreview">Verder</button>
+                  <button v-else-if="musicStep === 2" type="button" class="visitor-pill-btn" @click="postMusicAndClose">Posten</button>
+                </div>
+              </div>
             </div>
           </template>
 
@@ -1897,6 +2076,8 @@ text-shadow:
   padding: 0;
   display: flex;
   flex-direction: column;
+  z-index: 10020;
+  pointer-events: auto;
 }
 
 .visitor-panel--side .visitor-panel-head {
@@ -1916,6 +2097,10 @@ text-shadow:
 .steps-track { width: 160px; height: 8px; background: rgba(7,59,87,0.08); border-radius: 8px; display:flex; gap:6px; padding:4px }
 .step-seg { flex:1; height:100%; background: rgba(255,255,255,0.6); border-radius: 6px }
 .step-seg.active { background: linear-gradient(90deg,#072b4c,#1a6b9a) }
+
+.music-url-input { width:100%; border:1px solid var(--visitor-border); padding:10px; border-radius:8px }
+.music-preview-box { background:#fff; border-radius:10px; padding:8px }
+.music-no-preview { color:#567a8f; padding:12px }
 
 .visitor-panel--side .visitor-panel-body {
   padding: 12px 18px 18px 18px;
@@ -2880,6 +3065,8 @@ text-shadow:
   cursor: pointer;
 }
 
+ 
+
 .visitor-gallery-add::before {
   content: '+';
   margin-right: 8px;
@@ -3124,6 +3311,20 @@ text-shadow:
   display: grid;
   place-items: center;
   color: rgba(255, 255, 255, 0.8);
+}
+
+.debug-overlay {
+  position: fixed;
+  right: 12px;
+  top: 12px;
+  background: rgba(0,0,0,0.72);
+  color: #fff;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  z-index: 20000;
+  line-height: 1.3;
+  min-width: 220px;
 }
 
 @keyframes vrFloat {
