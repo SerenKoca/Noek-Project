@@ -155,6 +155,8 @@ const gallerySelectedItem = computed(() => {
   return filteredContributions.value[gallerySelectedIndex.value] || null
 })
 
+const galleryReactionsOpen = ref(false)
+
 const roomPhotoItems = computed(() => {
   const items = Array.isArray(contributions.value) ? contributions.value : []
   return items.filter((item) => item.type === 'photo' && item.mediaUrl).slice(0, 12)
@@ -260,10 +262,16 @@ function goToNextGalleryPage() {
 function openGalleryItem(item) {
   if (!item?._id) return
   gallerySelectedId.value = String(item._id)
+  galleryReactionsOpen.value = false
 }
 
 function closeGalleryItem() {
   gallerySelectedId.value = ''
+  galleryReactionsOpen.value = false
+}
+
+function toggleGalleryReactions() {
+  galleryReactionsOpen.value = !galleryReactionsOpen.value
 }
 
 function goToNextGalleryItem() {
@@ -782,11 +790,41 @@ onBeforeUnmount(() => {
                   <p class="visitor-gallery-lightbox-label">Hun boodschap:</p>
                   <div class="visitor-gallery-lightbox-message">{{ gallerySelectedItem.tributeText || 'Geen boodschap toegevoegd.' }}</div>
 
-                  <div class="visitor-gallery-lightbox-reactions" style="position:relative">
-                    <div class="visitor-gallery-reaction-toggle">
-                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span>{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
-                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span>{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
-                      <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span>{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
+                  <div class="visitor-gallery-lightbox-reactions-wrap">
+                    <div class="visitor-gallery-lightbox-reactions">
+                      <div class="visitor-gallery-reaction-toggle">
+                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span>{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
+                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span>{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
+                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span>{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="visitor-gallery-comment-toggle"
+                        :aria-expanded="galleryReactionsOpen"
+                        aria-label="Toon reacties"
+                        @click="toggleGalleryReactions"
+                      >
+                        <span class="visitor-gallery-comment-icon" aria-hidden="true"></span>
+                      </button>
+                    </div>
+
+                    <div v-if="galleryReactionsOpen" class="visitor-gallery-reaction-panel">
+                      <button type="button" class="visitor-gallery-reaction-close" @click="toggleGalleryReactions">×</button>
+                      <ul class="item-comments-items visitor-gallery-comments" v-if="gallerySelectedItem.comments?.length">
+                        <li v-for="comment in gallerySelectedItem.comments" :key="comment._id || comment.createdAt" class="item-comment-entry visitor-gallery-comment-entry">
+                          <div class="visitor-gallery-comment-author-row">
+                            <span class="visitor-gallery-comment-avatar" aria-hidden="true"></span>
+                            <span class="item-comment-author">{{ comment.displayName || 'Bezoeker' }}</span>
+                          </div>
+                          <div class="visitor-gallery-comment-bubble">{{ comment.text }}</div>
+                        </li>
+                      </ul>
+
+                      <form class="visitor-gallery-comment-form" @submit.prevent="submitContributionComment(gallerySelectedItem._id)">
+                        <input v-model="commentDrafts[gallerySelectedItem._id]" type="text" maxlength="500" placeholder="Type hier je bericht" />
+                        <button type="submit" :disabled="commentStateByItem[gallerySelectedItem._id]?.loading">{{ commentStateByItem[gallerySelectedItem._id]?.loading ? 'Bezig...' : 'Plaats' }}</button>
+                      </form>
                     </div>
                   </div>
                 </aside>
@@ -2137,17 +2175,176 @@ text-shadow:
   flex-wrap: wrap;
 }
 
+.visitor-gallery-lightbox-reactions-wrap {
+  position: relative;
+  min-height: 72px;
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  width: 100%;
+  padding-right: 54px;
+}
+
+.visitor-gallery-comment-toggle {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  padding: 0;
+  cursor: pointer;
+  display: grid;
+  place-items: center;
+  color: #0b4b80;
+}
+
+.visitor-gallery-comment-icon {
+  position: relative;
+  width: 24px;
+  height: 18px;
+  border-radius: 6px;
+  background: #0b4b80;
+}
+
+.visitor-gallery-comment-icon::after {
+  content: '';
+  position: absolute;
+  right: 3px;
+  bottom: -4px;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: #0b4b80;
+  transform: rotate(45deg);
+}
+
+.visitor-gallery-reaction-panel {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  /* match the width of the info card (parent is 100% of that card) but cap on very wide screens */
+  width: min(480px, 100%);
+  background: #dfeeff;
+  border-radius: 24px;
+  box-shadow: 0 16px 40px rgba(11, 63, 116, 0.16);
+  border: 0;
+  /* give extra top padding so the close button doesn't overlap comments */
+  padding: 46px 12px 12px;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: calc(100vh - 120px);
+  justify-content: flex-start;
+  z-index: 2;
+}
+
+.visitor-gallery-reaction-close {
+  position: absolute;
+  right: 10px;
+  top: 10px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 0;
+  background: #ffffff;
+  color: #06304a;
+  font-size: 1.2rem;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(11,63,116,0.12);
+}
+.visitor-gallery-comments {
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px; /* increased spacing between individual comments */
+  flex: 1 1 auto;
+  padding-right: 4px;
+  align-items: stretch;
+  -webkit-overflow-scrolling: touch;
+}
+
+.visitor-gallery-comment-entry {
+  display: block;
+  color: #193247;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(11,75,128,0.06);
+}
+
+.visitor-gallery-comment-author-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.visitor-gallery-comment-avatar {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: linear-gradient(180deg,#e8f7ff,#d7eefc);
+  box-shadow: 0 6px 16px rgba(11, 63, 116, 0.12);
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.visitor-gallery-comment-avatar::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 8px;
+  width: 10px;
+  height: 10px;
+  transform: translateX(-50%);
+  border-radius: 50%;
+  background: #0b4b80;
+}
+
+.visitor-gallery-comment-avatar::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 6px;
+  width: 16px;
+  height: 8px;
+  transform: translateX(-50%);
+  border-radius: 10px 10px 4px 4px;
+  background: #0b4b80;
+}
+
+.visitor-gallery-comment-bubble {
+  display: block;
+  background: #ffffff;
+  border-radius: 8px;
+  padding: 12px 14px;
+  box-shadow: 0 6px 18px rgba(11, 63, 116, 0.08);
+  line-height: 1.45;
+  color: #153242;
+  margin-left: 48px;
+}
+
+.visitor-gallery-comment-entry .item-comment-author {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #153242;
+}
+
 .visitor-gallery-reaction-btn {
   border: 0;
-  border-radius: 999px;
   background: transparent;
   color: #0b4b80;
-  font-size: 1.2rem;
+  font-size: 1.1rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 4px;
-  padding: 0;
+  gap: 8px;
+  padding: 6px 8px;
 }
 
 .visitor-gallery-reaction-btn span {
@@ -2164,24 +2361,76 @@ text-shadow:
 
 .visitor-gallery-comment-form {
   margin-top: 2px;
-  display: grid;
-  grid-template-columns: 1fr auto;
+  display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.visitor-gallery-comment-form input[type="text"] {
+  width: 100%;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 0;
+  box-shadow: inset 0 1px 2px rgba(11,63,116,0.04);
+}
+
+.visitor-gallery-comment-form button {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: #0b4b80;
+  color: #fff;
+  border: 0;
+}
+
+@media (max-width: 700px) {
+  .visitor-gallery-reaction-panel {
+    position: fixed;
+    left: 50%;
+    transform: translateX(-50%);
+    top: auto;
+    bottom: 12px;
+    width: 92vw;
+    max-height: 70vh;
+    border-radius: 12px;
+  }
 }
 
 .visitor-gallery-comment-form input {
-  border: 1px solid rgba(11, 75, 128, 0.18);
-  border-radius: 8px;
-  padding: 9px 10px;
+  border: 1px solid rgba(11, 75, 128, 0.22);
+  border-radius: 14px;
+  padding: 10px 12px;
+  background: #ffffff;
+  color: #1b2d3d;
 }
 
 .visitor-gallery-comment-form button {
   border: 0;
-  border-radius: 8px;
-  background: #0b4b80;
+  border-radius: 14px;
+  background: #06304a;
   color: #fff;
-  padding: 0 12px;
+  padding: 6px 12px;
   cursor: pointer;
+}
+
+.visitor-gallery-comment-form button:disabled {
+  opacity: 0.7;
+}
+
+/* Darken comment submit buttons in other contexts (room/item forms) */
+.item-comment-form button,
+.item-comment-form .visitor-pill-btn {
+  background: #06304a;
+  color: #fff;
+  border: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+}
+.item-comment-form button:hover,
+.item-comment-form .visitor-pill-btn:hover {
+  background: #05263f;
 }
 
 .visitor-gallery-lightbox-media {
