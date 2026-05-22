@@ -92,6 +92,7 @@ const type = ref('candle')
 const externalUrl = ref('')
 const mediaUrl = ref('')
 const roomCommentText = ref('')
+const roomCommentInput = ref(null)
 const mediaFile = ref(null)
 const mediaPreviewUrl = ref('')
 const photosStep = ref(1)
@@ -858,9 +859,21 @@ async function postRoomComment() {
       displayName: visitorName.value
     })
     roomCommentText.value = ''
+    await nextTick()
+    try { if (roomCommentInput.value) { roomCommentInput.value.style.height = 'auto' } } catch (e) {}
   } catch {
     // noop
   }
+}
+
+function autosizeRoomComment() {
+  try {
+    const el = roomCommentInput.value
+    if (!el) return
+    el.style.height = 'auto'
+    // add small extra to avoid scrollbar in some browsers
+    el.style.height = (el.scrollHeight + 2) + 'px'
+  } catch (e) {}
 }
 
 async function toggleRoomReaction(kind) {
@@ -1196,11 +1209,11 @@ onBeforeUnmount(() => {
 
                   <div class="visitor-gallery-lightbox-reactions-wrap">
                     <div class="visitor-gallery-lightbox-reactions">
-                      <div class="visitor-gallery-reaction-toggle">
-                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span>{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
-                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span>{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
-                        <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span>{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
-                      </div>
+                              <div class="visitor-gallery-reaction-toggle">
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤</button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝</button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯</button>
+                                </div>
 
                       <button
                         type="button"
@@ -1467,15 +1480,7 @@ onBeforeUnmount(() => {
           </div>
         </div>
 
-        <!-- DEBUG OVERLAY - remove after debugging -->
-        <div class="debug-overlay" aria-hidden="false">
-          <div><strong>DEBUG</strong></div>
-          <div>activePanel: {{ activePanel }}</div>
-          <div>selectedCategory: {{ selectedCategory }}</div>
-          <div>route: {{ route.path }}</div>
-          <div>gallerySelectedId: {{ gallerySelectedId }}</div>
-          <div>galleryReactionsOpen: {{ galleryReactionsOpen }}</div>
-        </div>
+        <!-- debug overlay removed -->
 
         <div class="visitor-panel-body">
           <template v-if="activePanel === 'tutorial'">
@@ -1598,25 +1603,28 @@ onBeforeUnmount(() => {
           </template>
 
           <template v-else-if="activePanel === 'messages'">
-            <div class="item-reactions-row">
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')">Hart {{ room?.roomReactions?.heartCount || 0 }}</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')">Steun {{ room?.roomReactions?.supportCount || 0 }}</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">Kaars {{ room?.roomReactions?.candleCount || 0 }}</button>
+            <div class="item-reactions-row" aria-hidden="true">
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')">❤</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')">🤝</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">🕯</button>
             </div>
+            <ul class="item-comments-items visitor-gallery-comments" v-if="room?.roomComments?.length">
+              <li v-for="comment in room.roomComments" :key="comment._id || comment.createdAt" class="visitor-gallery-comment-entry">
+                <div class="visitor-gallery-comment-author-row">
+                  <span class="visitor-gallery-comment-avatar" aria-hidden="true"></span>
+                  <span class="item-comment-author">{{ comment.displayName || 'Bezoeker' }}</span>
+                </div>
+                <div class="visitor-gallery-comment-bubble">{{ comment.text }}</div>
+              </li>
+            </ul>
             <form class="item-comment-form" @submit.prevent="postRoomComment">
-              <input v-model="roomCommentText" type="text" maxlength="500" placeholder="Type hier je bericht">
+              <textarea v-model="roomCommentText" ref="roomCommentInput" rows="1" maxlength="500" placeholder="Type hier je bericht" @input="autosizeRoomComment"></textarea>
               <button type="submit" class="visitor-pill-btn" aria-label="Verstuur bericht">
                 <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
                   <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" fill="currentColor" />
                 </svg>
               </button>
             </form>
-            <ul class="item-comments-items" v-if="room?.roomComments?.length">
-              <li v-for="comment in room.roomComments" :key="comment._id || comment.createdAt" class="item-comment-entry">
-                <span class="item-comment-author">{{ comment.displayName || 'Bezoeker' }}:</span>
-                <span>{{ comment.text }}</span>
-              </li>
-            </ul>
           </template>
 
           <template v-else-if="activePanel === 'photos-steps'">
@@ -1711,9 +1719,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="item-reactions-row">
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">Hart {{ item.reactions?.heartCount || 0 }}</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">Steun {{ item.reactions?.supportCount || 0 }}</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">Kaars {{ item.reactions?.candleCount || 0 }}</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">❤</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">🤝</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">🕯</button>
                 </div>
 
                 <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
@@ -2320,11 +2328,11 @@ text-shadow:
 }
 
 .visitor-panel--side-right .visitor-panel-body {
-  padding: 18px;
+  padding: 18px 18px 0 18px; /* flush bottom padding so input can sit fully at the bottom */
   display: flex;
   flex-direction: column;
   gap: 12px;
-  overflow: auto;
+  overflow: hidden; /* comment list will scroll instead */
 }
 
 .visitor-panel--side-right .item-comment-entry {
@@ -2343,16 +2351,22 @@ text-shadow:
   margin-bottom: 8px;
 }
 
-.visitor-panel--side-right .item-comments-items { padding: 4px 0 60px 0 }
+.visitor-panel--side-right .item-comments-items {
+  padding: 4px 0 0 0;
+  flex: 1 1 auto;
+  overflow: auto;
+}
 
 .visitor-panel--side-right .item-comment-form {
-  position: sticky;
-  bottom: 12px;
-  display: flex;
+  position: static;
+  margin-top: 6px;
+  display: grid;
+  grid-template-columns: 1fr auto;
   gap: 8px;
   align-items: center;
   background: transparent;
   padding-top: 6px;
+  z-index: 60;
 }
 
 .visitor-panel--side-right .item-comment-form input[type="text"] {
@@ -2363,6 +2377,21 @@ text-shadow:
   background: #fff;
   box-shadow: inset 0 1px 0 rgba(11,63,116,0.02);
   color: #567a8f;
+}
+
+.visitor-panel--side-right .item-comment-form textarea {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 28px;
+  border: 1px solid rgba(7,59,87,0.08);
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(11,63,116,0.02);
+  color: #567a8f;
+  resize: none;
+  overflow: hidden;
+  min-height: 44px;
+  max-height: 160px;
+  line-height: 1.35;
 }
 
 .visitor-panel--side-right .item-comment-form .visitor-pill-btn {
@@ -2590,8 +2619,22 @@ text-shadow:
   border: 1px solid var(--visitor-border);
   background: #fff;
   border-radius: 999px;
-  padding: 6px 10px;
+  padding: 6px 8px;
   cursor: pointer;
+}
+
+.reaction-count {
+  display: inline-flex;
+  min-width: 18px;
+  height: 18px;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  margin-left: 6px;
+  padding: 0 6px;
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
+  border-radius: 999px;
 }
 
 .item-comment-form {
