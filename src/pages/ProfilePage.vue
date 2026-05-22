@@ -327,17 +327,27 @@ function getSpotifyEmbedUrl(rawUrl) {
 
 <style scoped>
 .profile-container {
+  --profile-ink: #382a69;
+  --profile-ink-soft: #4f4379;
+  --profile-card: rgba(255, 255, 255, 0.82);
+  --profile-field-bg: #fcf9ff;
+  --profile-field-border: #beb2d8;
+  --profile-primary: #5c478f;
+  --profile-primary-hover: #4d3a7c;
+  --profile-secondary: #d5a15a;
+  --profile-secondary-hover: #c58f48;
   display: flex;
   flex-direction: column;
   min-height: calc(100vh - 80px);
-  background: linear-gradient(180deg, var(--editor-bg-shell-top, #f6f7f8) 0%, var(--editor-bg-shell-mid, #eff4fa) 58%, var(--editor-bg-shell-bottom, #9fc0e1) 100%);
+  background:
+    linear-gradient(100deg, #b6b4de 0%, #e8bfd0 56%, #f1ded2 100%);
 }
 
 .profile-tabs {
   display: flex;
   gap: 0;
-  border-bottom: 2px solid #dce9f4;
-  background: #ffffff;
+  border-bottom: 2px solid rgba(190, 178, 216, 0.7);
+  background: rgba(255, 255, 255, 0.6);
   padding: 0;
   margin: 0;
 }
@@ -347,7 +357,7 @@ function getSpotifyEmbedUrl(rawUrl) {
   padding: 16px 24px;
   border: none;
   background: transparent;
-  color: #5a6b7a;
+  color: var(--profile-ink-soft);
   font-weight: 600;
   font-size: 1rem;
   cursor: pointer;
@@ -357,14 +367,14 @@ function getSpotifyEmbedUrl(rawUrl) {
 }
 
 .profile-tab:hover {
-  color: #0b3f72;
-  background: #f8fbff;
+  color: var(--profile-ink);
+  background: rgba(255, 255, 255, 0.55);
 }
 
 .profile-tab.active {
-  color: #0b3f72;
-  border-bottom-color: #0e4e84;
-  background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+  color: var(--profile-ink);
+  border-bottom-color: var(--profile-primary);
+  background: rgba(255, 255, 255, 0.82);
 }
 
 .profile-content {
@@ -386,17 +396,19 @@ function getSpotifyEmbedUrl(rawUrl) {
   display: flex;
   align-items: center;
   gap: 32px;
-  background: #ffffff;
+  background: var(--profile-card);
   padding: 32px;
   border-radius: 16px;
-  box-shadow: 0 2px 8px rgba(11, 63, 116, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 18px 45px rgba(74, 56, 117, 0.14);
+  backdrop-filter: blur(3px);
 }
 
 .profile-avatar {
   width: 120px;
   height: 120px;
   border-radius: 50%;
-  background: linear-gradient(135deg, #0e4e84, #0b3f72);
+  background: linear-gradient(135deg, var(--profile-primary), #8f7ac1);
   color: #ffffff;
   display: flex;
   align-items: center;
@@ -404,7 +416,7 @@ function getSpotifyEmbedUrl(rawUrl) {
   font-size: 2.5rem;
   font-weight: 700;
   flex-shrink: 0;
-  box-shadow: 0 4px 12px rgba(11, 63, 116, 0.2);
+  box-shadow: 0 10px 20px rgba(74, 56, 117, 0.2);
 }
 
 .profile-info {
@@ -414,24 +426,24 @@ function getSpotifyEmbedUrl(rawUrl) {
 .profile-info h2 {
   margin: 0 0 8px 0;
   font-size: 1.8rem;
-  color: #0b3f72;
+  color: var(--profile-ink);
   font-weight: 700;
 }
 
 .profile-email {
   margin: 0 0 12px 0;
   font-size: 1rem;
-  color: #5a6b7a;
+  color: var(--profile-ink-soft);
 }
 
 .profile-role {
   margin: 0;
   font-size: 0.95rem;
-  color: #345;
+  color: var(--profile-ink-soft);
 }
 
 .profile-role strong {
-  color: #0e4e84;
+  color: var(--profile-primary);
 }
 
 .profile-actions {
@@ -443,17 +455,18 @@ function getSpotifyEmbedUrl(rawUrl) {
 
 .secondary-btn {
   padding: 12px 24px;
-  background: #d7e3ef;
-  color: #0b3f72;
+  background: linear-gradient(90deg, var(--profile-primary), #8f7ac1);
+  color: #ffffff;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
+  box-shadow: 0 8px 20px rgba(72, 54, 119, 0.22);
 }
 
 .secondary-btn:hover {
-  background: #c9d8eb;
+  background: linear-gradient(90deg, var(--profile-primary-hover), #7f6aac);
 }
 
 .contributions-section {
@@ -470,13 +483,13 @@ function getSpotifyEmbedUrl(rawUrl) {
 .contributions-header h2 {
   margin: 0 0 8px 0;
   font-size: 1.6rem;
-  color: #0b3f72;
+  color: var(--profile-ink);
   font-weight: 700;
 }
 
 .contributions-header p {
   margin: 0;
-  color: #5a6b7a;
+  color: var(--profile-ink-soft);
   font-size: 0.95rem;
 }
 
@@ -489,8 +502,27 @@ function getSpotifyEmbedUrl(rawUrl) {
 .profile-contribution-embed {
   width: 100%;
   border-radius: 10px;
-  border: 1px solid rgba(92, 113, 125, 0.28);
-  background: #fff;
+  border: 1px solid var(--profile-field-border);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.visited-section {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.visited-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 12px;
+}
+
+.visited-list .secondary-btn {
+  width: 100%;
+  text-align: left;
 }
 
 .profile-contribution-image,
