@@ -312,7 +312,7 @@ body {
   height: auto;
   min-height: 620px;
   max-height: 620px;
-  overflow: hidden;
+  overflow: visible;
   min-width: 0;
   color: var(--editor-text);
 }
@@ -389,18 +389,21 @@ body {
 .editor-assets-btn span:last-child {
   flex: 1;
   display: inline-block;
-  background: color-mix(in srgb, white 84%, var(--editor-panel) 16%);
-  border: 1px solid color-mix(in srgb, var(--editor-brand) 12%, white);
+  background: color-mix(in srgb, white 74%, var(--editor-panel) 26%);
+  border: 1px solid color-mix(in srgb, var(--editor-brand) 22%, white);
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 14px;
+  font-weight: 600;
   color: var(--editor-text);
+  box-shadow: 0 4px 10px rgba(9, 12, 18, 0.08);
 }
 
 .editor-assets-btn.active span:last-child {
   border-color: var(--editor-brand);
-  background: color-mix(in srgb, var(--editor-brand) 10%, white);
+  background: color-mix(in srgb, var(--editor-brand) 18%, white);
   color: var(--editor-brand);
+  box-shadow: 0 6px 14px color-mix(in srgb, var(--editor-brand) 14%, transparent);
 }
 
 .chip-icon {
@@ -463,26 +466,29 @@ body {
 
 /* Limit subnav list and allow scrolling */
 .editor-sub-list {
-  max-height: 260px;
-  overflow-y: auto;
-  padding-right: 6px;
+  max-height: none;
+  overflow: visible;
+  padding-right: 0;
 }
 
 .editor-sub-item {
   width: 100%;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--editor-border-strong) 58%, white);
   border-radius: 8px;
-  background: color-mix(in srgb, white 86%, var(--editor-panel) 14%);
+  background: color-mix(in srgb, white 72%, var(--editor-panel) 28%);
   color: var(--editor-text);
   text-align: left;
   font-size: 13px;
+  font-weight: 600;
   padding: 8px 10px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(12,40,80,0.04);
+  box-shadow: 0 4px 10px rgba(12,40,80,0.08);
 }
 
 .editor-sub-item.active {
-  outline: 2px solid color-mix(in srgb, var(--editor-brand) 24%, white);
+  border-color: color-mix(in srgb, var(--editor-brand) 48%, white);
+  outline: 2px solid color-mix(in srgb, var(--editor-brand) 18%, white);
+  background: color-mix(in srgb, var(--editor-brand) 10%, white);
 }
 
 .editor-models-panel {
