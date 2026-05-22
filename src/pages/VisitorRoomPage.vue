@@ -3401,6 +3401,14 @@ text-shadow:
   justify-self: end;
 }
 
+/* In gallery views only show the logo image; hide the title/subtitle text under it */
+.visitor-gallery-panel .visitor-brand-card strong,
+.visitor-gallery-panel .visitor-brand-card span,
+.visitor-gallery-footer .visitor-brand-card strong,
+.visitor-gallery-footer .visitor-brand-card span {
+  display: none;
+}
+
 .visitor-gallery-kicker,
 .visitor-gallery-copy strong,
 .visitor-gallery-copy p,
