@@ -1,8 +1,9 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
 import ThreeScene from '../components/ThreeScene.vue'
+import { applyBrandingTheme } from '../services/brandTheme.js'
 import {
   createFuneralDirector,
   deleteFuneralDirector,
@@ -30,7 +31,6 @@ const templateLoading = ref(false)
 const templateSaving = ref(false)
 const templateError = ref('')
 const templateStatus = ref('')
-const templateRoomId = ref('')
 const templateRoomName = ref('')
 const templateSceneData = ref(null)
 const templateSceneRef = ref(null)
@@ -40,7 +40,12 @@ const form = ref({
   password: ''
 })
 
-const canEditTemplate = computed(() => true)
+const NOEK_BRANDING = {
+  logoUrl: '/img/logo-noek.svg',
+  directorName: 'Noek',
+  darkColor: '#382a69',
+  lightColor: '#d5a15a'
+}
 
 function formatApiError(err, fallback) {
   const data = err?.response?.data || {}
@@ -73,7 +78,6 @@ async function loadTemplateRoom() {
 
   try {
     const result = await getTemplateRoom()
-    templateRoomId.value = String(result?.roomId || '')
     templateRoomName.value = String(result?.name || 'Template kamer')
     templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : null
   } catch (err) {
@@ -87,12 +91,8 @@ async function loadTemplateRoom() {
 async function openTemplateEditor() {
   templatePanelOpen.value = true
   await loadTemplateRoom()
-}
-
-function closeTemplateEditor() {
-  templatePanelOpen.value = false
-  templateError.value = ''
-  templateStatus.value = ''
+  await nextTick()
+  document.querySelector('.template-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function saveTemplateRoom() {
@@ -108,7 +108,6 @@ async function saveTemplateRoom() {
   try {
     const sceneData = templateSceneRef.value.serializeRoom()
     const result = await updateTemplateRoom({ sceneData })
-    templateRoomId.value = String(result?.roomId || templateRoomId.value || '')
     templateRoomName.value = String(result?.name || templateRoomName.value || 'Template kamer')
     templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : sceneData
     templateStatus.value = 'Template opgeslagen.'
@@ -121,6 +120,7 @@ async function saveTemplateRoom() {
 
 onMounted(async () => {
   await state.bootstrap()
+  state.brandingState.value = applyBrandingTheme(NOEK_BRANDING)
 
   if (!state.authState.value?.token) {
     await router.replace('/login')
@@ -209,228 +209,447 @@ async function logout() {
 
 <template>
   <div class="editor-page is-home">
-    <div class="auth-page-v2 admin-auth-page">
-      <div class="auth-card-v2 admin-auth-card">
-        <section class="auth-form-v2 admin-form-v2">
-          <header class="admin-toolbar">
-            <div class="admin-toolbar-user">
-              <strong>{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</strong>
-              <span class="role-badge">admin</span>
+    <div class="admin-dashboard">
+      <header class="admin-topbar">
+        <div class="admin-brand">
+          <div class="admin-brand-mark">
+            <img src="/img/logo-noek.svg" alt="Noek logo" />
+          </div>
+          <div class="admin-brand-copy">
+            <span>Noek</span>
+            <small>Super admin</small>
+          </div>
+        </div>
+
+        <div class="admin-topbar-actions">
+          <div class="admin-user-pill">
+            <span class="admin-user-name">{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
+            <span class="admin-role-badge">admin</span>
+          </div>
+          <button type="button" class="admin-ghost-btn" @click="openTemplateEditor">Template editor</button>
+          <button type="button" class="admin-ghost-btn" @click="loadDirectors">Ververs</button>
+          <button type="button" class="admin-logout-btn" @click="logout">Uitloggen</button>
+        </div>
+      </header>
+
+      <main class="admin-main">
+        <section class="admin-hero">
+          <h1>Noek super admin</h1>
+          <p>Beheer uitvaartondernemers, de templatekamer en de basis van het platform.</p>
+        </section>
+
+        <div class="admin-grid">
+          <article class="admin-panel create-panel">
+            <header class="admin-panel-head">
+              <h2>Uitvaartondernemer aanmaken</h2>
+              <p>Nieuwe accounts voor een uitvaartondernemer maak je hier aan.</p>
+            </header>
+
+            <form class="admin-create-form" @submit.prevent="submitCreateDirector">
+              <label class="admin-field">
+                <span>Naam</span>
+                <input v-model="form.displayName" type="text" placeholder="volledige naam" />
+              </label>
+              <label class="admin-field">
+                <span>Email</span>
+                <input v-model="form.email" type="email" placeholder="emailadres" />
+              </label>
+              <label class="admin-field">
+                <span>Tijdelijk wachtwoord</span>
+                <input v-model="form.password" type="password" placeholder="min. 8 tekens" />
+              </label>
+              <button type="submit" class="admin-primary-btn">Uitvaartondernemer aanmaken</button>
+            </form>
+
+            <div v-if="status" class="admin-inline-status success">{{ status }}</div>
+            <div v-if="error" class="admin-inline-status error">{{ error }}</div>
+          </article>
+
+          <article class="admin-panel directors-panel">
+            <header class="admin-panel-head split">
+              <div>
+                <h2>Uitvaartondernemers</h2>
+                <p>Overzicht van alle bestaande accounts met snelle acties.</p>
+              </div>
+              <button type="button" class="admin-secondary-btn" @click="loadDirectors">Ververs</button>
+            </header>
+
+            <div v-if="loading" class="admin-empty compact">Bezig met laden...</div>
+
+            <div v-else-if="directors.length === 0" class="admin-empty compact">Nog geen uitvaartondernemers.</div>
+
+            <div v-else class="admin-director-list">
+              <article v-for="item in directors" :key="item.id" class="admin-director-card">
+                <div class="admin-director-main">
+                  <strong>{{ item.displayName }}</strong>
+                  <span>{{ item.email }}</span>
+                  <small>Aangemaakt: {{ new Date(item.createdAt).toLocaleString('nl-NL') }}</small>
+                </div>
+                <div class="admin-director-actions">
+                  <button type="button" class="admin-ghost-btn small" @click="showDirectorDetails(item)">
+                    {{ selectedDirectorId === item.id ? 'Sluit details' : 'Bekijk details' }}
+                  </button>
+                  <button type="button" class="admin-danger-btn" @click="removeDirector(item)">Verwijder</button>
+                </div>
+              </article>
             </div>
-            <div class="admin-toolbar-actions">
-              <button type="button" class="auth-switch-v2" @click="openTemplateEditor">Template editor</button>
-              <button type="button" class="auth-switch-v2" @click="loadDirectors">Ververs</button>
-              <button type="button" class="auth-switch-v2" @click="logout">Uitloggen</button>
-            </div>
+          </article>
+        </div>
+
+        <section v-if="selectedDirectorId" class="admin-panel details-panel">
+          <header class="admin-panel-head">
+            <h2>Details uitvaartondernemer</h2>
+            <p>Branding, klanten en kamers van de geselecteerde uitvaartondernemer.</p>
           </header>
 
-          <div class="admin-title-block">
-            <h2>Uitvaartondernemers</h2>
-            <p>Maak accounts aan en beheer bestaande uitvaartondernemers.</p>
-          </div>
+          <div v-if="detailsLoading" class="admin-empty compact">Details laden...</div>
+          <div v-else-if="detailsError" class="admin-inline-status error">{{ detailsError }}</div>
 
-          <form class="admin-create-form" @submit.prevent="submitCreateDirector">
-            <label class="auth-field-v2">
-              <span>Naam</span>
-              <input v-model="form.displayName" type="text" placeholder="volledige naam" />
-            </label>
-            <label class="auth-field-v2">
-              <span>Email</span>
-              <input v-model="form.email" type="email" placeholder="emailadres" />
-            </label>
-            <label class="auth-field-v2">
-              <span>Tijdelijk wachtwoord</span>
-              <input v-model="form.password" type="password" placeholder="min. 8 tekens" />
-            </label>
-            <button type="submit" class="auth-submit-v2">Uitvaartondernemer aanmaken</button>
-          </form>
+          <div v-else-if="selectedDetails" class="admin-details-body">
+            <div class="admin-stats-row">
+              <article class="admin-stat-card">
+                <span>Klanten</span>
+                <strong>{{ selectedDetails.stats?.clientCount ?? 0 }}</strong>
+              </article>
+              <article class="admin-stat-card">
+                <span>Kamers</span>
+                <strong>{{ selectedDetails.stats?.roomCount ?? 0 }}</strong>
+              </article>
+            </div>
 
-          <div v-if="status" class="auth-status-v2 success">{{ status }}</div>
-          <div v-if="error" class="auth-status-v2 error">{{ error }}</div>
-
-          <div v-if="loading" class="room-empty compact-empty">
-            <h3>Bezig met laden...</h3>
-          </div>
-
-          <div v-else-if="directors.length === 0" class="room-empty compact-empty">
-            <h3>Geen uitvaartondernemers</h3>
-            <p>Maak hierboven een eerste account aan.</p>
-          </div>
-
-          <div v-else class="room-grid room-grid-v2">
-            <article v-for="item in directors" :key="item.id" class="room-card room-card-v2 admin-room-card">
-              <div class="room-info">
-                <strong>{{ item.displayName }}</strong>
-                <div class="room-meta">{{ item.email }}</div>
-                <div class="room-meta">Aangemaakt: {{ new Date(item.createdAt).toLocaleString('nl-NL') }}</div>
+            <article class="admin-info-card">
+              <h3>Branding gekozen</h3>
+              <div class="room-meta">Logo: {{ selectedDetails.branding?.logoUrl || 'Geen logo' }}</div>
+              <div class="admin-color-row">
+                <span class="admin-color-pill">
+                  Donker: {{ selectedDetails.branding?.darkColor || '-' }}
+                  <i :style="{ backgroundColor: selectedDetails.branding?.darkColor || '#1e2b37' }" />
+                </span>
+                <span class="admin-color-pill">
+                  Licht: {{ selectedDetails.branding?.lightColor || '-' }}
+                  <i :style="{ backgroundColor: selectedDetails.branding?.lightColor || '#d7e1eb' }" />
+                </span>
               </div>
-              <div class="room-actions-row room-actions-row-v2">
-                <button
-                  type="button"
-                  class="auth-switch-v2 details-btn"
-                  @click="showDirectorDetails(item)"
-                >
-                  {{ selectedDirectorId === item.id ? 'Sluit details' : 'Bekijk details' }}
-                </button>
-                <button type="button" class="danger-btn" @click="removeDirector(item)">Verwijder</button>
+            </article>
+
+            <article class="admin-info-card">
+              <h3>Klanten en kamers</h3>
+              <div v-if="(selectedDetails.clients || []).length === 0" class="room-meta">
+                Geen klanten gekoppeld aan deze uitvaartondernemer.
+              </div>
+              <div v-else class="admin-client-list">
+                <div v-for="client in selectedDetails.clients" :key="client.id" class="admin-client-item">
+                  <div class="admin-client-head">
+                    <strong>{{ client.displayName }}</strong>
+                    <span>{{ client.email }}</span>
+                    <span>{{ client.roomCount }} kamer(s)</span>
+                  </div>
+                  <ul v-if="(client.rooms || []).length" class="admin-room-list">
+                    <li v-for="room in client.rooms" :key="room.id">
+                      {{ room.name }}
+                      <span>{{ room.isPublic ? 'Publiek' : 'Privaat' }}</span>
+                    </li>
+                  </ul>
+                  <p v-else class="room-meta">Nog geen kamers.</p>
+                </div>
               </div>
             </article>
           </div>
-
-          <section v-if="selectedDirectorId" class="admin-details-panel">
-            <h3>Details uitvaartondernemer</h3>
-
-            <div v-if="detailsLoading" class="room-empty compact-empty">
-              <h3>Details laden...</h3>
-            </div>
-
-            <div v-else-if="detailsError" class="auth-status-v2 error">{{ detailsError }}</div>
-
-            <div v-else-if="selectedDetails" class="admin-details-body">
-              <div class="admin-stats-row">
-                <article class="admin-stat-card">
-                  <span>Klanten</span>
-                  <strong>{{ selectedDetails.stats?.clientCount ?? 0 }}</strong>
-                </article>
-                <article class="admin-stat-card">
-                  <span>Kamers</span>
-                  <strong>{{ selectedDetails.stats?.roomCount ?? 0 }}</strong>
-                </article>
-              </div>
-
-              <article class="admin-info-card">
-                <h4>Branding gekozen</h4>
-                <div class="room-meta">Logo: {{ selectedDetails.branding?.logoUrl || 'Geen logo' }}</div>
-                <div class="admin-color-row">
-                  <span class="admin-color-pill">
-                    Donker: {{ selectedDetails.branding?.darkColor || '-' }}
-                    <i :style="{ backgroundColor: selectedDetails.branding?.darkColor || '#1e2b37' }" />
-                  </span>
-                  <span class="admin-color-pill">
-                    Licht: {{ selectedDetails.branding?.lightColor || '-' }}
-                    <i :style="{ backgroundColor: selectedDetails.branding?.lightColor || '#d7e1eb' }" />
-                  </span>
-                </div>
-              </article>
-
-              <article class="admin-info-card">
-                <h4>Klanten en kamers</h4>
-                <div v-if="(selectedDetails.clients || []).length === 0" class="room-meta">
-                  Geen klanten gekoppeld aan deze uitvaartondernemer.
-                </div>
-                <div v-else class="admin-client-list">
-                  <div v-for="client in selectedDetails.clients" :key="client.id" class="admin-client-item">
-                    <div class="admin-client-head">
-                      <strong>{{ client.displayName }}</strong>
-                      <span>{{ client.email }}</span>
-                      <span>{{ client.roomCount }} kamer(s)</span>
-                    </div>
-                    <ul v-if="(client.rooms || []).length" class="admin-room-list">
-                      <li v-for="room in client.rooms" :key="room.id">
-                        {{ room.name }}
-                        <span>{{ room.isPublic ? 'Publiek' : 'Privaat' }}</span>
-                      </li>
-                    </ul>
-                    <p v-else class="room-meta">Nog geen kamers.</p>
-                  </div>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section class="admin-details-panel template-admin-panel">
-            <div class="template-admin-header">
-              <div>
-                <h3>Template kamer</h3>
-                <p>Pas hier de startkamer aan die nieuwe kamers als basis krijgen.</p>
-              </div>
-              <button type="button" class="auth-switch-v2" @click="templatePanelOpen = !templatePanelOpen">
-                {{ templatePanelOpen ? 'Template verbergen' : 'Template tonen' }}
-              </button>
-            </div>
-
-            <div v-if="templateStatus" class="auth-status-v2 success">{{ templateStatus }}</div>
-            <div v-if="templateError" class="auth-status-v2 error">{{ templateError }}</div>
-            <div v-if="templateRoomName" class="room-meta">Huidige template: {{ templateRoomName }}</div>
-            <div v-if="templatePanelOpen" class="template-scene-shell">
-              <div v-if="templateLoading" class="room-empty compact-empty">
-                <h3>Template laden...</h3>
-              </div>
-
-              <div v-else-if="!templateSceneData" class="room-empty compact-empty">
-                <h3>Geen template beschikbaar</h3>
-                <p>Er is nog geen template kamer geladen.</p>
-              </div>
-
-              <div v-else class="template-scene-wrap">
-                <ThreeScene
-                  ref="templateSceneRef"
-                  class="template-scene"
-                  :room-data="templateSceneData"
-                  :can-edit-template="true"
-                  :use-stored-template="false"
-                  :hide-local-template-actions="true"
-                />
-
-                <div class="template-modal-actions">
-                  <button type="button" class="auth-submit-v2" :disabled="templateSaving" @click="saveTemplateRoom">
-                    {{ templateSaving ? 'Opslaan...' : 'Template opslaan' }}
-                  </button>
-                  <button type="button" class="auth-switch-v2" @click="loadTemplateRoom">Herladen</button>
-                </div>
-              </div>
-            </div>
-          </section>
         </section>
-      </div>
+
+        <section class="admin-panel template-panel">
+          <div class="template-panel-header">
+            <div>
+              <h2>Template kamer</h2>
+              <p>Pas hier de startkamer aan die nieuwe kamers als basis krijgen.</p>
+            </div>
+            <button type="button" class="admin-ghost-btn" @click="templatePanelOpen = !templatePanelOpen">
+              {{ templatePanelOpen ? 'Template verbergen' : 'Template tonen' }}
+            </button>
+          </div>
+
+          <div v-if="templateStatus" class="admin-inline-status success">{{ templateStatus }}</div>
+          <div v-if="templateError" class="admin-inline-status error">{{ templateError }}</div>
+
+          <div v-if="templatePanelOpen" class="template-scene-shell">
+            <div v-if="templateLoading" class="admin-empty compact">Template laden...</div>
+
+            <div v-else-if="!templateSceneData" class="admin-empty compact">
+              Er is nog geen template kamer geladen.
+            </div>
+
+            <div v-else class="template-scene-wrap">
+              <ThreeScene
+                ref="templateSceneRef"
+                class="template-scene"
+                :room-data="templateSceneData"
+                :can-edit-template="true"
+                :use-stored-template="false"
+                :hide-local-template-actions="true"
+              />
+
+              <div class="template-modal-actions">
+                <button type="button" class="admin-primary-btn" :disabled="templateSaving" @click="saveTemplateRoom">
+                  {{ templateSaving ? 'Opslaan...' : 'Template opslaan' }}
+                </button>
+                <button type="button" class="admin-secondary-btn" @click="loadTemplateRoom">Herladen</button>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
     </div>
   </div>
 </template>
 
 <style scoped>
-.admin-auth-page {
-  padding: 28px;
+.editor-page.is-home {
+  height: auto;
+  min-height: 100vh;
+  overflow-y: auto;
 }
 
-.admin-auth-card {
-  width: min(1180px, 100%);
-  grid-template-columns: 1fr;
+.admin-dashboard {
+  min-height: 100vh;
+  overflow-y: auto;
+  --editor-brand: #382a69;
+  --editor-panel: #fcf9ff;
+  --editor-panel-soft: #f1e6fa;
+  --editor-panel-strong: #5c478f;
+  --editor-border: #beb2d8;
+  --editor-border-strong: #a99ac8;
+  --editor-text: #382a69;
+  --editor-text-soft: #4f4379;
+  --editor-primary-hover: #4d3a7c;
+  background:
+    linear-gradient(100deg, #b6b4de 0%, #e8bfd0 56%, #f1ded2 100%);
 }
 
-.admin-form-v2 {
-  padding-top: 42px;
-  gap: 16px;
-  max-height: none;
-  overflow: visible;
-}
-
-.admin-toolbar {
+.admin-topbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1rem;
+  gap: 16px;
+  padding: 14px 22px;
+  background: rgba(255, 255, 255, 0.72);
+  border-bottom: 1px solid var(--editor-border);
+  box-shadow: 0 4px 16px rgba(8, 18, 30, 0.06);
 }
 
-.admin-toolbar-user {
+.admin-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-brand-mark {
+  min-width: 150px;
+  display: inline-grid;
+  place-items: center;
+  padding: 10px 16px;
+  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--editor-border);
+  box-shadow: 0 4px 10px rgba(8, 18, 30, 0.08);
+}
+
+.admin-brand-mark img {
+  max-height: 48px;
+  max-width: 220px;
+  object-fit: contain;
+  display: block;
+}
+
+.admin-brand-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.admin-brand-copy span {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--editor-brand);
+}
+
+.admin-brand-copy small {
+  color: var(--editor-text-soft);
+}
+
+.admin-topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-user-pill {
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--editor-border);
+  color: var(--editor-text);
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  color: var(--auth-ink);
+  gap: 10px;
 }
 
-.admin-toolbar-actions {
-  display: inline-flex;
-  gap: 0.75rem;
+.admin-role-badge {
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: var(--editor-panel-strong);
+  color: #fff;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
-.admin-title-block h2 {
+.admin-ghost-btn,
+.admin-secondary-btn,
+.admin-primary-btn,
+.admin-logout-btn,
+.admin-danger-btn {
+  border: 0;
+  border-radius: 10px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.admin-ghost-btn,
+.admin-secondary-btn {
+  padding: 12px 16px;
+  background: var(--editor-brand);
+  color: #fff;
+  font-weight: 700;
+}
+
+.admin-ghost-btn.small {
+  padding: 10px 12px;
+}
+
+.admin-logout-btn,
+.admin-danger-btn {
+  padding: 12px 16px;
+  background: #8a2a34;
+  color: #fff;
+  font-weight: 700;
+}
+
+.admin-primary-btn {
+  padding: 13px 16px;
+  background: linear-gradient(90deg, var(--editor-brand), var(--editor-primary-hover, var(--editor-brand)));
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--editor-brand) 22%, transparent);
+}
+
+.admin-main {
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: 30px 28px 38px;
+  display: grid;
+  gap: 22px;
+}
+
+.admin-hero {
+  padding: 8px 4px 4px;
+}
+
+.admin-hero h1 {
   margin: 0;
-  color: var(--auth-ink);
+  color: var(--editor-brand);
+  font-size: clamp(2rem, 3vw, 2.8rem);
+  line-height: 1.05;
 }
 
-.admin-title-block p {
-  margin: 0.3rem 0 0;
-  color: var(--auth-ink-soft);
+.admin-hero p {
+  margin: 8px 0 0;
+  color: var(--editor-text-soft);
+  font-size: 0.98rem;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.admin-panel {
+  border: 1px solid var(--editor-border);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.8);
+  box-shadow: 0 10px 24px rgba(8, 18, 30, 0.08);
+  padding: 18px;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-panel-head h2 {
+  margin: 0;
+  color: var(--editor-brand);
+  font-size: 1.35rem;
+}
+
+.admin-panel-head p {
+  margin: 6px 0 0;
+  color: var(--editor-text-soft);
+  line-height: 1.45;
+}
+
+.admin-panel-head.split {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.brand-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.brand-logo-shell {
+  min-height: 110px;
+  border-radius: 12px;
+  border: 1px solid var(--editor-border);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.brand-logo {
+  max-height: 64px;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+.brand-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.brand-swatch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--editor-border);
+  background: #fff;
+  color: var(--editor-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.brand-swatch i {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 36, 56, 0.2);
 }
 
 .admin-create-form {
@@ -438,26 +657,106 @@ async function logout() {
   gap: 12px;
 }
 
-.admin-room-card {
-  border-color: var(--auth-field-border);
-  background: #fffdfd;
+.admin-field {
+  display: grid;
+  gap: 6px;
+  color: var(--editor-text);
+  font-size: 0.92rem;
+  font-weight: 600;
 }
 
-.details-btn {
-  text-decoration: none;
+.admin-field input[type='text'],
+.admin-field input[type='email'],
+.admin-field input[type='password'] {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  background: rgba(252, 249, 255, 0.98);
+  padding: 12px 14px;
+  font: inherit;
+  color: var(--editor-text);
+}
+
+.admin-inline-status {
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 0.93rem;
+  font-weight: 600;
+}
+
+.admin-inline-status.success {
+  background: #f1e6fa;
+  color: #1d6f42;
+  border: 1px solid #b8e2c6;
+}
+
+.admin-inline-status.error {
+  background: #fdebed;
+  color: #8a2a34;
+  border: 1px solid #efb7bf;
+}
+
+.admin-empty {
+  border: 1px dashed var(--editor-border-strong);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.78);
+  color: var(--editor-text-soft);
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+.admin-empty.compact {
+  min-height: 92px;
+  padding: 14px;
+}
+
+.admin-director-list {
+  display: grid;
+  gap: 10px;
+  max-height: 520px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.admin-director-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid var(--editor-border);
+  background: rgba(255, 255, 255, 0.84);
+  box-shadow: 0 6px 14px rgba(8, 18, 30, 0.08);
+}
+
+.admin-director-main {
+  display: grid;
+  gap: 4px;
+}
+
+.admin-director-main strong {
+  color: var(--editor-brand);
+  font-size: 1.05rem;
+}
+
+.admin-director-main span,
+.admin-director-main small,
+.room-meta {
+  color: var(--editor-text-soft);
+}
+
+.admin-director-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }
 
 .admin-details-panel {
-  margin-top: 0.35rem;
-  padding: 1rem;
-  border: 1px solid var(--auth-field-border);
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.75);
-}
-
-.admin-details-panel h3 {
-  margin: 0 0 0.75rem;
-  color: var(--auth-ink);
+  display: grid;
+  gap: 14px;
 }
 
 .admin-details-body {
@@ -472,33 +771,33 @@ async function logout() {
 }
 
 .admin-stat-card {
-  border: 1px solid var(--auth-field-border);
+  border: 1px solid var(--editor-border);
   border-radius: 10px;
   padding: 0.75rem;
-  background: #fcf9ff;
+  background: rgba(255, 255, 255, 0.92);
 }
 
 .admin-stat-card span {
   display: block;
-  color: var(--auth-ink-soft);
+  color: var(--editor-text-soft);
   font-size: 0.86rem;
 }
 
 .admin-stat-card strong {
   font-size: 1.4rem;
-  color: var(--auth-ink);
+  color: var(--editor-brand);
 }
 
 .admin-info-card {
-  border: 1px solid var(--auth-field-border);
+  border: 1px solid var(--editor-border);
   border-radius: 10px;
   padding: 0.75rem;
-  background: #ffffff;
+  background: rgba(255, 255, 255, 0.92);
 }
 
-.admin-info-card h4 {
+.admin-info-card h3 {
   margin: 0 0 0.5rem;
-  color: var(--auth-ink);
+  color: var(--editor-brand);
 }
 
 .admin-color-row {
@@ -514,115 +813,91 @@ async function logout() {
   gap: 0.5rem;
   padding: 0.3rem 0.55rem;
   border-radius: 999px;
-  border: 1px solid var(--auth-field-border);
-  background: #fcf9ff;
-  color: var(--auth-ink);
+  border: 1px solid var(--editor-border);
+  background: rgba(252, 249, 255, 0.96);
+  color: var(--editor-brand);
   font-size: 0.86rem;
+  font-weight: 600;
 }
 
 .admin-color-pill i {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
-  border: 1px solid rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(0, 0, 0, 0.12);
 }
 
 .admin-client-list {
   display: grid;
-  gap: 0.6rem;
-}
-
-.admin-client-item {
-  border: 1px solid var(--auth-field-border);
-  border-radius: 8px;
-  padding: 0.6rem;
-  background: #fcf9ff;
-}
-
-.admin-client-head {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
-
-.admin-client-head span {
-  color: var(--auth-ink-soft);
-  font-size: 0.84rem;
-}
-
-.admin-room-list {
-  margin: 0.45rem 0 0;
-  padding-left: 1rem;
-}
-
-.admin-room-list li {
-  margin: 0.15rem 0;
-}
-
-.admin-room-list li span {
-  margin-left: 0.5rem;
-  color: var(--auth-ink-soft);
-  font-size: 0.84rem;
-}
-
-.template-admin-panel {
-  display: grid;
   gap: 0.75rem;
 }
 
-.template-admin-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
+.admin-client-item {
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  padding: 0.7rem;
+  background: rgba(252, 249, 255, 0.96);
 }
 
-.template-admin-header h3 {
-  margin: 0;
-}
-
-.template-admin-header p {
+.admin-client-head {
   margin: 0.25rem 0 0;
-  color: var(--auth-ink-soft);
+  color: var(--editor-text-soft);
 }
 
 .template-scene-shell {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .template-scene-wrap {
   display: grid;
-  gap: 12px;
+  gap: 0.75rem;
 }
 
 .template-scene {
-  height: min(80vh, 900px);
-  border-radius: 14px;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  width: 100%;
+  min-height: 420px;
 }
 
 .template-modal-actions {
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
-  justify-content: flex-end;
 }
 
-.compact-empty {
-  padding: 0.75rem;
-}
-
-@media (max-width: 980px) {
-  .admin-auth-card {
+@media (max-width: 1180px) {
+  .admin-grid {
     grid-template-columns: 1fr;
   }
 
-  .admin-form-v2 {
-    max-height: none;
+  .admin-director-card {
+    grid-template-columns: 1fr;
+    align-items: start;
+  }
+
+  .admin-director-actions {
+    flex-wrap: wrap;
+  }
+}
+
+@media (max-width: 820px) {
+  .admin-topbar,
+  .admin-topbar-actions,
+  .template-panel-header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-main {
+    padding: 20px 16px 28px;
+  }
+
+  .admin-brand {
+    width: 100%;
+  }
+
+  .admin-brand-mark {
+    min-width: 132px;
   }
 }
 </style>
