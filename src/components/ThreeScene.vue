@@ -459,7 +459,7 @@ let floorMaterial = null
 let wallMaterial = null
 let sideWallMaterial = null
 let tileMaterial = null
-const templateEditorOpen = ref(false)
+const templateEditorOpen = ref(true)
 const templateEditorMessage = ref('')
 const selectedTemplateTarget = ref(null)
 const templateEditorSlotId = ref(TEMPLATE_SLOTS.value[0]?.id || '')
@@ -495,6 +495,10 @@ const filteredReplacementModels = computed(() => {
     return title.includes(query) || id.includes(query) || category.includes(query)
   })
 })
+
+function getTemplateReplacementPreview(model) {
+  return model?.thumbnailUrl || model?.previewUrl || model?.Thumbnail || model?.preview || ''
+}
 
 function getDefaultTemplateCategories(slotId) {
   const id = String(slotId || '').toLowerCase()
@@ -2378,9 +2382,329 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <div class="relative h-full w-full">
-    <div ref="containerEl" class="h-full w-full"></div>
+  <div class="three-scene-shell">
+    <div ref="containerEl" class="three-scene-canvas"></div>
 
-    <!-- Camera/target coordinates overlay removed -->
+    <div v-if="canEditTemplate" class="template-editor-overlay">
+      <button type="button" class="template-editor-toggle" @click="templateEditorOpen = !templateEditorOpen">
+        {{ templateEditorOpen ? 'Sluit template editor' : 'Open template editor' }}
+      </button>
+
+      <div v-show="templateEditorOpen" class="template-editor-panel">
+        <div class="template-editor-head">
+          <div>
+            <strong>Template editor</strong>
+            <p>Pas hier de kamer aan: kies een slot, verplaats het en wijs een object toe.</p>
+          </div>
+          <button type="button" class="template-editor-mini-btn" @click="saveTemplateToLocalStorage">Opslaan</button>
+        </div>
+
+        <div v-if="templateEditorMessage" class="template-editor-message">{{ templateEditorMessage }}</div>
+        <div v-if="templateReplacementError" class="template-editor-message is-error">{{ templateReplacementError }}</div>
+
+        <div class="template-editor-grid">
+          <section class="template-editor-section">
+            <h4>Slots</h4>
+            <div class="template-slot-list">
+              <button
+                v-for="slot in filteredTemplateSlots"
+                :key="slot.id"
+                type="button"
+                class="template-slot-btn"
+                :class="{ active: templateEditorSlotId === slot.id }"
+                @click="templateEditorSlotId = slot.id"
+              >
+                {{ slot.label || slot.id }}
+              </button>
+            </div>
+            <div class="template-editor-actions">
+              <button type="button" class="template-editor-mini-btn" @click="createNewTemplateSlot">Nieuw slot</button>
+              <button type="button" class="template-editor-mini-btn" @click="resetTemplateDefaults">Reset</button>
+            </div>
+          </section>
+
+          <section class="template-editor-section">
+            <h4>Geselecteerd slot</h4>
+            <label class="template-editor-field">
+              <span>Positie X</span>
+              <input v-model="templateDraft.x" type="number" step="0.1" />
+            </label>
+            <label class="template-editor-field">
+              <span>Positie Y</span>
+              <input v-model="templateDraft.y" type="number" step="0.1" />
+            </label>
+            <label class="template-editor-field">
+              <span>Positie Z</span>
+              <input v-model="templateDraft.z" type="number" step="0.1" />
+            </label>
+            <label class="template-editor-field">
+              <span>Rotatie</span>
+              <input v-model="templateDraft.rotationDeg" type="number" step="0.1" />
+            </label>
+
+            <label class="template-editor-field">
+              <span>Categorie</span>
+              <select v-model="templateDraft.slotCategories">
+                <option v-for="category in TEMPLATE_SLOT_EDITOR_CATEGORIES" :key="category" :value="category">{{ category }}</option>
+              </select>
+            </label>
+
+            <div class="template-editor-checks">
+              <label><input v-model="templateDraft.acceptsMeubel" type="checkbox" /> Meubel</label>
+              <label><input v-model="templateDraft.acceptsPersoonlijk" type="checkbox" /> Persoonlijk</label>
+              <label><input v-model="templateDraft.acceptsDecoratie" type="checkbox" /> Decoratie</label>
+            </div>
+
+            <div class="template-editor-actions">
+              <button type="button" class="template-editor-mini-btn" @click="applyTemplateDraft">Toepassen</button>
+              <button type="button" class="template-editor-mini-btn" @click="toggleTemplateDrag">
+                {{ templateDragEnabled ? 'Drag uit' : 'Drag aan' }}
+              </button>
+              <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('translate')">Verplaats</button>
+              <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('rotate')">Roteer</button>
+            </div>
+          </section>
+
+          <section class="template-editor-section template-editor-section-wide">
+            <h4>Object vervangen</h4>
+            <label class="template-editor-field">
+              <span>Zoeken</span>
+              <input v-model="templateReplacementSearch" type="text" placeholder="zoek model..." />
+            </label>
+
+            <div v-if="templateReplacementLoading" class="template-editor-message">Modellen laden...</div>
+
+            <div v-else class="template-replacement-list">
+              <button
+                v-for="model in filteredReplacementModels"
+                :key="model.id || model.title"
+                type="button"
+                class="template-replacement-card"
+                @click="replaceSelectedTemplateObject(model)"
+              >
+                <img v-if="getTemplateReplacementPreview(model)" :src="getTemplateReplacementPreview(model)" alt="preview" class="template-replacement-thumb" />
+                <span class="template-replacement-label">{{ model.title || model.id || 'Onbekend model' }}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
+
+<style scoped>
+.three-scene-shell {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.three-scene-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+}
+
+.template-editor-overlay {
+  position: absolute;
+  right: 16px;
+  top: 16px;
+  z-index: 20;
+  width: min(420px, calc(100% - 32px));
+  display: grid;
+  gap: 10px;
+  pointer-events: none;
+}
+
+.template-editor-toggle,
+.template-editor-panel,
+.template-editor-mini-btn,
+.template-slot-btn,
+.template-replacement-btn {
+  pointer-events: auto;
+}
+
+.template-editor-toggle {
+  justify-self: start;
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: rgba(34, 34, 38, 0.92);
+  color: #f4f4f7;
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.32);
+  cursor: pointer;
+}
+
+.template-editor-panel {
+  background: rgba(32, 32, 37, 0.92);
+  color: #f1f1f4;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 18px;
+  padding: 16px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(6px);
+  display: grid;
+  gap: 14px;
+  max-height: min(84vh, 820px);
+  overflow: auto;
+}
+
+.template-editor-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.template-editor-head strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.template-editor-head p {
+  margin: 6px 0 0;
+  color: rgba(241, 241, 244, 0.78);
+  font-size: 0.9rem;
+}
+
+.template-editor-message {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #f4f4f7;
+  font-size: 0.92rem;
+}
+
+.template-editor-message.is-error {
+  background: rgba(166, 55, 71, 0.28);
+}
+
+.template-editor-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.template-editor-section {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
+.template-editor-section-wide {
+  grid-column: span 1;
+}
+
+.template-editor-section h4 {
+  margin: 0;
+  font-size: 0.92rem;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.template-slot-list,
+.template-replacement-list,
+.template-editor-actions,
+.template-editor-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-slot-list {
+  max-height: 150px;
+  overflow: auto;
+}
+
+.template-slot-btn,
+.template-replacement-card,
+.template-editor-mini-btn {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  font: inherit;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+
+.template-slot-btn.active {
+  background: rgba(93, 71, 143, 0.95);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.template-replacement-card {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 58px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 8px;
+  text-align: left;
+}
+
+.template-replacement-thumb {
+  width: 58px;
+  height: 58px;
+  border-radius: 10px;
+  object-fit: cover;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+.template-replacement-label {
+  font-size: 0.92rem;
+  color: #fff;
+  line-height: 1.25;
+}
+
+.template-editor-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.template-editor-field span {
+  color: rgba(241, 241, 244, 0.8);
+}
+
+.template-editor-field input,
+.template-editor-field select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.template-editor-checks label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+@media (max-width: 980px) {
+  .template-editor-overlay {
+    left: 10px;
+    right: 10px;
+    width: auto;
+  }
+
+  .template-editor-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .template-editor-section-wide {
+    grid-column: span 1;
+  }
+}
+</style>

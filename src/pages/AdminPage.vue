@@ -26,7 +26,6 @@ const selectedDirectorId = ref('')
 const selectedDetails = ref(null)
 const detailsLoading = ref(false)
 const detailsError = ref('')
-const templatePanelOpen = ref(true)
 const templateLoading = ref(false)
 const templateSaving = ref(false)
 const templateError = ref('')
@@ -89,10 +88,9 @@ async function loadTemplateRoom() {
 }
 
 async function openTemplateEditor() {
-  templatePanelOpen.value = true
   await loadTemplateRoom()
   await nextTick()
-  document.querySelector('.template-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  document.querySelector('.template-panel-primary')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function saveTemplateRoom() {
@@ -226,7 +224,7 @@ async function logout() {
             <span class="admin-user-name">{{ state.authState.value?.user?.displayName || state.authState.value?.user?.email }}</span>
             <span class="admin-role-badge">admin</span>
           </div>
-          <button type="button" class="admin-ghost-btn" @click="openTemplateEditor">Template editor</button>
+          <button type="button" class="admin-template-btn" @click="openTemplateEditor">Open template editor</button>
           <button type="button" class="admin-ghost-btn" @click="loadDirectors">Ververs</button>
           <button type="button" class="admin-logout-btn" @click="logout">Uitloggen</button>
         </div>
@@ -357,46 +355,42 @@ async function logout() {
           </div>
         </section>
 
-        <section class="admin-panel template-panel">
+        <section class="admin-panel template-panel template-panel-primary">
           <div class="template-panel-header">
             <div>
               <h2>Template kamer</h2>
-              <p>Pas hier de startkamer aan die nieuwe kamers als basis krijgen.</p>
+              <p>Hier pas je direct de punten, voorwerpen en basisopstelling van de template aan.</p>
             </div>
-            <button type="button" class="admin-ghost-btn" @click="templatePanelOpen = !templatePanelOpen">
-              {{ templatePanelOpen ? 'Template verbergen' : 'Template tonen' }}
-            </button>
+            <button type="button" class="admin-secondary-btn" @click="loadTemplateRoom">Herladen</button>
           </div>
 
           <div v-if="templateStatus" class="admin-inline-status success">{{ templateStatus }}</div>
           <div v-if="templateError" class="admin-inline-status error">{{ templateError }}</div>
 
-          <div v-if="templatePanelOpen" class="template-scene-shell">
-            <div v-if="templateLoading" class="admin-empty compact">Template laden...</div>
+          <div v-if="templateLoading" class="admin-empty compact">Template laden...</div>
 
-            <div v-else-if="!templateSceneData" class="admin-empty compact">
-              Er is nog geen template kamer geladen.
-            </div>
+          <div v-else-if="!templateSceneData" class="admin-empty compact">
+            Er is nog geen template kamer geladen.
+          </div>
 
-            <div v-else class="template-scene-wrap">
-              <ThreeScene
-                ref="templateSceneRef"
-                class="template-scene"
-                :room-data="templateSceneData"
-                :can-edit-template="true"
-                :use-stored-template="false"
-                :hide-local-template-actions="true"
-              />
+          <div v-else class="template-scene-wrap template-scene-wrap-large">
+            <ThreeScene
+              ref="templateSceneRef"
+              class="template-scene template-scene-large"
+              :room-data="templateSceneData"
+              :can-edit-template="true"
+              :use-stored-template="false"
+              :hide-local-template-actions="true"
+            />
 
-              <div class="template-modal-actions">
-                <button type="button" class="admin-primary-btn" :disabled="templateSaving" @click="saveTemplateRoom">
-                  {{ templateSaving ? 'Opslaan...' : 'Template opslaan' }}
-                </button>
-                <button type="button" class="admin-secondary-btn" @click="loadTemplateRoom">Herladen</button>
-              </div>
+            <div class="template-modal-actions">
+              <button type="button" class="admin-primary-btn" :disabled="templateSaving" @click="saveTemplateRoom">
+                {{ templateSaving ? 'Opslaan...' : 'Template opslaan' }}
+              </button>
             </div>
           </div>
         </section>
+
       </main>
     </div>
   </div>
@@ -508,6 +502,7 @@ async function logout() {
 .admin-ghost-btn,
 .admin-secondary-btn,
 .admin-primary-btn,
+.admin-template-btn,
 .admin-logout-btn,
 .admin-danger-btn {
   border: 0;
@@ -522,6 +517,18 @@ async function logout() {
   background: var(--editor-brand);
   color: #fff;
   font-weight: 700;
+}
+
+.admin-template-btn {
+  padding: 12px 18px;
+  background: linear-gradient(90deg, var(--editor-primary-hover), var(--editor-brand));
+  color: #fff;
+  font-weight: 800;
+  box-shadow: 0 10px 22px color-mix(in srgb, var(--editor-brand) 20%, transparent);
+}
+
+.admin-template-btn:hover {
+  filter: brightness(1.03);
 }
 
 .admin-ghost-btn.small {
@@ -574,6 +581,10 @@ async function logout() {
   grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
   gap: 18px;
   align-items: start;
+}
+
+.template-panel-primary {
+  margin-bottom: 2px;
 }
 
 .admin-panel {
@@ -857,6 +868,14 @@ async function logout() {
 .template-scene {
   width: 100%;
   min-height: 420px;
+}
+
+.template-scene-wrap-large {
+  gap: 12px;
+}
+
+.template-scene-large {
+  min-height: 620px;
 }
 
 .template-modal-actions {
