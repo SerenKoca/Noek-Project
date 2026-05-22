@@ -181,10 +181,6 @@ async function logout() {
             <img v-if="branding.logoUrl" :src="branding.logoUrl" alt="Brand logo" />
             <strong v-else>{{ branding.directorName || 'Uitvaartondernemer' }}</strong>
           </div>
-          <div class="director-brand-copy">
-            <span>{{ branding.directorName || 'Uitvaartondernemer' }}</span>
-            <small>Dashboard</small>
-          </div>
         </div>
 
         <div class="director-topbar-actions">
@@ -359,26 +355,26 @@ async function logout() {
 }
 
 .director-brand-mark {
-  min-width: 112px;
+  min-width: 144px;
   display: inline-grid;
   place-items: center;
-  padding: 8px 12px;
-  border-radius: 8px;
+  padding: 10px 16px;
+  border-radius: 10px;
   background: #fff;
   border: 1px solid var(--editor-border);
   box-shadow: 0 4px 10px rgba(8, 18, 30, 0.08);
 }
 
 .director-brand-mark img {
-  max-height: 34px;
-  max-width: 160px;
+  max-height: 48px;
+  max-width: 220px;
   object-fit: contain;
   display: block;
 }
 
 .director-brand-mark strong {
   color: var(--editor-brand);
-  font-size: 1.05rem;
+  font-size: 1.2rem;
 }
 
 .director-brand-copy {
@@ -476,7 +472,7 @@ async function logout() {
 }
 
 .codes-panel {
-  max-height: 760px;
+  max-height: 660px;
   overflow: hidden;
 }
 
@@ -653,7 +649,7 @@ async function logout() {
 .director-code-list {
   overflow-y: auto;
   padding-right: 4px;
-  max-height: 620px;
+  max-height: 500px;
 }
 
 .director-code-card {
@@ -733,7 +729,7 @@ async function logout() {
 }
 
 .codes-panel .director-empty.compact {
-  min-height: 140px;
+  min-height: 110px;
 }
 
 .editors-panel {
