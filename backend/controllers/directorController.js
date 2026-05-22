@@ -41,6 +41,16 @@ async function generateUniqueCode() {
   throw new Error('Could not generate unique code')
 }
 
+async function purgeExpiredEditorCodes(directorId) {
+  const cutoff = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+  await EditorRegistrationCode.deleteMany({
+    createdByDirectorId: directorId,
+    usedAt: null,
+    usedByUserId: null,
+    expiresAt: { $lt: cutoff }
+  })
+}
+
 exports.listMyEditors = async (req, res) => {
   try {
     const directorId = req.auth?.userId
@@ -64,6 +74,7 @@ exports.listMyEditors = async (req, res) => {
 exports.generateEditorCode = async (req, res) => {
   try {
     const directorId = req.auth?.userId
+    await purgeExpiredEditorCodes(directorId)
     const expiresInDaysRaw = Number(req.body?.expiresInDays)
     const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.max(1, Math.min(365, Math.round(expiresInDaysRaw))) : 30
 
@@ -92,6 +103,7 @@ exports.generateEditorCode = async (req, res) => {
 exports.listMyEditorCodes = async (req, res) => {
   try {
     const directorId = req.auth?.userId
+    await purgeExpiredEditorCodes(directorId)
     const items = await EditorRegistrationCode.find({ createdByDirectorId: directorId }).sort({ createdAt: -1 })
 
     res.json(

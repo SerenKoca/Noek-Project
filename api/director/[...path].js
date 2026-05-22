@@ -50,6 +50,16 @@ async function generateUniqueCode(EditorRegistrationCodeModel) {
   throw new Error('Could not generate unique code')
 }
 
+async function purgeExpiredEditorCodes(EditorRegistrationCodeModel, directorId) {
+  const cutoff = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+  await EditorRegistrationCodeModel.deleteMany({
+    createdByDirectorId: directorId,
+    usedAt: null,
+    usedByUserId: null,
+    expiresAt: { $lt: cutoff }
+  })
+}
+
 // Handler for /api/director/branding
 async function handleBranding(req, res, auth) {
   try {
@@ -215,6 +225,7 @@ async function handleEditorCodes(req, res, auth) {
 
     if (req.method === 'GET') {
       try {
+        await purgeExpiredEditorCodes(EditorRegistrationCode, auth.userId)
         const items = await EditorRegistrationCode.find({ createdByDirectorId: auth.userId }).sort({ createdAt: -1 })
         res.status(200).json(
           items.map((item) => ({
@@ -243,6 +254,7 @@ async function handleEditorCodes(req, res, auth) {
 
     if (req.method === 'POST') {
       try {
+        await purgeExpiredEditorCodes(EditorRegistrationCode, auth.userId)
         const expiresInDaysRaw = Number(parseBody(req).expiresInDays)
         const expiresInDays = Number.isFinite(expiresInDaysRaw) ? Math.max(1, Math.min(365, Math.round(expiresInDaysRaw))) : 30
 

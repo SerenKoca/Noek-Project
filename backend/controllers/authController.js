@@ -26,6 +26,13 @@ function normalizeRegisterRole(value) {
 }
 
 async function consumeEditorRegistrationCode(rawCode, userId) {
+  const cutoff = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000)
+  await EditorRegistrationCode.deleteMany({
+    usedAt: null,
+    usedByUserId: null,
+    expiresAt: { $lt: cutoff }
+  })
+
   const code = String(rawCode || '').trim().toUpperCase()
   if (!code) {
     return { ok: false, status: 400, error: 'Registratiecode is verplicht.' }
