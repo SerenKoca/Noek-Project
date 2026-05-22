@@ -83,6 +83,7 @@ export function applyBrandingTheme(input = {}) {
   root.style.setProperty('--editor-btn-hover', lightHover)
   root.style.setProperty('--editor-panel', light)
   root.style.setProperty('--editor-panel-soft', panelSoft)
+  root.style.setProperty('--editor-panel-strong', dark)
   root.style.setProperty('--editor-border', border)
   root.style.setProperty('--editor-border-strong', borderStrong)
   root.style.setProperty('--editor-bg-page', dark)

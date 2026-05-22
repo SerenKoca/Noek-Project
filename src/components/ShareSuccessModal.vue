@@ -120,7 +120,7 @@ function downloadQR() {
 }
 
 .share-modal-content {
-  background: #e9f2fb;
+  background: color-mix(in srgb, white 88%, var(--editor-panel) 12%);
   border-radius: 12px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
   max-width: 900px;
@@ -214,7 +214,7 @@ function downloadQR() {
 .share-copy-btn {
   width: 40px;
   height: 40px;
-  background: #0c4f82;
+  background: var(--editor-brand);
   color: white;
   border: none;
   border-radius: 6px;
@@ -227,7 +227,7 @@ function downloadQR() {
 }
 
 .share-copy-btn:hover {
-  background: #0a3d68;
+  background: var(--editor-primary-hover, var(--editor-brand));
 }
 
 .share-modal-buttons {
@@ -251,30 +251,30 @@ function downloadQR() {
 }
 
 .share-btn.facebook {
-  background: #0c4f82;
+  background: var(--editor-brand);
   color: white;
 }
 
 .share-btn.facebook:hover {
-  background: #0a3d68;
+  background: var(--editor-primary-hover, var(--editor-brand));
 }
 
 .share-btn.x {
-  background: #0c4f82;
+  background: var(--editor-brand);
   color: white;
 }
 
 .share-btn.x:hover {
-  background: #0a3d68;
+  background: var(--editor-primary-hover, var(--editor-brand));
 }
 
 .share-btn.mail {
-  background: #0c4f82;
+  background: var(--editor-brand);
   color: white;
 }
 
 .share-btn.mail:hover {
-  background: #0a3d68;
+  background: var(--editor-primary-hover, var(--editor-brand));
 }
 
 .share-modal-right {
@@ -315,7 +315,7 @@ function downloadQR() {
 
 .share-qr-branding {
   text-align: center;
-  color: #0c5a8a;
+  color: var(--editor-brand);
 }
 
 .share-qr-text {
@@ -330,7 +330,7 @@ function downloadQR() {
 
 .share-download-btn {
   padding: 12px 24px;
-  background: #0c4f82;
+  background: var(--editor-brand);
   color: white;
   border: none;
   border-radius: 6px;
@@ -341,7 +341,7 @@ function downloadQR() {
 }
 
 .share-download-btn:hover {
-  background: #0a3d68;
+  background: var(--editor-primary-hover, var(--editor-brand));
 }
 
 @media (max-width: 750px) {

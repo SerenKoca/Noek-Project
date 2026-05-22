@@ -183,7 +183,7 @@ body {
   left: 50%;
   transform: translateX(-50%);
   z-index: 24;
-  width: min(380px, calc(100vw - 28px));
+  width: min(480px, calc(100vw - 28px));
   border: 1px solid var(--editor-border);
   border-radius: 10px;
   background: rgba(246, 250, 255, 0.95);
@@ -193,10 +193,8 @@ body {
 }
 
 .editor-room-sound-controls {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
+  display: grid;
+  gap: 8px;
 }
 
 .editor-room-widget {
@@ -242,9 +240,12 @@ body {
 }
 
 .editor-room-range.horizontal {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(160px, 1fr) auto;
   align-items: center;
   gap: 8px;
+  width: 100%;
+  min-width: 0;
 }
 
 .editor-room-range-label {
@@ -252,13 +253,17 @@ body {
 }
 
 .editor-room-range input[type='range'] {
-  width: 160px;
+  width: 100%;
 }
 
 .compact-btn {
   justify-self: center;
   padding: 8px 10px;
   font-size: 0.8rem;
+}
+
+.editor-room-sound-controls .compact-btn {
+  width: 100%;
 }
 
 .editor-content {
@@ -298,15 +303,15 @@ body {
 .editor-assets-nav,
 .editor-sub-nav,
 .editor-models-panel {
-  background: linear-gradient(180deg, rgba(229,241,252,0.95), rgba(239,246,252,0.95));
+  background: linear-gradient(180deg, color-mix(in srgb, white 88%, var(--editor-panel) 12%), color-mix(in srgb, white 82%, var(--editor-panel-soft) 18%));
   border-radius: 8px;
   padding: 12px;
   box-sizing: border-box;
   box-shadow: 0 6px 18px rgba(12,40,80,0.06);
   align-self: start;
   height: auto;
-  min-height: 560px;
-  max-height: 560px;
+  min-height: 620px;
+  max-height: 620px;
   overflow: hidden;
   min-width: 0;
   color: var(--editor-text);
@@ -336,8 +341,8 @@ body {
 .editor-models-panel .editor-model-grid,
 .editor-models-panel .editor-sound-list,
 .editor-color-preset-list {
-  max-height: 320px;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
 }
 
 .editor-assets-title {
@@ -384,17 +389,18 @@ body {
 .editor-assets-btn span:last-child {
   flex: 1;
   display: inline-block;
-  background: #fff;
-  border: 1px solid rgba(11,64,110,0.08);
+  background: color-mix(in srgb, white 84%, var(--editor-panel) 16%);
+  border: 1px solid color-mix(in srgb, var(--editor-brand) 12%, white);
   border-radius: 8px;
   padding: 6px 10px;
   font-size: 14px;
-  color: rgba(7,38,72,0.95);
+  color: var(--editor-text);
 }
 
 .editor-assets-btn.active span:last-child {
   border-color: var(--editor-brand);
-  color: #06345a;
+  background: color-mix(in srgb, var(--editor-brand) 10%, white);
+  color: var(--editor-brand);
 }
 
 .chip-icon {
@@ -440,7 +446,7 @@ body {
   padding: 4px 6px;
 }
 
-.editor-back-btn svg { fill: rgba(7,38,72,0.9); transform: translateX(-2px); }
+.editor-back-btn svg { fill: currentColor; transform: translateX(-2px); }
 
 /* Models panel close button styling (top-right) */
 .editor-models-header .editor-mini-btn {
@@ -449,7 +455,7 @@ body {
   width: 28px;
   height: 28px;
   border-radius: 8px;
-  box-shadow: 0 6px 18px rgba(11,64,110,0.16);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--editor-brand) 18%, transparent);
   border: 0;
 }
 
@@ -466,7 +472,7 @@ body {
   width: 100%;
   border: 0;
   border-radius: 8px;
-  background: #fff;
+  background: color-mix(in srgb, white 86%, var(--editor-panel) 14%);
   color: var(--editor-text);
   text-align: left;
   font-size: 13px;
@@ -476,7 +482,7 @@ body {
 }
 
 .editor-sub-item.active {
-  outline: 2px solid rgba(11,64,110,0.12);
+  outline: 2px solid color-mix(in srgb, var(--editor-brand) 24%, white);
 }
 
 .editor-models-panel {
@@ -496,7 +502,7 @@ body {
   height: 22px;
   border: 0;
   border-radius: 6px;
-  background: rgba(234,246,255,0.9);
+  background: color-mix(in srgb, var(--editor-brand) 10%, white);
   color: var(--editor-brand);
   font-size: 12px;
   line-height: 1;
@@ -558,7 +564,7 @@ body {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 6px;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .editor-sound-list {
@@ -567,16 +573,18 @@ body {
   list-style: none;
   display: grid;
   gap: 6px;
-  overflow-y: auto;
+  overflow: visible;
 }
 
 .editor-sound-item {
   border: 1px solid var(--editor-border);
-  border-radius: 6px;
-  background: var(--editor-tile);
-  padding: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, white 86%, var(--editor-panel-soft) 14%);
+  padding: 10px;
   display: grid;
-  gap: 6px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
 }
 
 .editor-sound-meta {
@@ -586,11 +594,17 @@ body {
 
 .editor-sound-meta strong {
   font-size: 0.82rem;
+  line-height: 1.25;
 }
 
 .editor-sound-meta span {
   font-size: 0.72rem;
   color: var(--editor-text-soft);
+}
+
+.editor-sound-item .editor-action-btn {
+  min-height: 34px;
+  border-radius: 8px;
 }
 
 .editor-colors-panel {
@@ -653,10 +667,11 @@ body {
   border: 1px solid rgba(16, 36, 56, 0.25);
   border-radius: 999px;
   cursor: pointer;
+  box-shadow: 0 2px 6px rgba(9, 12, 18, 0.16);
 }
 
 .editor-color-dot.active {
-  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--editor-border-strong);
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px var(--editor-border-strong), 0 8px 16px rgba(9, 12, 18, 0.16);
 }
 
 .editor-color-preset-item {
@@ -667,7 +682,7 @@ body {
   width: 100%;
   border: 1px solid var(--editor-border);
   border-radius: 6px;
-  background: var(--editor-tile);
+  background: color-mix(in srgb, white 82%, var(--editor-panel-soft) 18%);
   color: var(--editor-text);
   padding: 6px;
   display: flex;
@@ -676,11 +691,13 @@ body {
   gap: 8px;
   font-size: 0.78rem;
   cursor: pointer;
+  box-shadow: 0 4px 10px rgba(9, 12, 18, 0.08);
 }
 
 .editor-color-preset-btn:hover {
-  background: #fff;
+  background: color-mix(in srgb, white 92%, var(--editor-panel) 8%);
   border-color: var(--editor-border-strong);
+  box-shadow: 0 6px 14px rgba(9, 12, 18, 0.12);
 }
 
 .editor-color-swatch-pair {
@@ -733,7 +750,7 @@ body {
 .editor-model-secondary {
   border: 1px solid var(--editor-border-strong);
   border-radius: 3px;
-  background: #eef4fb;
+  background: color-mix(in srgb, var(--editor-panel-soft) 78%, white);
   color: var(--editor-text);
   font-size: 10px;
   height: 17px;
