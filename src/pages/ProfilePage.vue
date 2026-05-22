@@ -20,6 +20,32 @@ const userLabel = computed(() => {
   if (email) return email.split('@')[0]
   return 'Gebruiker'
 })
+
+const visitedRooms = ref([])
+
+function loadVisitedRooms() {
+  try {
+    if (typeof window === 'undefined') return
+    const raw = window.localStorage.getItem('noek_visited_rooms') || '[]'
+    const parsed = JSON.parse(raw)
+    if (Array.isArray(parsed)) visitedRooms.value = parsed
+  } catch (e) { visitedRooms.value = [] }
+}
+
+// prefer local visitor name when account displayName is empty
+const visitorDisplayName = computed(() => {
+  const displayName = String(state.authState.value?.user?.displayName || '').trim()
+  if (displayName) return displayName
+  try {
+    if (typeof window !== 'undefined') {
+      const local = String(window.localStorage.getItem('noek_visitor_name') || '').trim()
+      if (local) return local
+    }
+  } catch (e) {}
+  const email = String(state.authState.value?.user?.email || '').trim()
+  if (email) return email.split('@')[0]
+  return 'Gebruiker'
+})
 const userInitial = computed(() => {
   const label = userLabel.value.trim()
   return label ? label.charAt(0).toUpperCase() : 'U'
@@ -59,6 +85,16 @@ async function goRoleDashboard() {
 }
 
 function goBack() {
+  try {
+    if (typeof window !== 'undefined') {
+      const last = sessionStorage.getItem('noek_last_room')
+      if (last) {
+        router.push(last)
+        return
+      }
+    }
+  } catch (e) {}
+
   router.push('/home')
 }
 
@@ -163,15 +199,23 @@ function getSpotifyEmbedUrl(rawUrl) {
         >
           Mijn bijdragen
         </button>
+        <button 
+          type="button"
+          class="profile-tab"
+          :class="{ active: activeTab === 'visited' }"
+          @click="(activeTab = 'visited', loadVisitedRooms())"
+        >
+          Bezochte kamers
+        </button>
       </div>
 
       <div class="profile-content">
         <!-- Profiel Tab -->
         <section v-if="activeTab === 'profile'" class="profile-section">
           <div class="profile-header">
-            <div class="profile-avatar">{{ userInitial }}</div>
-            <div class="profile-info">
-              <h2>{{ state.authState.value?.user?.displayName || 'Gebruiker' }}</h2>
+                    <div class="profile-avatar">{{ userInitial }}</div>
+                    <div class="profile-info">
+                      <h2>{{ visitorDisplayName }}</h2>
               <p class="profile-email">{{ state.authState.value?.user?.email }}</p>
               <p class="profile-role">Rol: <strong>{{ state.authState.value?.user?.role || 'Bezoeker' }}</strong></p>
             </div>
@@ -184,6 +228,25 @@ function getSpotifyEmbedUrl(rawUrl) {
             <button type="button" class="secondary-btn" @click="state.onLogout(); router.replace('/login')">
               Uitloggen
             </button>
+          </div>
+        </section>
+
+        <!-- Visited rooms Tab -->
+        <section v-if="activeTab === 'visited'" class="visited-section">
+          <div class="contributions-header">
+            <h2>Bezochte kamers</h2>
+            <p>Kamers die je recent bezocht hebt</p>
+          </div>
+          <div v-if="visitedRooms.length === 0" class="room-empty">
+            <h3>Geen bezochte kamers</h3>
+            <p>Zodra je een kamer bezoekt, verschijnt deze hier.</p>
+          </div>
+          <div v-else class="visited-list">
+            <ul>
+              <li v-for="r in visitedRooms" :key="r.path">
+                <button type="button" class="secondary-btn" @click="router.push(r.path)">{{ r.name || r.path }}</button>
+              </li>
+            </ul>
           </div>
         </section>
 

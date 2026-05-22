@@ -87,6 +87,8 @@ const authDisplayName = computed(() => {
 })
 
 const visitorName = ref('')
+const editingVisitorName = ref(false)
+const nameInput = ref(null)
 const tributeText = ref('')
 const type = ref('candle')
 const externalUrl = ref('')
@@ -226,6 +228,21 @@ function applyVisitorName() {
   const trimmed = String(visitorName.value || '').trim()
   visitorName.value = trimmed || authDisplayName.value || 'Naam'
   persistVisitorName(visitorName.value)
+}
+
+async function startEditVisitorName() {
+  if (isLoggedIn.value) {
+    await openProfile()
+    return
+  }
+  editingVisitorName.value = true
+  await nextTick()
+  try { if (nameInput.value) nameInput.value.focus() } catch (e) {}
+}
+
+function finishEditVisitorName() {
+  applyVisitorName()
+  editingVisitorName.value = false
 }
 
 function ensureVisitorBootState() {
@@ -649,7 +666,7 @@ async function enterRoom() {
 }
 
 async function openLogin() {
-  await router.push('/login')
+  await router.push({ path: '/login', query: { next: route.path } })
 }
 
 async function openProfile() {
@@ -975,6 +992,30 @@ onMounted(async () => {
         router.replace({ path: route.path, query: q }).catch(() => {})
       }
     } catch (e) {}
+
+    // remember last visited room path so profile can link back
+    try {
+      if (typeof window !== 'undefined' && route.path && route.path.startsWith('/visit/')) {
+        sessionStorage.setItem('noek_last_room', route.path)
+      }
+    } catch (e) {}
+    // also append to a local visited rooms list (keep recent history)
+    try {
+      if (typeof window !== 'undefined' && roomId.value) {
+        const key = 'noek_visited_rooms'
+        const raw = window.localStorage.getItem(key) || '[]'
+        let list = []
+        try { list = JSON.parse(raw) } catch (e) { list = [] }
+        const path = route.path
+        const roomNameLocal = String(room?.name || roomTitle.value || '').trim()
+        // remove existing with same path
+        list = (list || []).filter((r) => r.path !== path)
+        list.unshift({ path, roomId: roomId.value, name: roomNameLocal, ts: Date.now() })
+        // keep up to 20
+        list = list.slice(0, 20)
+        try { window.localStorage.setItem(key, JSON.stringify(list)) } catch (e) {}
+      }
+    } catch (e) {}
 })
 
 watch(() => route.query.open, (openFlag) => {
@@ -1105,10 +1146,25 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="visitor-topbar-right">
-          <button type="button" class="visitor-name-btn" @click="applyVisitorName">
-            <span>{{ visitorName || 'Naam' }}</span>
-            <span class="visitor-edit">✎</span>
-          </button>
+          <div>
+            <template v-if="isLoggedIn">
+              <button type="button" class="visitor-name-btn" @click="openProfile">
+                <span>{{ authDisplayName || visitorName || 'Naam' }}</span>
+                <span class="visitor-edit">✎</span>
+              </button>
+            </template>
+            <template v-else>
+              <template v-if="editingVisitorName">
+                <input ref="nameInput" class="visitor-name-input" v-model="visitorName" @blur="finishEditVisitorName" @keydown.enter.prevent="finishEditVisitorName" />
+              </template>
+              <template v-else>
+                <button type="button" class="visitor-name-btn" @click="startEditVisitorName">
+                  <span>{{ visitorName || 'Naam' }}</span>
+                  <span class="visitor-edit">✎</span>
+                </button>
+              </template>
+            </template>
+          </div>
           <button type="button" class="visitor-reactions-btn" :aria-expanded="roomReactionsOpen" @click="toggleRoomReactions">
             Reacties
           </button>
@@ -1407,10 +1463,25 @@ onBeforeUnmount(() => {
       <header class="visitor-topbar">
         <h1>{{ roomTitle }}</h1>
         <div class="visitor-topbar-right">
-          <button type="button" class="visitor-name-btn" @click="applyVisitorName">
-            <span>{{ visitorName || 'Naam' }}</span>
-            <span class="visitor-edit">✎</span>
-          </button>
+          <div>
+            <template v-if="isLoggedIn">
+              <button type="button" class="visitor-name-btn" @click="openProfile">
+                <span>{{ authDisplayName || visitorName || 'Naam' }}</span>
+                <span class="visitor-edit">✎</span>
+              </button>
+            </template>
+            <template v-else>
+              <template v-if="editingVisitorName">
+                <input ref="nameInput" class="visitor-name-input" v-model="visitorName" @blur="finishEditVisitorName" @keydown.enter.prevent="finishEditVisitorName" />
+              </template>
+              <template v-else>
+                <button type="button" class="visitor-name-btn" @click="startEditVisitorName">
+                  <span>{{ visitorName || 'Naam' }}</span>
+                  <span class="visitor-edit">✎</span>
+                </button>
+              </template>
+            </template>
+          </div>
           <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">
             {{ isLoggedIn ? 'Profiel' : 'Inloggen' }}
           </button>
@@ -2077,6 +2148,15 @@ background: linear-gradient(
   color: var(--visitor-color-dark);
   height: 44px;
   cursor: pointer;
+}
+
+.visitor-name-input {
+  padding: 8px 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(7,59,87,0.08);
+  min-width: 140px;
+  font: inherit;
+  color: var(--visitor-color-dark);
 }
 
 .visitor-name-btn {

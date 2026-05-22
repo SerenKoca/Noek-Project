@@ -1,10 +1,11 @@
 <script setup>
 import { computed, onMounted } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRouter, useRoute } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
 import './styles/auth-page.css'
 
 const router = useRouter()
+const route = useRoute()
 const state = useNoekState()
 
 const isEditorRole = computed(() => state.authRegisterRole.value === 'editor')
@@ -22,6 +23,8 @@ const authSubtitle = computed(() => {
 })
 
 function getRouteByRole(role) {
+  // If a `next` query param exists (e.g. coming from a room), use it for visitors
+  if (role === 'visitor' && route.query?.next) return String(route.query.next)
   if (role === 'admin') return '/admin'
   if (role === 'funeral_director') return '/director'
   if (role === 'editor') return '/home'
