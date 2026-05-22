@@ -1210,9 +1210,9 @@ onBeforeUnmount(() => {
                   <div class="visitor-gallery-lightbox-reactions-wrap">
                     <div class="visitor-gallery-lightbox-reactions">
                               <div class="visitor-gallery-reaction-toggle">
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤</button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝</button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯</button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span class="reaction-count">{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span class="reaction-count">{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span class="reaction-count">{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
                                 </div>
 
                       <button
@@ -1719,9 +1719,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="item-reactions-row">
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">❤</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">🤝</button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">🕯</button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">❤ <span class="reaction-count">{{ item.reactions?.heartCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">🤝 <span class="reaction-count">{{ item.reactions?.supportCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">🕯 <span class="reaction-count">{{ item.reactions?.candleCount || 0 }}</span></button>
                 </div>
 
                 <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
