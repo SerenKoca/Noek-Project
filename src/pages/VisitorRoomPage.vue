@@ -1233,7 +1233,7 @@ onBeforeUnmount(() => {
                     v-else-if="gallerySelectedItem.type === 'video_file' || isVideoUrl(gallerySelectedItem.mediaUrl)"
                     :src="gallerySelectedItem.mediaUrl"
                     controls
-                    class="visitor-gallery-lightbox-video"
+                    class="visitor-gallery-lightbox-video visitor-gallery-lightbox-video--force"
                   />
                   <iframe
                     v-else-if="getYouTubeEmbedUrl(gallerySelectedItem.externalUrl)"
@@ -1513,7 +1513,7 @@ onBeforeUnmount(() => {
                       </template>
                       <template v-else>
                         <div class="upload-preview">
-                          <video v-if="mediaFile && mediaFile.type && mediaFile.type.startsWith('video')" :src="mediaPreviewUrl" controls style="max-width:100%;height:auto;border-radius:8px"></video>
+                          <video v-if="mediaFile && mediaFile.type && mediaFile.type.startsWith('video')" :src="mediaPreviewUrl" controls class="videos-step-preview-video"></video>
                           <img v-else :src="mediaPreviewUrl" alt="Preview" />
                         </div>
                       </template>
@@ -2690,8 +2690,10 @@ text-shadow:
 }
 
 .visitor-gallery-grid.is-media {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  grid-auto-rows: minmax(180px, auto);
+  /* use smaller square tiles by allowing more columns with a minimum width */
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  grid-auto-rows: 1fr;
+  gap: 10px;
 }
 
 .visitor-gallery-card {
@@ -2738,6 +2740,32 @@ text-shadow:
   background: linear-gradient(180deg, rgba(221, 232, 242, 0.9), rgba(201, 218, 235, 0.95));
   border: 1px solid rgba(18, 58, 98, 0.12);
   box-shadow: 0 8px 20px rgba(11, 63, 116, 0.08);
+}
+
+/* Make media tiles square in media galleries */
+.visitor-gallery-grid.is-media .visitor-gallery-media {
+  aspect-ratio: 1 / 1;
+  height: auto;
+  max-width: 220px;
+  margin: 0 auto;
+}
+
+.visitor-gallery-grid.is-media .visitor-gallery-image,
+.visitor-gallery-grid.is-media .visitor-gallery-video,
+.visitor-gallery-grid.is-media .visitor-gallery-embed,
+.visitor-gallery-grid.is-media .visitor-gallery-audio {
+  width: 100%;
+  height: 100%;
+}
+
+.visitor-gallery-grid.is-media .visitor-gallery-embed {
+  display: block;
+}
+
+.visitor-gallery-grid.is-media .visitor-gallery-embed iframe {
+  width: 100%;
+  height: 100%;
+  border: 0;
 }
 
 .visitor-gallery-image,
@@ -2830,7 +2858,7 @@ text-shadow:
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 26px;
   padding: 24px 26px 28px 22px;
-  align-items: start;
+  align-items: center;
   overflow: hidden;
 }
 
@@ -3157,11 +3185,14 @@ text-shadow:
   background: transparent;
   border: 0;
   display: flex;
-  align-items: center;
+  align-items: stretch;
   justify-content: center;
   padding: 12px 18px 12px 12px;
-  min-height: 360px;
-  max-height: calc(100vh - 180px);
+  height: min(78vh, 720px);
+  min-height: min(78vh, 720px);
+  max-height: calc(100vh - 220px);
+  width: min(100%, 760px);
+  margin: 0 auto;
   overflow: hidden;
 }
 
@@ -3169,13 +3200,32 @@ text-shadow:
 .visitor-gallery-lightbox-video,
 .visitor-gallery-lightbox-embed,
 .visitor-gallery-lightbox-audio {
-  width: auto;
-  height: auto;
-  /* make images slightly smaller so the close button remains visible */
-  max-width: calc(100% - 120px);
-  max-height: calc(100vh - 320px);
+  width: 100%;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
   border-radius: 12px;
   object-fit: contain;
+}
+
+.visitor-gallery-lightbox-video {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  align-self: center;
+  justify-self: center;
+  background: #000;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.18);
+  transform: translateX(-14px);
+}
+
+.visitor-gallery-lightbox-video--force {
+  width: auto;
+  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  transform: translateX(-14px);
 }
 
 /* ensure img/video elements never overflow and keep aspect ratio */
@@ -3184,10 +3234,27 @@ text-shadow:
 .visitor-gallery-lightbox-embed iframe {
   display: block;
   width: auto;
-  height: auto;
+  height: 100%;
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
+}
+
+.visitor-gallery-lightbox-video video,
+.visitor-gallery-lightbox-embed iframe,
+.visitor-gallery-lightbox-audio audio {
+  min-height: 100%;
+}
+
+.videos-step-preview-video {
+  display: block;
+  width: auto;
+  height: min(360px, 48vh);
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: 8px;
+  object-fit: contain;
+  background: #000;
 }
 
 .visitor-gallery-lightbox-embed {
@@ -3548,7 +3615,14 @@ text-shadow:
   }
 
   .visitor-gallery-lightbox-media {
-    min-height: 240px;
+    height: min(74vh, 600px);
+    min-height: min(74vh, 600px);
+    width: min(100%, 100%);
+  }
+
+  .visitor-gallery-lightbox-video,
+  .visitor-gallery-lightbox-video--force {
+    transform: translateX(-10px);
   }
 
   .visitor-topbar-right {
