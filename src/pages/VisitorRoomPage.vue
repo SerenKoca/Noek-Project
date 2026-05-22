@@ -165,6 +165,7 @@ const gallerySelectedItem = computed(() => {
 })
 
 const galleryReactionsOpen = ref(false)
+  const roomReactionsOpen = ref(false)
 
 const roomPhotoItems = computed(() => {
   const items = Array.isArray(contributions.value) ? contributions.value : []
@@ -250,6 +251,7 @@ function normalizeGalleryCategory(rawCategory) {
 
 function goToGallery(category) {
   if (!roomId.value) return
+  try { sessionStorage.removeItem('noek_open_panel') } catch (e) {}
   router.push(`/visit/${roomId.value}/${category}`)
 }
 
@@ -281,6 +283,10 @@ function closeGalleryItem() {
 
 function toggleGalleryReactions() {
   galleryReactionsOpen.value = !galleryReactionsOpen.value
+}
+
+function toggleRoomReactions() {
+  roomReactionsOpen.value = !roomReactionsOpen.value
 }
 
 function goToNextGalleryItem() {
@@ -996,9 +1002,10 @@ watch(roomId, () => {
         if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
-    if (!keep) activePanel.value = 'none'
+    // Only auto-close if the currently open panel is one of the multi-step panels.
+    if (!keep && ['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
   } catch (e) {
-    activePanel.value = 'none'
+    if (['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
   }
 })
 
@@ -1013,9 +1020,10 @@ watch(selectedCategory, () => {
         if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
-    if (!keep) activePanel.value = 'none'
+    // Only auto-close step panels; leave other panels (messages, candles, etc.) alone.
+    if (!keep && ['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
   } catch (e) {
-    activePanel.value = 'none'
+    if (['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
   }
   galleryMode.value = 'gallery'
   galleryPage.value = 0
@@ -1087,6 +1095,9 @@ onBeforeUnmount(() => {
           <button type="button" class="visitor-name-btn" @click="applyVisitorName">
             <span>{{ visitorName || 'Naam' }}</span>
             <span class="visitor-edit">✎</span>
+          </button>
+          <button type="button" class="visitor-reactions-btn" :aria-expanded="roomReactionsOpen" @click="toggleRoomReactions">
+            Reacties
           </button>
           <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">
             {{ isLoggedIn ? 'Profiel' : 'Inloggen' }}
@@ -1294,6 +1305,42 @@ onBeforeUnmount(() => {
         </button>
       </main>
 
+      <!-- Room reactions sidebar -->
+      <aside v-if="roomReactionsOpen" class="visitor-room-reaction-panel" @click.self="toggleRoomReactions">
+        <button type="button" class="visitor-gallery-reaction-close" @click="toggleRoomReactions">×</button>
+        <div class="visitor-gallery-comments-list">
+          <template v-if="filteredContributions.length">
+            <ul class="item-comments-items visitor-gallery-comments">
+              <li v-for="item in filteredContributions" :key="item._id" class="item-comment-entry visitor-gallery-comment-entry">
+                <div class="visitor-gallery-comment-author-row">
+                  <span class="visitor-gallery-comment-avatar" aria-hidden="true"></span>
+                  <span class="item-comment-author">{{ item.giverName || 'Bezoeker' }}</span>
+                </div>
+                <div class="visitor-gallery-comment-bubble small">Bijdrage: {{ item.tributeText || '-' }}</div>
+
+                <div class="visitor-gallery-comment-sublist" v-if="item.comments?.length">
+                  <ul>
+                    <li v-for="c in item.comments" :key="c._id || c.createdAt" class="item-comment-entry visitor-gallery-comment-entry">
+                      <div class="visitor-gallery-comment-author-row">
+                        <span class="visitor-gallery-comment-avatar" aria-hidden="true"></span>
+                        <span class="item-comment-author">{{ c.displayName || 'Bezoeker' }}</span>
+                      </div>
+                      <div class="visitor-gallery-comment-bubble">{{ c.text }}</div>
+                    </li>
+                  </ul>
+                </div>
+
+                <form class="visitor-gallery-comment-form" @submit.prevent="submitContributionComment(item._id)">
+                  <input v-model="commentDrafts[item._id]" type="text" maxlength="500" placeholder="Type hier je bericht" />
+                  <button type="submit" :disabled="commentStateByItem[item._id]?.loading">{{ commentStateByItem[item._id]?.loading ? 'Bezig...' : 'Plaats' }}</button>
+                </form>
+              </li>
+            </ul>
+          </template>
+          <p v-else class="visitor-status">Nog geen reacties.</p>
+        </div>
+      </aside>
+
       <footer v-if="!isVrMode" class="visitor-gallery-footer">
         <button type="button" class="visitor-gallery-add" @click="openGalleryComposer(selectedCategory)">
           {{ galleryActionLabel }}
@@ -1406,7 +1453,7 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' }]">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'messages', 'visitor-panel--side-right': activePanel === 'messages' }]">
         <div class="visitor-panel-head">
             <div class="panel-head-left">
             <button v-if="activePanel === 'photos-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
@@ -1557,8 +1604,12 @@ onBeforeUnmount(() => {
               <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">Kaars {{ room?.roomReactions?.candleCount || 0 }}</button>
             </div>
             <form class="item-comment-form" @submit.prevent="postRoomComment">
-              <input v-model="roomCommentText" type="text" maxlength="500" placeholder="Laat een reactie achter voor deze kamer">
-              <button type="submit" class="visitor-pill-btn">Plaats reactie</button>
+              <input v-model="roomCommentText" type="text" maxlength="500" placeholder="Type hier je bericht">
+              <button type="submit" class="visitor-pill-btn" aria-label="Verstuur bericht">
+                <svg viewBox="0 0 24 24" width="18" height="18" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                  <path d="M2 21l21-9L2 3v7l15 2-15 2v7z" fill="currentColor" />
+                </svg>
+              </button>
             </form>
             <ul class="item-comments-items" v-if="room?.roomComments?.length">
               <li v-for="comment in room.roomComments" :key="comment._id || comment.createdAt" class="item-comment-entry">
@@ -2251,6 +2302,94 @@ text-shadow:
   flex-direction: column;
   z-index: 10020;
   pointer-events: auto;
+}
+
+.visitor-panel--side-right {
+  left: auto;
+  right: 14px;
+}
+
+.visitor-panel--side-right {
+  width: 320px;
+  top: calc(50% - 240px);
+  bottom: auto;
+  height: 480px;
+  max-height: 90vh;
+  border-radius: 18px;
+  box-shadow: 0 18px 40px rgba(7,59,87,0.14);
+}
+
+.visitor-panel--side-right .visitor-panel-body {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow: auto;
+}
+
+.visitor-panel--side-right .item-comment-entry {
+  display: block;
+  padding: 12px;
+  background: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 6px 20px rgba(11,63,116,0.06);
+  margin-bottom: 12px;
+}
+
+.visitor-panel--side-right .item-comment-author {
+  display: block;
+  font-weight: 700;
+  color: #073b57;
+  margin-bottom: 8px;
+}
+
+.visitor-panel--side-right .item-comments-items { padding: 4px 0 60px 0 }
+
+.visitor-panel--side-right .item-comment-form {
+  position: sticky;
+  bottom: 12px;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  background: transparent;
+  padding-top: 6px;
+}
+
+.visitor-panel--side-right .item-comment-form input[type="text"] {
+  flex: 1;
+  padding: 12px 16px;
+  border-radius: 28px;
+  border: 1px solid rgba(7,59,87,0.08);
+  background: #fff;
+  box-shadow: inset 0 1px 0 rgba(11,63,116,0.02);
+  color: #567a8f;
+}
+
+.visitor-panel--side-right .item-comment-form .visitor-pill-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 999px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.visitor-panel--side-right .item-comment-form .visitor-pill-btn {
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
+  border: none;
+  box-shadow: 0 6px 18px rgba(7,59,87,0.12);
+}
+
+.visitor-panel--side-right .item-comment-form .visitor-pill-btn svg { width:18px; height:18px; fill:currentColor }
+
+/* Hide contribution reaction controls inside the messages right-side panel */
+.visitor-panel--side-right .visitor-gallery-reaction-toggle,
+.visitor-panel--side-right .visitor-gallery-reaction-btn,
+.visitor-panel--side-right .reaction-chip,
+.visitor-panel--side-right .visitor-gallery-reaction-panel {
+  display: none !important;
 }
 
 .visitor-panel--side .visitor-panel-head {
@@ -3005,6 +3144,27 @@ text-shadow:
   cursor: pointer;
   box-shadow: 0 6px 18px rgba(11,63,116,0.12);
 }
+
+/* Room reactions sidebar (fixed to right) */
+.visitor-room-reaction-panel {
+  position: fixed;
+  right: 24px;
+  top: 80px;
+  width: min(420px, 38%);
+  max-width: 520px;
+  background: #dfeeff;
+  border-radius: 18px;
+  box-shadow: 0 20px 48px rgba(11,63,116,0.18);
+  padding: 48px 16px 16px;
+  z-index: 40;
+  max-height: calc(100vh - 160px);
+  overflow: auto;
+}
+
+.visitor-room-reaction-panel .visitor-gallery-comment-bubble.small {
+  background: transparent;
+  padding: 6px 0 12px 0;
+}
 .visitor-gallery-comments {
   overflow-y: auto;
   display: flex;
@@ -3154,8 +3314,8 @@ text-shadow:
 .visitor-gallery-comment-form button {
   border: 0;
   border-radius: 14px;
-  background: #06304a;
-  color: #fff;
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
   padding: 6px 12px;
   cursor: pointer;
 }
@@ -3167,8 +3327,8 @@ text-shadow:
 /* Darken comment submit buttons in other contexts (room/item forms) */
 .item-comment-form button,
 .item-comment-form .visitor-pill-btn {
-  background: #06304a;
-  color: #fff;
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
   border: 0;
   padding: 8px 12px;
   border-radius: 10px;
@@ -3176,7 +3336,7 @@ text-shadow:
 }
 .item-comment-form button:hover,
 .item-comment-form .visitor-pill-btn:hover {
-  background: #05263f;
+  background: color-mix(in srgb, var(--visitor-color-dark) 85%, black);
 }
 
 .visitor-gallery-lightbox-media {
