@@ -25,9 +25,12 @@ const error = ref('')
 const models = ref([])
 const activeCategory = ref('Meubels')
 const activeSubCategory = ref('Alle')
+const panelStage = ref('categories')
 
 const isSoundCategory = computed(() => activeCategory.value === 'Geluid')
 const isColorCategory = computed(() => activeCategory.value === 'Kleuren')
+const showSubNav = computed(() => panelStage.value !== 'categories')
+const showContentPanel = computed(() => panelStage.value === 'content')
 const DEFAULT_FURNITURE_SUBCATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Dieren', 'Foto', 'Video', 'Muziek', 'Persoonlijk']
 
 const VEHICLE_KEYWORDS = ['car', 'truck', 'vehicle', 'police', 'mitsubishi', 'bus', 'tractor', 'bike', 'motor']
@@ -348,6 +351,29 @@ function deleteSelected() {
   emit('delete-selected')
 }
 
+function selectCategory(category) {
+  activeCategory.value = category
+  panelStage.value = 'subcategories'
+}
+
+function selectSubCategory(subCategory) {
+  activeSubCategory.value = subCategory
+  panelStage.value = 'content'
+}
+
+function closeContentPanel() {
+  panelStage.value = 'subcategories'
+}
+
+function goBack() {
+  if (panelStage.value === 'content') {
+    panelStage.value = 'subcategories'
+    return
+  }
+
+  panelStage.value = 'categories'
+}
+
 onMounted(() => {
   loadFromApi()
 })
@@ -381,32 +407,35 @@ watch(allowedSubCategories, (list) => {
     <div class="editor-sidebar-grid" :class="{ 'is-colors': isColorCategory }">
       <SidebarAssetsNav
         :active-category="activeCategory"
-        @update:active-category="activeCategory = $event"
+        @update:active-category="selectCategory"
       />
 
       <SidebarSubNav
-        v-if="true"
+        v-if="showSubNav"
         :active-category="activeCategory"
         :active-sub-category="activeSubCategory"
         :allowed-sub-categories="allowedSubCategories"
-        @update:active-sub-category="activeSubCategory = $event"
+        @update:active-sub-category="selectSubCategory"
+        @back="goBack"
       />
 
       <SidebarSoundsPanel
-        v-if="isSoundCategory"
+        v-if="showContentPanel && isSoundCategory"
         :active-sub-category="activeSubCategory"
         @select-sound="emit('select-sound', $event)"
+        @close="closeContentPanel"
       />
 
       <SidebarColorsPanel
-        v-else-if="isColorCategory"
+        v-else-if="showContentPanel && isColorCategory"
         :active-sub-category="activeSubCategory"
         :room-appearance="props.roomAppearance"
         @apply-colors="emit('apply-room-colors', $event)"
+        @close="closeContentPanel"
       />
 
       <SidebarModelsPanel
-        v-else
+        v-else-if="showContentPanel"
         :loading="loading"
         :error="error"
         :selected="props.selected"
@@ -415,6 +444,7 @@ watch(allowedSubCategories, (list) => {
         @delete-selected="deleteSelected"
         @request-load="requestLoad"
         @request-load-with-mode="requestLoadWithMode"
+        @close="closeContentPanel"
       />
     </div>
   </aside>

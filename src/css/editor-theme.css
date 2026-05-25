@@ -523,6 +523,11 @@ body {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-bottom: 4px;
+  background: linear-gradient(180deg, color-mix(in srgb, white 88%, var(--editor-panel) 12%), color-mix(in srgb, white 82%, var(--editor-panel-soft) 18%));
 }
 
 .editor-mini-btn {
@@ -537,6 +542,15 @@ body {
   cursor: pointer;
   display: inline-grid;
   place-items: center;
+}
+
+.editor-close-btn {
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
 }
 
 .editor-quick-actions {

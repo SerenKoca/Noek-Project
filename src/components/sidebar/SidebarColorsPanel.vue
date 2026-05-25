@@ -16,7 +16,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['apply-colors'])
+const emit = defineEmits(['apply-colors', 'close'])
 
 const floorTextureId = ref(DEFAULT_FLOOR_TEXTURE_ID)
 const wallTextureId = ref(DEFAULT_WALL_TEXTURE_ID)
@@ -73,6 +73,10 @@ function applyPresetTexture(textureId) {
 
 <template>
   <section class="editor-models-panel editor-colors-panel">
+    <div class="editor-models-header">
+      <button type="button" class="editor-mini-btn editor-close-btn" @click.stop="$emit('close')" aria-label="Sluiten">x</button>
+    </div>
+
     <div class="editor-color-targets editor-texture-targets">
       <button
         type="button"

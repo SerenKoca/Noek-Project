@@ -9,7 +9,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['select-sound'])
+const emit = defineEmits(['select-sound', 'close'])
 
 const loading = ref(false)
 const error = ref('')
@@ -39,11 +39,21 @@ onMounted(() => {
 <template>
   <section class="editor-models-panel">
     <div class="editor-models-header">
-      <button class="editor-mini-btn" :disabled="loading" @click="loadSoundLibrary">r</button>
+      <button type="button" class="editor-mini-btn" :disabled="loading" @click="loadSoundLibrary">r</button>
+      <button
+        type="button"
+        class="editor-mini-btn editor-close-btn"
+        @pointerdown.stop.prevent="$emit('close')"
+        @click.stop.prevent="$emit('close')"
+        aria-label="Sluiten"
+        title="Sluiten"
+      >
+        ×
+      </button>
     </div>
 
     <div class="editor-quick-actions">
-      <button class="editor-action-btn" @click="loadSoundLibrary">Herladen</button>
+      <button type="button" class="editor-action-btn" @click="loadSoundLibrary">Herladen</button>
     </div>
 
     <div v-if="error" class="editor-inline-error">
@@ -58,7 +68,7 @@ onMounted(() => {
           <strong>{{ sound.title }}</strong>
           <span>{{ sound.category }}</span>
         </div>
-        <button class="editor-action-btn" @click="emit('select-sound', sound)">Gebruik</button>
+        <button type="button" class="editor-action-btn" @click="emit('select-sound', sound)">Gebruik</button>
       </li>
       <li v-if="!filteredSounds.length" class="editor-loading">Geen geluiden in deze categorie.</li>
     </ul>

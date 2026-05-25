@@ -18,19 +18,28 @@ defineProps({
   }
 })
 
-defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mode'])
+defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mode', 'close'])
 </script>
 
 <template>
   <section class="editor-models-panel">
     <div class="editor-models-header">
-      <button class="editor-mini-btn" :disabled="loading" @click="$emit('reload')">r</button>
-      <button class="editor-mini-btn" :disabled="!selected || selected?.isSlotMarker" @click="$emit('delete-selected')">x</button>
+      <button type="button" class="editor-mini-btn" :disabled="loading" @click="$emit('reload')">r</button>
+      <button
+        type="button"
+        class="editor-mini-btn editor-close-btn"
+        @pointerdown.stop.prevent="$emit('close')"
+        @click.stop.prevent="$emit('close')"
+        aria-label="Sluiten"
+        title="Sluiten"
+      >
+        ×
+      </button>
     </div>
 
     <div class="editor-quick-actions">
-      <button class="editor-action-btn" :disabled="!selected || selected?.isSlotMarker" @click="$emit('delete-selected')">Verwijder</button>
-      <button class="editor-action-btn" @click="$emit('reload')">Herladen</button>
+      <button type="button" class="editor-action-btn" :disabled="!selected || selected?.isSlotMarker" @click="$emit('delete-selected')">Verwijder</button>
+      <button type="button" class="editor-action-btn" @click="$emit('reload')">Herladen</button>
     </div>
 
     <div v-if="error" class="editor-inline-error">
@@ -42,7 +51,7 @@ defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mod
     <div v-else class="editor-model-scroll">
       <ul class="editor-model-grid">
         <li v-for="m in models" :key="m.id || m.ID" class="editor-model-card">
-          <button class="editor-model-tile" @click="$emit('request-load', m)">
+          <button type="button" class="editor-model-tile" @click="$emit('request-load', m)">
             <img
               v-if="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
               :src="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
@@ -54,12 +63,14 @@ defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mod
           </button>
           <div class="editor-model-actions">
             <button
+              type="button"
               class="editor-model-primary"
               @click="$emit('request-load', m)"
             >
               {{ selected?.isSlotMarker ? 'Plaats' : (selected ? 'Vervang' : 'Plaats') }}
             </button>
             <button
+              type="button"
               v-if="selected"
               class="editor-model-secondary"
               @click="$emit('request-load-with-mode', m, 'add')"

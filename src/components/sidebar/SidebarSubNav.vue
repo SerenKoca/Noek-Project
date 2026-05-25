@@ -1,7 +1,7 @@
 <script setup>
 import { computed } from 'vue'
 
-defineEmits(['update:activeSubCategory', 'update:activeCategory'])
+defineEmits(['update:activeSubCategory', 'back'])
 
 const props = defineProps({
   activeCategory: {
@@ -37,10 +37,12 @@ const subCategories = computed(() => {
 
 <template>
   <section class="editor-sub-nav">
-    <button type="button" class="editor-back-btn" @click="$emit('update:activeCategory', 'Meubels')" aria-label="Terug">
+    <div class="editor-sub-nav-top">
+      <button type="button" class="editor-back-btn" @click="$emit('back')" aria-label="Terug">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
       <span>back</span>
-    </button>
+      </button>
+    </div>
     <div class="editor-sub-title">{{ activeCategory }}</div>
     <div class="editor-sub-list">
       <button
