@@ -193,6 +193,31 @@ const candleContributions = computed(() => {
   return items.filter((item) => item.type === 'candle')
 })
 
+function upsertContributionList(list, contribution) {
+  const items = Array.isArray(list) ? [...list] : []
+  const nextItem = contribution && typeof contribution === 'object' ? contribution : null
+  const contributionId = String(nextItem?._id || '').trim()
+
+  if (!nextItem) return items
+
+  if (!contributionId) {
+    items.unshift(nextItem)
+    return items
+  }
+
+  const index = items.findIndex((item) => String(item?._id || '').trim() === contributionId)
+  if (index >= 0) {
+    items[index] = {
+      ...items[index],
+      ...nextItem
+    }
+    return items
+  }
+
+  items.unshift(nextItem)
+  return items
+}
+
 const vrGalleryItems = computed(() => {
   const items = filteredContributions.value.filter((item) => item.type === 'photo' && item.mediaUrl)
   return items.slice(0, 12)
@@ -722,8 +747,10 @@ async function loadAll() {
     room.value = roomData
     applyRoomBranding(roomData)
     contributions.value = Array.isArray(items) ? items : []
+    return contributions.value
   } catch (err) {
     error.value = err?.response?.data?.error || 'Kon kamer niet laden.'
+    return contributions.value
   } finally {
     loading.value = false
   }
@@ -978,7 +1005,7 @@ async function addContribution() {
       nextMediaUrl = uploadResult.secure_url || ''
     }
 
-    await createPublicRoomContribution(roomId.value, {
+    const createdContribution = await createPublicRoomContribution(roomId.value, {
       type: type.value,
       giverName: visitorName.value,
       tributeText: tributeText.value,
@@ -993,7 +1020,10 @@ async function addContribution() {
     mediaFile.value = null
     submitState.value = { loading: false, error: '', success: 'Bijdrage toegevoegd.' }
 
-    await loadAll()
+    const freshList = await loadAll()
+    if (createdContribution && createdContribution._id) {
+      contributions.value = upsertContributionList(freshList, createdContribution)
+    }
   } catch (err) {
     submitState.value = {
       loading: false,

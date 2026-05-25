@@ -121,8 +121,8 @@ const ZOOM_RECENTER_STRENGTH = 0.5
 const FAR_RESET_BLEND_START = 0.08
 const ROOM_SIZE = 34
 const WALL_HEIGHT = 19
-const CONTRIBUTION_CANDLE_RADIUS = ROOM_SIZE * 0.72
-const CONTRIBUTION_CANDLE_RING_Y = 0
+const CONTRIBUTION_CANDLE_RADIUS = ROOM_SIZE * 0.55
+const CONTRIBUTION_CANDLE_RING_Y = WALL_HEIGHT + 0.35
 const CONTRIBUTION_CANDLE_HEIGHT = 1.15
 const CONTRIBUTION_CANDLE_SCALE = 2.48
 const CONTRIBUTION_CANDLE_MIN_FLAME_INTENSITY = 0.2
@@ -1292,17 +1292,16 @@ function clearContributionCandles() {
 
 function getContributionCandlePosition(index, total) {
   const safeTotal = Math.max(1, Number(total) || 1)
-  const arcStart = Math.PI * 0.95
-  const arcEnd = Math.PI * 0.05
-  const ratio = safeTotal === 1 ? 0.5 : index / (safeTotal - 1)
-  const angle = arcStart + ((arcEnd - arcStart) * ratio)
-  const jitter = ((index % 3) - 1) * 0.22
-  const radius = CONTRIBUTION_CANDLE_RADIUS + ((index % 4) * 0.12)
+  const side = index % 2 === 0 ? -1 : 1
+  const row = Math.floor(index / 2)
+  const xOffset = ROOM_SIZE / 2 + 0.9 + (row * 0.25)
+  const zOffset = ROOM_SIZE / 2 + 0.5 + (row * 1.15)
+  const zNudge = side < 0 ? -0.1 : 0.1
 
   return new THREE.Vector3(
-    (Math.cos(angle) * radius) + jitter,
-    CONTRIBUTION_CANDLE_RING_Y,
-    Math.sin(angle) * radius
+    side * xOffset,
+    FLOOR_Y,
+    zOffset + zNudge + ((safeTotal > 2 && row % 2 === 1) ? 0.2 : 0)
   )
 }
 
