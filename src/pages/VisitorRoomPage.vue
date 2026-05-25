@@ -100,6 +100,9 @@ const mediaPreviewUrl = ref('')
 const photosStep = ref(1)
 const videoStep = ref(1)
 const musicStep = ref(1)
+const candleStep = ref(1)
+const candlePanelMode = ref('create')
+const selectedCandleFromScene = ref(null)
 const musicUrlInput = ref('')
 const musicPreviewEmbed = ref('')
 const videoUrlInput = ref('')
@@ -123,6 +126,7 @@ const panelTitle = computed(() => {
     music: 'Muziek',
     videos: "Video's",
     'photos-steps': 'Media',
+    'candles-steps': 'Kaarsjes',
     candles: 'Kaarsjes',
     messages: 'Bericht',
     tutorial: 'Tutorial'
@@ -173,6 +177,11 @@ const galleryReactionsOpen = ref(false)
 const roomPhotoItems = computed(() => {
   const items = Array.isArray(contributions.value) ? contributions.value : []
   return items.filter((item) => item.type === 'photo' && item.mediaUrl).slice(0, 12)
+})
+
+const candleContributions = computed(() => {
+  const items = Array.isArray(contributions.value) ? contributions.value : []
+  return items.filter((item) => item.type === 'candle')
 })
 
 const vrGalleryItems = computed(() => {
@@ -440,6 +449,56 @@ async function openGalleryComposer(cat) {
     } catch (e) {
       // ignore navigation errors
     }
+  } else if (category === 'candles') {
+    if (!roomId.value) return
+    try {
+      const payload = JSON.stringify({ panel: 'candles-steps', ts: Date.now() })
+      sessionStorage.setItem('noek_open_panel', payload)
+    } catch (e) {}
+
+    try {
+      const targetPath = `/visit/${roomId.value}`
+      if (route.path === targetPath) {
+        try {
+          const raw = sessionStorage.getItem('noek_open_panel')
+          if (raw) {
+            const parsed = JSON.parse(raw)
+            const age = Date.now() - Number(parsed?.ts || 0)
+            if (parsed?.panel === 'candles-steps' && age >= 0 && age < 5000) {
+              sessionStorage.removeItem('noek_open_panel')
+              candlePanelMode.value = 'create'
+              selectedCandleFromScene.value = null
+              candleStep.value = 1
+              activePanel.value = 'candles-steps'
+              type.value = 'candle'
+              submitState.value = { loading: false, error: '', success: '' }
+              return
+            }
+          }
+        } catch (e) {}
+      }
+
+      await router.push({ path: `/visit/${roomId.value}` })
+
+      try {
+        const raw = sessionStorage.getItem('noek_open_panel')
+        if (raw) {
+          const parsed = JSON.parse(raw)
+          const age = Date.now() - Number(parsed?.ts || 0)
+          if (parsed?.panel === 'candles-steps' && age >= 0 && age < 5000) {
+            sessionStorage.removeItem('noek_open_panel')
+            candlePanelMode.value = 'create'
+            selectedCandleFromScene.value = null
+            candleStep.value = 1
+            activePanel.value = 'candles-steps'
+            type.value = 'candle'
+            submitState.value = { loading: false, error: '', success: '' }
+          }
+        }
+      } catch (e) {}
+    } catch (e) {
+      // ignore navigation errors
+    }
   } else if (category === 'videos') {
     if (!roomId.value) return
     try {
@@ -576,6 +635,12 @@ function openContributionPanel(panel) {
     musicStep.value = 1
     musicUrlInput.value = ''
     musicPreviewEmbed.value = ''
+  } else if (panel === 'candles') {
+    activePanel.value = 'candles-steps'
+    candleStep.value = 1
+    candlePanelMode.value = 'create'
+    selectedCandleFromScene.value = null
+    type.value = 'candle'
   } else {
     activePanel.value = panel
   }
@@ -592,6 +657,9 @@ function openContributionPanel(panel) {
 
 function closePanel() {
   activePanel.value = 'none'
+  candlePanelMode.value = 'create'
+  selectedCandleFromScene.value = null
+  candleStep.value = 1
 }
 
 function stopRoomAudio() {
@@ -735,6 +803,49 @@ async function postMusicAndClose() {
   }
 }
 
+async function postCandleAndContinue() {
+  type.value = 'candle'
+  await addContribution()
+  if (submitState.value.success) {
+    candlePanelMode.value = 'create'
+    selectedCandleFromScene.value = null
+    candleStep.value = 2
+  }
+}
+
+function showCandleComposer() {
+  candlePanelMode.value = 'create'
+  selectedCandleFromScene.value = null
+  candleStep.value = 1
+  type.value = 'candle'
+  submitState.value = { loading: false, error: '', success: '' }
+}
+
+function onSceneContributionCandleSelected(payload) {
+  if (!payload?.contributionId) return
+
+  const match = candleContributions.value.find((item) => String(item?._id || '') === String(payload.contributionId)) || null
+  selectedCandleFromScene.value = match
+    ? {
+        contributionId: String(match._id || ''),
+        giverName: String(match.giverName || '').trim(),
+        tributeText: String(match.tributeText || '').trim(),
+        createdAt: match.createdAt || ''
+      }
+    : {
+        contributionId: String(payload.contributionId || ''),
+        giverName: String(payload.giverName || '').trim(),
+        tributeText: String(payload.tributeText || '').trim(),
+        createdAt: ''
+      }
+
+  candlePanelMode.value = 'details'
+  candleStep.value = 1
+  activePanel.value = 'candles-steps'
+  type.value = 'candle'
+  submitState.value = { loading: false, error: '', success: '' }
+}
+
 function handlePanelBack() {
   if (activePanel.value === 'photos-steps' && photosStep.value > 1) {
     photosStep.value = Math.max(1, photosStep.value - 1)
@@ -746,6 +857,10 @@ function handlePanelBack() {
   }
   if (activePanel.value === 'videos-steps' && videoStep.value > 1) {
     videoStep.value = Math.max(1, videoStep.value - 1)
+    return
+  }
+  if (activePanel.value === 'candles-steps' && candleStep.value > 1) {
+    candleStep.value = Math.max(1, candleStep.value - 1)
     return
   }
   closePanel()
@@ -967,7 +1082,7 @@ onMounted(async () => {
         try {
           const parsed = JSON.parse(raw)
           const age = Date.now() - Number(parsed?.ts || 0)
-          if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) {
+          if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps' || parsed?.panel === 'candles-steps') && age >= 0 && age < 5000) {
             sessionStorage.removeItem('noek_open_panel')
             setTimeout(() => {
               activePanel.value = parsed.panel
@@ -983,7 +1098,7 @@ onMounted(async () => {
     // Also support opening via query param as a fallback
     try {
       const openFlag = String(route.query?.open || '')
-      if (openFlag === 'photos-steps' || openFlag === 'music-steps' || openFlag === 'videos-steps') {
+      if (openFlag === 'photos-steps' || openFlag === 'music-steps' || openFlag === 'videos-steps' || openFlag === 'candles-steps') {
         setTimeout(() => {
           activePanel.value = openFlag
         }, 80)
@@ -1020,7 +1135,7 @@ onMounted(async () => {
 
 watch(() => route.query.open, (openFlag) => {
   const value = String(openFlag || '')
-  if (value === 'photos-steps' || value === 'music-steps' || value === 'videos-steps') {
+  if (value === 'photos-steps' || value === 'music-steps' || value === 'videos-steps' || value === 'candles-steps') {
     const panel = value
     setTimeout(() => {
       activePanel.value = panel
@@ -1041,6 +1156,9 @@ watch(activePanel, (val) => {
   } else if (val === 'videos-steps') {
     videoStep.value = 1
     type.value = 'video_file'
+  } else if (val === 'candles-steps') {
+    candleStep.value = 1
+    type.value = 'candle'
   }
 })
 
@@ -1053,13 +1171,13 @@ watch(roomId, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps' || parsed?.panel === 'candles-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     // Only auto-close if the currently open panel is one of the multi-step panels.
-    if (!keep && ['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
+    if (!keep && ['photos-steps', 'music-steps', 'videos-steps', 'candles-steps'].includes(activePanel.value)) activePanel.value = 'none'
   } catch (e) {
-    if (['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
+    if (['photos-steps', 'music-steps', 'videos-steps', 'candles-steps'].includes(activePanel.value)) activePanel.value = 'none'
   }
 })
 
@@ -1071,13 +1189,13 @@ watch(selectedCategory, () => {
       try {
         const parsed = JSON.parse(raw)
         const age = Date.now() - Number(parsed?.ts || 0)
-        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps') && age >= 0 && age < 5000) keep = true
+        if ((parsed?.panel === 'photos-steps' || parsed?.panel === 'music-steps' || parsed?.panel === 'videos-steps' || parsed?.panel === 'candles-steps') && age >= 0 && age < 5000) keep = true
       } catch (e) {}
     }
     // Only auto-close step panels; leave other panels (messages, candles, etc.) alone.
-    if (!keep && ['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
+    if (!keep && ['photos-steps', 'music-steps', 'videos-steps', 'candles-steps'].includes(activePanel.value)) activePanel.value = 'none'
   } catch (e) {
-    if (['photos-steps', 'music-steps', 'videos-steps'].includes(activePanel.value)) activePanel.value = 'none'
+    if (['photos-steps', 'music-steps', 'videos-steps', 'candles-steps'].includes(activePanel.value)) activePanel.value = 'none'
   }
   galleryMode.value = 'gallery'
   galleryPage.value = 0
@@ -1435,7 +1553,7 @@ onBeforeUnmount(() => {
             </div>
             <span class="visitor-action-label">Video's</span>
           </button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles-steps' }]" @click="openGalleryComposer('candles')">
             <div class="visitor-action-icon">
               <div class="icon-shape icon-kaars"></div>
             </div>
@@ -1490,7 +1608,12 @@ onBeforeUnmount(() => {
 
       <main class="visitor-stage">
         <div v-if="!loading && !error && room" class="visitor-scene-frame">
-          <ThreeScene class="visitor-scene" :room-data="roomSceneData" />
+          <ThreeScene
+            class="visitor-scene"
+            :room-data="roomSceneData"
+            :room-contributions="candleContributions"
+            @contribution-candle-selected="onSceneContributionCandleSelected"
+          />
         </div>
         <div v-else-if="loading" class="visitor-status">Kamer laden...</div>
         <div v-else class="visitor-status error">{{ error }}</div>
@@ -1518,7 +1641,7 @@ onBeforeUnmount(() => {
             </div>
             <span class="visitor-action-label">Video's</span>
           </button>
-          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles' }]" @click="openContributionPanel('candles')">
+          <button type="button" :class="['visitor-action-btn', { active: activePanel === 'candles-steps' }]" @click="openContributionPanel('candles')">
             <div class="visitor-action-icon">
               <div class="icon-shape icon-kaars"></div>
             </div>
@@ -1537,16 +1660,17 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'messages', 'visitor-panel--side-right': activePanel === 'messages' }]">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps' || activePanel === 'messages', 'visitor-panel--side-right': activePanel === 'messages' }]">
         <div class="visitor-panel-head">
             <div class="panel-head-left">
-            <button v-if="activePanel === 'photos-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
+            <button v-if="activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
             <strong v-else>{{ panelTitle }}</strong>
           </div>
           <div class="panel-head-right">
             <small v-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
             <small v-else-if="activePanel === 'music-steps'">Stap {{ musicStep }} van 3</small>
             <small v-else-if="activePanel === 'videos-steps'">Stap {{ videoStep }} van 3</small>
+            <small v-else-if="activePanel === 'candles-steps'">Stap {{ candleStep }} van 2</small>
             <button v-else type="button" class="visitor-close" @click="closePanel">×</button>
           </div>
         </div>
@@ -1671,6 +1795,52 @@ onBeforeUnmount(() => {
                   </div>
                 </div>
               </div>
+          </template>
+
+          <template v-else-if="activePanel === 'candles-steps'">
+            <div class="steps-container">
+              <div class="steps-progress">
+                <div class="steps-track">
+                  <span v-for="n in 2" :key="n" :class="['step-seg', { active: n <= candleStep }]" />
+                </div>
+              </div>
+              <div class="steps-body">
+                <div class="steps-title"><strong>Brand een kaarsje</strong></div>
+                <div class="steps-subtitle">Kaarsjes</div>
+                <p class="steps-desc">Laat je steun blijken en brand een kaarsje.</p>
+
+                <template v-if="candlePanelMode === 'details' && selectedCandleFromScene && candleStep === 1">
+                  <div class="candle-detail-card">
+                    <p class="candle-detail-giver">{{ selectedCandleFromScene.giverName || 'Bezoeker' }}</p>
+                    <p class="candle-detail-text">{{ selectedCandleFromScene.tributeText || 'Geen boodschap toegevoegd.' }}</p>
+                  </div>
+                  <div class="panel-actions">
+                    <button type="button" class="visitor-pill-btn" @click="showCandleComposer">Ook kaarsje branden</button>
+                  </div>
+                </template>
+
+                <template v-else-if="candleStep === 1">
+                  <label class="panel-field">
+                    <span>Schrijf een mooie boodschap (optioneel)</span>
+                    <textarea v-model="tributeText" rows="4" maxlength="1000" placeholder="Je zin nog altijd in onze gedachten"></textarea>
+                  </label>
+                  <div class="panel-actions">
+                    <button type="button" class="visitor-pill-btn" :disabled="submitState.loading" @click="postCandleAndContinue">
+                      {{ submitState.loading ? 'Plaatsen...' : 'Plaatsen' }}
+                    </button>
+                  </div>
+                  <p v-if="submitState.error" class="visitor-status error">{{ submitState.error }}</p>
+                </template>
+
+                <template v-else>
+                  <p class="visitor-status ok">Je kaarsje brandt in de herdenkingsruimte.</p>
+                  <div class="panel-actions">
+                    <button type="button" class="visitor-pill-btn" @click="showCandleComposer">Nog een kaarsje</button>
+                    <button type="button" class="visitor-pill-btn secondary" @click="closePanel">Sluiten</button>
+                  </div>
+                </template>
+              </div>
+            </div>
           </template>
 
           <template v-else-if="activePanel === 'messages'">
@@ -2523,6 +2693,26 @@ text-shadow:
 .music-preview-box { background:#fff; border-radius:10px; padding:8px }
 .music-no-preview { color:#567a8f; padding:12px }
 
+.candle-detail-card {
+  background: #ffffff;
+  border-radius: 12px;
+  border: 1px solid rgba(7, 59, 87, 0.12);
+  padding: 12px;
+  box-shadow: 0 6px 18px rgba(10, 82, 112, 0.08);
+}
+
+.candle-detail-giver {
+  margin: 0 0 6px 0;
+  font-weight: 700;
+  color: #083b57;
+}
+
+.candle-detail-text {
+  margin: 0;
+  color: #3d5b6d;
+  white-space: pre-wrap;
+}
+
 .visitor-panel--side .visitor-panel-body {
   padding: 12px 18px 18px 18px;
   overflow: auto;
@@ -2604,6 +2794,12 @@ text-shadow:
   width: 100%;
   border-radius: 12px;
   padding: 12px 16px;
+}
+
+.visitor-panel--side .visitor-pill-btn.secondary {
+  background: #ffffff;
+  color: #083b57;
+  border: 1px solid rgba(7, 59, 87, 0.18);
 }
 
 .visitor-panel-head {

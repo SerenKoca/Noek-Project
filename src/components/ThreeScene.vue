@@ -42,10 +42,14 @@ const props = defineProps({
   vrItems: {
     type: Array,
     default: () => []
+  },
+  roomContributions: {
+    type: Array,
+    default: () => []
   }
 })
 
-const emit = defineEmits(['selected', 'selected-anchor', 'load-error'])
+const emit = defineEmits(['selected', 'selected-anchor', 'load-error', 'contribution-candle-selected'])
 
 const containerEl = ref(null)
 const cameraCoords = ref('')
@@ -73,6 +77,7 @@ let vrDragStartX = 0
 let vrDragStartY = 0
 
 const selectableRoots = []
+const contributionCandleRoots = []
 let selectedRoot = null
 
 const sceneReady = ref(false)
@@ -116,6 +121,11 @@ const ZOOM_RECENTER_STRENGTH = 0.5
 const FAR_RESET_BLEND_START = 0.08
 const ROOM_SIZE = 34
 const WALL_HEIGHT = 19
+const CONTRIBUTION_CANDLE_RADIUS = ROOM_SIZE * 0.72
+const CONTRIBUTION_CANDLE_RING_Y = 0
+const CONTRIBUTION_CANDLE_HEIGHT = 1.15
+const CONTRIBUTION_CANDLE_MIN_FLAME_INTENSITY = 0.2
+const CONTRIBUTION_CANDLE_MAX_FLAME_INTENSITY = 0.45
 const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
 const DEFAULT_WALL_COLOR = DEFAULT_ROOM_WALL_COLOR
 const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
@@ -1177,6 +1187,7 @@ function createScene() {
   if (!props.vrMode) {
     initializeFurnitureSlots()
     hydrateCuratedDefaultFurniture()
+    syncContributionCandles()
   }
   
   deselect()
@@ -1262,6 +1273,144 @@ function animateVRPhotos() {
   })
 }
 
+function getContributionCandleItems() {
+  const items = Array.isArray(props.roomContributions) ? props.roomContributions : []
+  return items
+    .filter((item) => item?.type === 'candle' && item?._id)
+    .sort((a, b) => new Date(a?.createdAt || 0).getTime() - new Date(b?.createdAt || 0).getTime())
+}
+
+function clearContributionCandles() {
+  while (contributionCandleRoots.length) {
+    const root = contributionCandleRoots.pop()
+    if (root && scene) {
+      scene.remove(root)
+    }
+  }
+}
+
+function getContributionCandlePosition(index, total) {
+  const safeTotal = Math.max(1, Number(total) || 1)
+  const arcStart = Math.PI * 0.95
+  const arcEnd = Math.PI * 0.05
+  const ratio = safeTotal === 1 ? 0.5 : index / (safeTotal - 1)
+  const angle = arcStart + ((arcEnd - arcStart) * ratio)
+  const jitter = ((index % 3) - 1) * 0.22
+  const radius = CONTRIBUTION_CANDLE_RADIUS + ((index % 4) * 0.12)
+
+  return new THREE.Vector3(
+    (Math.cos(angle) * radius) + jitter,
+    CONTRIBUTION_CANDLE_RING_Y,
+    Math.sin(angle) * radius
+  )
+}
+
+function createContributionCandleRoot(item, index, total) {
+  const root = new THREE.Group()
+  root.userData.isContributionCandle = true
+  root.userData.contributionId = String(item?._id || '')
+  root.userData.giverName = String(item?.giverName || '').trim()
+  root.userData.tributeText = String(item?.tributeText || '').trim()
+
+  const waxMat = new THREE.MeshStandardMaterial({
+    color: 0xf6f0dc,
+    roughness: 0.85,
+    metalness: 0.05
+  })
+  const wickMat = new THREE.MeshStandardMaterial({
+    color: 0x2f2519,
+    roughness: 1,
+    metalness: 0
+  })
+  const flameMat = new THREE.MeshStandardMaterial({
+    color: 0xffb347,
+    emissive: 0xff8f1f,
+    emissiveIntensity: 0.9,
+    transparent: true,
+    opacity: 0.92,
+    roughness: 0.35,
+    metalness: 0
+  })
+
+  const candleHeight = CONTRIBUTION_CANDLE_HEIGHT + ((index % 3) * 0.08)
+  const wax = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.19, candleHeight, 20), waxMat)
+  wax.position.y = candleHeight / 2
+  wax.castShadow = true
+  wax.receiveShadow = true
+  wax.userData.isContributionCandle = true
+  root.add(wax)
+
+  const wick = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.018, 0.08, 8), wickMat)
+  wick.position.y = candleHeight + 0.04
+  wick.userData.isContributionCandle = true
+  root.add(wick)
+
+  const flame = new THREE.Mesh(new THREE.SphereGeometry(0.08, 10, 10), flameMat)
+  flame.scale.set(0.62, 1.2, 0.62)
+  flame.position.y = candleHeight + 0.17
+  flame.userData.isContributionCandle = true
+  root.add(flame)
+
+  const glow = new THREE.PointLight(0xffc978, 0.28, 4.8, 2)
+  glow.position.y = candleHeight + 0.16
+  glow.userData.isContributionCandleLight = true
+  root.add(glow)
+
+  root.userData.flameRef = flame
+  root.userData.lightRef = glow
+  root.userData.flickerSeed = (index + 1) * 0.67
+  root.userData.baseFlameY = flame.position.y
+
+  const position = getContributionCandlePosition(index, total)
+  root.position.copy(position)
+  root.rotation.y = (Math.PI * 0.2) + (index * 0.33)
+
+  return root
+}
+
+function syncContributionCandles() {
+  if (!scene || props.vrMode) return
+
+  clearContributionCandles()
+  const candleItems = getContributionCandleItems()
+  const total = candleItems.length
+  if (!total) return
+
+  candleItems.forEach((item, index) => {
+    const root = createContributionCandleRoot(item, index, total)
+    contributionCandleRoots.push(root)
+    scene.add(root)
+  })
+}
+
+function animateContributionCandles() {
+  if (!contributionCandleRoots.length) return
+
+  const t = Date.now() * 0.0032
+  for (const root of contributionCandleRoots) {
+    const flame = root?.userData?.flameRef
+    const light = root?.userData?.lightRef
+    const seed = Number(root?.userData?.flickerSeed || 0)
+    const baseY = Number(root?.userData?.baseFlameY || 1.3)
+    const wave = Math.sin(t + seed)
+    const waveFine = Math.sin((t * 1.9) + (seed * 1.7))
+    const flicker = (wave * 0.5) + (waveFine * 0.5)
+
+    if (flame) {
+      flame.scale.set(0.6 + (flicker * 0.08), 1.14 + (flicker * 0.13), 0.6 + (flicker * 0.08))
+      flame.position.y = baseY + (flicker * 0.02)
+    }
+
+    if (light) {
+      light.intensity = THREE.MathUtils.clamp(
+        0.3 + (flicker * 0.16),
+        CONTRIBUTION_CANDLE_MIN_FLAME_INTENSITY,
+        CONTRIBUTION_CANDLE_MAX_FLAME_INTENSITY
+      )
+    }
+  }
+}
+
 function resize() {
   if (!containerEl.value || !renderer || !camera) return
 
@@ -1323,6 +1472,8 @@ function animate() {
     // Animate VR photos
     if (props.vrMode) {
       animateVRPhotos()
+    } else {
+      animateContributionCandles()
     }
     
     renderer.render(scene, camera)
@@ -1920,6 +2071,32 @@ function onPointerDown(e) {
 
   // Raycast full scene and pick the first hit that belongs to a model root.
   const hits = raycaster.intersectObjects(scene.children, true)
+
+  const firstContributionCandleHit = hits.find((hit) => {
+    let current = hit?.object || null
+    while (current) {
+      if (current?.userData?.isContributionCandle) return true
+      current = current.parent
+    }
+    return false
+  })
+
+  if (firstContributionCandleHit) {
+    let current = firstContributionCandleHit.object
+    while (current && !current?.userData?.isContributionCandle) {
+      current = current.parent
+    }
+
+    if (current?.userData?.contributionId) {
+      emit('contribution-candle-selected', {
+        contributionId: String(current.userData.contributionId),
+        giverName: String(current.userData.giverName || '').trim(),
+        tributeText: String(current.userData.tributeText || '').trim()
+      })
+      return
+    }
+  }
+
   const firstModelHit = hits.find((hit) => getRootModel(hit.object))
   if (!firstModelHit) {
     deselect()
@@ -2293,6 +2470,18 @@ watch(
   }
 )
 
+watch(
+  [() => props.roomContributions, () => props.vrMode, sceneReady],
+  ([, vrMode, ready]) => {
+    if (!ready || vrMode) {
+      clearContributionCandles()
+      return
+    }
+    syncContributionCandles()
+  },
+  { immediate: true, deep: true }
+)
+
 watch(templateEditorSlotId, (slotId) => {
   if (!slotId) return
   writeDraftFromSlot(slotId)
@@ -2363,6 +2552,7 @@ onBeforeUnmount(() => {
   }
 
   transform?.detach()
+  clearContributionCandles()
   renderer?.setAnimationLoop(null)
   renderer?.dispose()
 
