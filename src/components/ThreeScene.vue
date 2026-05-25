@@ -127,6 +127,10 @@ const CONTRIBUTION_CANDLE_HEIGHT = 1.15
 const CONTRIBUTION_CANDLE_SCALE = 2.48
 const CONTRIBUTION_CANDLE_MIN_FLAME_INTENSITY = 0.2
 const CONTRIBUTION_CANDLE_MAX_FLAME_INTENSITY = 0.45
+const CONTRIBUTION_CANDLE_GROUP_POSITIONS = [
+  new THREE.Vector3(-27.2, 0, 0),
+  new THREE.Vector3(0, 0, 26.43)
+]
 const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
 const DEFAULT_WALL_COLOR = DEFAULT_ROOM_WALL_COLOR
 const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
@@ -1291,18 +1295,22 @@ function clearContributionCandles() {
 }
 
 function getContributionCandlePosition(index, total) {
-  const safeTotal = Math.max(1, Number(total) || 1)
-  const side = index % 2 === 0 ? -1 : 1
-  const row = Math.floor(index / 2)
-  const xOffset = ROOM_SIZE / 2 + 0.9 + (row * 0.25)
-  const zOffset = ROOM_SIZE / 2 + 0.5 + (row * 1.15)
-  const zNudge = side < 0 ? -0.1 : 0.1
-  const leftSideShift = side < 0 ? 2.8 : 0
+  const groupCount = Math.max(1, CONTRIBUTION_CANDLE_GROUP_POSITIONS.length)
+  const groupIndex = index % groupCount
+  const indexInGroup = Math.floor(index / groupCount)
+  const anchor = CONTRIBUTION_CANDLE_GROUP_POSITIONS[groupIndex] || new THREE.Vector3(0, FLOOR_Y, 0)
+  const columns = 3
+  const row = Math.floor(indexInGroup / columns)
+  const column = indexInGroup % columns
+  const rowShift = row % 2 === 0 ? 0 : 1.1
+  const xOffsets = [-2.2, 0, 2.2]
+  const zSpacing = 2.0
+  const depthOffset = 0.35 + (row * 0.35)
 
   return new THREE.Vector3(
-    side * (xOffset + leftSideShift),
+    anchor.x + xOffsets[column] + rowShift,
     FLOOR_Y,
-    zOffset + zNudge + ((safeTotal > 2 && row % 2 === 1) ? 0.2 : 0)
+    anchor.z + (row * zSpacing) + depthOffset
   )
 }
 
@@ -2073,6 +2081,23 @@ function onPointerDown(e) {
 
   // Raycast full scene and pick the first hit that belongs to a model root.
   const hits = raycaster.intersectObjects(scene.children, true)
+
+  const floorPoint = new THREE.Vector3()
+  const floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -FLOOR_Y)
+  const floorHit = raycaster.ray.intersectPlane(floorPlane, floorPoint)
+  const primaryHit = hits[0]?.point?.clone?.() || null
+  const loggedPoint = primaryHit || (floorHit ? floorPoint : null)
+
+  if (loggedPoint) {
+    console.info('[ThreeScene] click coordinates', {
+      x: Number(loggedPoint.x.toFixed(2)),
+      y: Number(loggedPoint.y.toFixed(2)),
+      z: Number(loggedPoint.z.toFixed(2)),
+      floorX: Number(floorPoint.x.toFixed(2)),
+      floorY: Number(FLOOR_Y.toFixed(2)),
+      floorZ: Number(floorPoint.z.toFixed(2))
+    })
+  }
 
   const firstContributionCandleHit = hits.find((hit) => {
     let current = hit?.object || null
