@@ -124,6 +124,7 @@ const WALL_HEIGHT = 19
 const CONTRIBUTION_CANDLE_RADIUS = ROOM_SIZE * 0.72
 const CONTRIBUTION_CANDLE_RING_Y = 0
 const CONTRIBUTION_CANDLE_HEIGHT = 1.15
+const CONTRIBUTION_CANDLE_SCALE = 1.12
 const CONTRIBUTION_CANDLE_MIN_FLAME_INTENSITY = 0.2
 const CONTRIBUTION_CANDLE_MAX_FLAME_INTENSITY = 0.45
 const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
@@ -1364,6 +1365,7 @@ function createContributionCandleRoot(item, index, total) {
   const position = getContributionCandlePosition(index, total)
   root.position.copy(position)
   root.rotation.y = (Math.PI * 0.2) + (index * 0.33)
+  root.scale.setScalar(CONTRIBUTION_CANDLE_SCALE)
 
   return root
 }

@@ -847,6 +847,11 @@ function onSceneContributionCandleSelected(payload) {
 }
 
 function handlePanelBack() {
+  if (activePanel.value === 'candles-steps') {
+    closePanel()
+    return
+  }
+
   if (activePanel.value === 'photos-steps' && photosStep.value > 1) {
     photosStep.value = Math.max(1, photosStep.value - 1)
     return
@@ -857,10 +862,6 @@ function handlePanelBack() {
   }
   if (activePanel.value === 'videos-steps' && videoStep.value > 1) {
     videoStep.value = Math.max(1, videoStep.value - 1)
-    return
-  }
-  if (activePanel.value === 'candles-steps' && candleStep.value > 1) {
-    candleStep.value = Math.max(1, candleStep.value - 1)
     return
   }
   closePanel()
