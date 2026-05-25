@@ -3018,7 +3018,7 @@ text-shadow:
   font-weight: 700;
   border-radius: 18px;
   padding: 14px 12px;
-  background: linear-gradient(90deg, #0f4979 0%, #6f94b9 100%);
+  background: linear-gradient(25deg, var(--visitor-color-dark) 0%, var(--visitor-color-light) 100%);
   width: 100%;
 }
 
