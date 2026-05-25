@@ -1297,9 +1297,10 @@ function getContributionCandlePosition(index, total) {
   const xOffset = ROOM_SIZE / 2 + 0.9 + (row * 0.25)
   const zOffset = ROOM_SIZE / 2 + 0.5 + (row * 1.15)
   const zNudge = side < 0 ? -0.1 : 0.1
+  const leftSideShift = side < 0 ? 2.8 : 0
 
   return new THREE.Vector3(
-    side * xOffset,
+    side * (xOffset + leftSideShift),
     FLOOR_Y,
     zOffset + zNudge + ((safeTotal > 2 && row % 2 === 1) ? 0.2 : 0)
   )
