@@ -39,34 +39,36 @@ defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mod
 
     <div v-if="loading" class="editor-loading">Loading...</div>
 
-    <ul v-else class="editor-model-grid">
-      <li v-for="m in models" :key="m.id || m.ID" class="editor-model-card">
-        <button class="editor-model-tile" @click="$emit('request-load', m)">
-          <img
-            v-if="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
-            :src="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
-            alt=""
-            class="editor-model-thumb"
-            loading="lazy"
-          />
-          <div v-else class="editor-model-thumb empty"></div>
-        </button>
-        <div class="editor-model-actions">
-          <button
-            class="editor-model-primary"
-            @click="$emit('request-load', m)"
-          >
-            {{ selected?.isSlotMarker ? 'Plaats' : (selected ? 'Vervang' : 'Plaats') }}
+    <div v-else class="editor-model-scroll">
+      <ul class="editor-model-grid">
+        <li v-for="m in models" :key="m.id || m.ID" class="editor-model-card">
+          <button class="editor-model-tile" @click="$emit('request-load', m)">
+            <img
+              v-if="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
+              :src="m.thumbnailUrl || m.previewUrl || m.Thumbnail"
+              alt=""
+              class="editor-model-thumb"
+              loading="lazy"
+            />
+            <div v-else class="editor-model-thumb empty"></div>
           </button>
-          <button
-            v-if="selected"
-            class="editor-model-secondary"
-            @click="$emit('request-load-with-mode', m, 'add')"
-          >
-            +
-          </button>
-        </div>
-      </li>
-    </ul>
+          <div class="editor-model-actions">
+            <button
+              class="editor-model-primary"
+              @click="$emit('request-load', m)"
+            >
+              {{ selected?.isSlotMarker ? 'Plaats' : (selected ? 'Vervang' : 'Plaats') }}
+            </button>
+            <button
+              v-if="selected"
+              class="editor-model-secondary"
+              @click="$emit('request-load-with-mode', m, 'add')"
+            >
+              +
+            </button>
+          </div>
+        </li>
+      </ul>
+    </div>
   </section>
 </template>
