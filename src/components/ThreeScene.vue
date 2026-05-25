@@ -2085,7 +2085,7 @@ function onPointerDown(e) {
 
   if (firstContributionCandleHit) {
     let current = firstContributionCandleHit.object
-    while (current && !current?.userData?.isContributionCandle) {
+    while (current && !current?.userData?.contributionId) {
       current = current.parent
     }
 

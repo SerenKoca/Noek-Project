@@ -134,6 +134,15 @@ const panelTitle = computed(() => {
   return map[activePanel.value] || 'Paneel'
 })
 
+const isCandleDetailsPanel = computed(() => {
+  return activePanel.value === 'candles-steps' && candlePanelMode.value === 'details' && Boolean(selectedCandleFromScene.value)
+})
+
+const candleDetailsHeading = computed(() => {
+  const giver = String(selectedCandleFromScene.value?.giverName || '').trim()
+  return giver ? `Kaars van ${giver}` : 'Kaars'
+})
+
 const filteredContributions = computed(() => {
   const items = Array.isArray(contributions.value) ? contributions.value : []
 
@@ -830,13 +839,25 @@ function onSceneContributionCandleSelected(payload) {
         contributionId: String(match._id || ''),
         giverName: String(match.giverName || '').trim(),
         tributeText: String(match.tributeText || '').trim(),
-        createdAt: match.createdAt || ''
+        createdAt: match.createdAt || '',
+        reactions: {
+          heartCount: Number(match?.reactions?.heartCount || 0),
+          supportCount: Number(match?.reactions?.supportCount || 0),
+          candleCount: Number(match?.reactions?.candleCount || 0)
+        },
+        commentCount: Array.isArray(match?.comments) ? match.comments.length : 0
       }
     : {
         contributionId: String(payload.contributionId || ''),
         giverName: String(payload.giverName || '').trim(),
         tributeText: String(payload.tributeText || '').trim(),
-        createdAt: ''
+        createdAt: '',
+        reactions: {
+          heartCount: 0,
+          supportCount: 0,
+          candleCount: 0
+        },
+        commentCount: 0
       }
 
   candlePanelMode.value = 'details'
@@ -1218,6 +1239,27 @@ watch(filteredContributions, () => {
     gallerySelectedId.value = ''
   }
 })
+
+watch(candleContributions, () => {
+  const selectedId = String(selectedCandleFromScene.value?.contributionId || '').trim()
+  if (!selectedId) return
+
+  const current = candleContributions.value.find((item) => String(item?._id || '') === selectedId)
+  if (!current) return
+
+  selectedCandleFromScene.value = {
+    contributionId: String(current._id || ''),
+    giverName: String(current.giverName || '').trim(),
+    tributeText: String(current.tributeText || '').trim(),
+    createdAt: current.createdAt || '',
+    reactions: {
+      heartCount: Number(current?.reactions?.heartCount || 0),
+      supportCount: Number(current?.reactions?.supportCount || 0),
+      candleCount: Number(current?.reactions?.candleCount || 0)
+    },
+    commentCount: Array.isArray(current?.comments) ? current.comments.length : 0
+  }
+}, { deep: true })
 
 onBeforeUnmount(() => {
   stopRoomAudio()
@@ -1661,14 +1703,16 @@ onBeforeUnmount(() => {
         </div>
       </footer>
 
-      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps' || activePanel === 'messages', 'visitor-panel--side-right': activePanel === 'messages' }]">
+      <section v-if="activePanel !== 'none'" :class="['visitor-panel', { 'visitor-panel--side': activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps' || activePanel === 'messages', 'visitor-panel--side-right': activePanel === 'messages', 'visitor-panel--candle-detail': isCandleDetailsPanel }]">
         <div class="visitor-panel-head">
             <div class="panel-head-left">
-            <button v-if="activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
+            <strong v-if="isCandleDetailsPanel">{{ candleDetailsHeading }}</strong>
+            <button v-else-if="activePanel === 'photos-steps' || activePanel === 'music-steps' || activePanel === 'videos-steps' || activePanel === 'candles-steps'" type="button" class="visitor-back" @click="handlePanelBack">◀ Terug</button>
             <strong v-else>{{ panelTitle }}</strong>
           </div>
           <div class="panel-head-right">
-            <small v-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
+            <button v-if="isCandleDetailsPanel" type="button" class="visitor-close visitor-close-soft" @click="closePanel">×</button>
+            <small v-else-if="activePanel === 'photos-steps'">Stap {{ photosStep }} van 3</small>
             <small v-else-if="activePanel === 'music-steps'">Stap {{ musicStep }} van 3</small>
             <small v-else-if="activePanel === 'videos-steps'">Stap {{ videoStep }} van 3</small>
             <small v-else-if="activePanel === 'candles-steps'">Stap {{ candleStep }} van 2</small>
@@ -1800,27 +1844,54 @@ onBeforeUnmount(() => {
 
           <template v-else-if="activePanel === 'candles-steps'">
             <div class="steps-container">
-              <div class="steps-progress">
+              <div v-if="!(candlePanelMode === 'details' && selectedCandleFromScene)" class="steps-progress">
                 <div class="steps-track">
                   <span v-for="n in 2" :key="n" :class="['step-seg', { active: n <= candleStep }]" />
                 </div>
               </div>
               <div class="steps-body">
-                <div class="steps-title"><strong>Brand een kaarsje</strong></div>
-                <div class="steps-subtitle">Kaarsjes</div>
-                <p class="steps-desc">Laat je steun blijken en brand een kaarsje.</p>
+                <template v-if="!(candlePanelMode === 'details' && selectedCandleFromScene)">
+                  <div class="steps-title"><strong>Brand een kaarsje</strong></div>
+                  <div class="steps-subtitle">Kaarsjes</div>
+                  <p class="steps-desc">Laat je steun blijken en brand een kaarsje.</p>
+                </template>
 
                 <template v-if="candlePanelMode === 'details' && selectedCandleFromScene && candleStep === 1">
-                  <div class="candle-detail-card">
-                    <p class="candle-detail-giver">{{ selectedCandleFromScene.giverName || 'Bezoeker' }}</p>
-                    <p class="candle-detail-text">{{ selectedCandleFromScene.tributeText || 'Geen boodschap toegevoegd.' }}</p>
-                  </div>
-                  <div class="panel-actions">
-                    <button type="button" class="visitor-pill-btn" @click="showCandleComposer">Ook kaarsje branden</button>
+                  <div class="candle-detail-frame">
+                    <div class="candle-detail-icon-wrap" aria-hidden="true">
+                      <span class="candle-detail-flame"></span>
+                      <span class="candle-detail-body"></span>
+                    </div>
+
+                    <hr class="candle-detail-divider" />
+
+                    <div class="candle-detail-card">
+                      <p class="candle-detail-label">Hun boodschap:</p>
+                      <p class="candle-detail-text">{{ selectedCandleFromScene.tributeText || 'Geen boodschap toegevoegd.' }}</p>
+                    </div>
+
+                    <div class="candle-detail-reactions" aria-label="Reacties">
+                      <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'heart')" aria-label="Hartje reactie">
+                        ❤️ <span>{{ selectedCandleFromScene.reactions?.heartCount || 0 }}</span>
+                      </button>
+                      <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'support')" aria-label="Steun reactie">
+                        🤝 <span>{{ selectedCandleFromScene.reactions?.supportCount || 0 }}</span>
+                      </button>
+                      <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'candle')" aria-label="Kaars reactie">
+                        😢 <span>{{ selectedCandleFromScene.reactions?.candleCount || 0 }}</span>
+                      </button>
+                    </div>
                   </div>
                 </template>
 
                 <template v-else-if="candleStep === 1">
+                  <div class="candle-compose-icon-wrap" aria-hidden="true">
+                    <span class="candle-compose-flame"></span>
+                    <span class="candle-compose-body"></span>
+                  </div>
+
+                  <hr class="candle-compose-divider" />
+
                   <label class="panel-field">
                     <span>Schrijf een mooie boodschap (optioneel)</span>
                     <textarea v-model="tributeText" rows="4" maxlength="1000" placeholder="Je zin nog altijd in onze gedachten"></textarea>
@@ -1986,7 +2057,16 @@ onBeforeUnmount(() => {
           </template>
         </div>
 
-        <!-- no pinned footer: posting occurs inline under the message in step 2 -->
+        <!-- candle detail footer: place button below the panel when viewing candle details -->
+        <div v-if="isCandleDetailsPanel" class="panel-footer candle-panel-footer">
+          <div class="panel-footer-inner">
+            <button type="button" class="visitor-pill-btn candle-detail-place-btn" @click="showCandleComposer">
+              <span aria-hidden="true">＋</span>
+              <span>Kaars plaatsen</span>
+            </button>
+          </div>
+        </div>
+
       </section>
 
       <p v-if="profileHint" class="visitor-profile-hint">{{ profileHint }}</p>
@@ -2553,7 +2633,7 @@ text-shadow:
   transform: none;
   width: min(360px, 92vw);
   max-height: calc(100vh - 80px);
-  background: linear-gradient(180deg, #eaf6fb 0%, #eef7fb 100%);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--visitor-color-light) 22%, white) 0%, color-mix(in srgb, var(--visitor-color-light) 8%, white) 100%);
   border: none;
   box-shadow: 0 30px 60px rgba(11, 63, 116, 0.18);
   padding: 0;
@@ -2566,6 +2646,61 @@ text-shadow:
 .visitor-panel--side-right {
   left: auto;
   right: 14px;
+}
+
+.visitor-panel--candle-detail {
+  width: min(330px, 88vw);
+  top: 50%;
+  bottom: auto;
+  height: auto;
+  max-height: calc(100vh - 104px);
+  border-radius: 18px;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--visitor-color-light) 28%, white) 0%, color-mix(in srgb, var(--visitor-color-light) 10%, white) 100%);
+  box-shadow: 0 30px 60px color-mix(in srgb, var(--visitor-color-dark) 12%, rgba(11,63,116,0.18));
+  border: none;
+  overflow: visible;
+  padding-bottom: 84px;
+  transform: translateX(0) translateY(-50%);
+}
+
+.visitor-panel--candle-detail .visitor-panel-head {
+  padding: 20px 16px 8px 16px;
+  align-items: flex-start;
+  background: transparent;
+  border-radius: 18px 18px 0 0;
+  border: none;
+  position: relative;
+}
+
+.visitor-panel--candle-detail .panel-head-left strong {
+  font-size: 1.45rem;
+  line-height: 1.08;
+  color: var(--visitor-color-dark);
+  font-weight: 800;
+  max-width: 220px;
+}
+
+.visitor-close-soft {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  background: transparent;
+  color: var(--visitor-color-dark);
+  font-size: 1.4rem;
+  line-height: 1;
+  padding: 0;
+  position: absolute;
+  top: 12px;
+  right: 12px;
+}
+
+.visitor-panel--candle-detail .visitor-panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 16px 18px 16px;
+  overflow: auto;
+  background: transparent;
 }
 
 .visitor-panel--side-right {
@@ -2598,7 +2733,7 @@ text-shadow:
 .visitor-panel--side-right .item-comment-author {
   display: block;
   font-weight: 700;
-  color: #073b57;
+  color: var(--visitor-color-dark);
   margin-bottom: 8px;
 }
 
@@ -2681,8 +2816,8 @@ text-shadow:
 
 .panel-head-left { display:flex; gap:10px; align-items:center }
 .panel-head-right { display:flex; gap:8px; align-items:center }
-.visitor-back { background:transparent; border:0; color:#073b57; font-weight:700; cursor:pointer }
-.panel-head-right small { color:#073b57; font-weight:700 }
+.visitor-back { background:transparent; border:0; color:var(--visitor-color-dark); font-weight:700; cursor:pointer }
+.panel-head-right small { color:var(--visitor-color-dark); font-weight:700 }
 
 .steps-container { display:flex; flex-direction:column; gap:12px }
 .steps-progress { padding: 0 6px; margin-top: 6px }
@@ -2697,24 +2832,172 @@ text-shadow:
 .candle-detail-card {
   background: #ffffff;
   border-radius: 12px;
-  border: 1px solid rgba(7, 59, 87, 0.12);
+  border: none;
   padding: 12px;
-  box-shadow: 0 6px 18px rgba(10, 82, 112, 0.08);
+  box-shadow: 0 6px 20px rgba(11,63,116,0.06);
+}
+
+.candle-detail-frame {
+  background: transparent;
+  border-radius: 0;
+  box-shadow: none;
+  padding: 0;
+}
+
+.candle-compose-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  margin-top: 2px;
+}
+
+.candle-compose-flame {
+  width: 24px;
+  height: 30px;
+  border-radius: 65% 65% 50% 50%;
+  background: radial-gradient(circle at 46% 34%, #ffe6a0 8%, #f3b13a 44%, #cb7d10 86%);
+  box-shadow: 0 0 0 14px rgba(246, 198, 92, 0.24), 0 0 20px rgba(245, 168, 45, 0.44);
+}
+
+.candle-compose-body {
+  width: 32px;
+  height: 54px;
+  margin-top: 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #fffdf8 0%, #f1ebdc 100%);
+  border: 1px solid rgba(176, 146, 90, 0.22);
+  box-shadow: inset -6px 0 8px rgba(176, 146, 90, 0.22);
+}
+
+.candle-compose-divider {
+  border: 0;
+  height: 2px;
+  margin: 2px 0 0;
+  background: color-mix(in srgb, var(--visitor-color-dark) 12%, transparent);
+}
+
+.candle-detail-icon-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 94px;
+  margin-top: 0;
+}
+
+.candle-detail-flame {
+  width: 24px;
+  height: 30px;
+  border-radius: 65% 65% 50% 50%;
+  background: radial-gradient(circle at 46% 34%, #ffe6a0 8%, #f3b13a 44%, #cb7d10 86%);
+  box-shadow: 0 0 0 14px rgba(246, 198, 92, 0.24), 0 0 20px rgba(245, 168, 45, 0.44);
+}
+
+.candle-detail-body {
+  width: 32px;
+  height: 54px;
+  margin-top: 5px;
+  border-radius: 4px;
+  background: linear-gradient(180deg, #fffdf8 0%, #f1ebdc 100%);
+  border: 1px solid rgba(176, 146, 90, 0.22);
+  box-shadow: inset -6px 0 8px rgba(176, 146, 90, 0.22);
+}
+
+.candle-detail-divider {
+  border: 0;
+  height: 2px;
+  margin: 2px 0 0;
+  background: color-mix(in srgb, var(--visitor-color-dark) 12%, transparent);
+}
+
+.candle-detail-label {
+  margin: 0 0 8px 0;
+  font-size: 1.3rem;
+  font-weight: 700;
+  color: var(--visitor-color-dark);
 }
 
 .candle-detail-giver {
   margin: 0 0 6px 0;
   font-weight: 700;
-  color: #083b57;
+  color: var(--visitor-color-dark);
 }
 
 .candle-detail-text {
   margin: 0;
   color: #3d5b6d;
   white-space: pre-wrap;
+  font-size: 0.98rem;
+  line-height: 1.4;
+  min-height: 74px;
 }
 
-.visitor-panel--side .visitor-panel-body {
+.candle-detail-reactions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 16px;
+  margin-top: 18px;
+  margin-bottom: 6px;
+}
+
+.candle-detail-reaction-chip,
+.candle-detail-chat-chip {
+  border: 0;
+  background: transparent;
+  color: var(--visitor-color-dark);
+  font-size: 1.9rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.candle-detail-reaction-chip span {
+  position: absolute;
+  top: -4px;
+  right: -8px;
+  display: inline-flex;
+  min-width: 20px;
+  height: 20px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--visitor-color-dark);
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.candle-detail-actions {
+  margin-top: 8px;
+}
+
+.candle-detail-place-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  border-radius: 18px;
+  padding: 14px 12px;
+  background: linear-gradient(90deg, #0f4979 0%, #6f94b9 100%);
+  width: 100%;
+}
+
+.candle-detail-place-btn span:first-child {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.visitor-panel--side:not(.visitor-panel--candle-detail) .visitor-panel-body {
   padding: 12px 18px 18px 18px;
   overflow: auto;
   flex: 1 1 auto;
@@ -2723,6 +3006,25 @@ text-shadow:
 .panel-footer { padding: 12px 18px; border-top: 1px solid rgba(7,59,87,0.06); background: transparent }
 .panel-footer-inner { max-width:100%; }
 .panel-footer .visitor-pill-btn { width:100% }
+
+.candle-panel-footer {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: -70px;
+  display: flex;
+  justify-content: center;
+  pointer-events: auto;
+  z-index: 5;
+}
+
+.candle-detail-place-btn {
+  width: 100%;
+  max-width: 300px;
+  border-radius: 20px;
+  padding: 13px 16px;
+  font-size: 1.15rem;
+}
 
 .add-steps {
   display: flex;
