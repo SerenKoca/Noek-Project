@@ -1825,13 +1825,13 @@ onBeforeUnmount(() => {
                       <button type="button" class="upload-delete" @click="removeMediaFile">🗑️<span class="sr-only">Delete</span></button>
                     </div>
                     <div class="upload-box" role="button" tabindex="0" @click="openVideoUploadPicker">
-                      <input id="videos-steps-file-input" type="file" accept="video/*,audio/*" @change="onMediaFileChange" style="display:none">
+                      <input id="videos-steps-file-input" type="file" accept="video/*" @change="onMediaFileChange" style="display:none">
                       <template v-if="!mediaPreviewUrl">
                         <svg width="120" height="80" viewBox="0 0 24 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <rect x="1" y="3" width="22" height="12" rx="2" fill="#0A5270" opacity="0.08"/>
                           <path d="M4 10l3-3 2 2 3-4 4 6H4z" fill="#0A5270" opacity="0.18"/>
                         </svg>
-                        <div class="upload-hint">Ondersteunde bestanden: MP3, WAV, MP4 (max. 50mb)</div>
+                        <div class="upload-hint">Ondersteunde bestanden: MP4, WebM, MOV (max. 50mb)</div>
                       </template>
                       <template v-else>
                         <div class="upload-preview">
@@ -3528,9 +3528,9 @@ text-shadow:
   height: 100%;
   border-radius: 16px;
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(221, 232, 242, 0.9), rgba(201, 218, 235, 0.95));
-  border: 1px solid rgba(18, 58, 98, 0.12);
-  box-shadow: 0 8px 20px rgba(11, 63, 116, 0.08);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 72%, white), color-mix(in srgb, var(--brand-light) 52%, var(--brand-dark)));
+  border: 1px solid color-mix(in srgb, var(--brand-dark) 18%, transparent);
+  box-shadow: 0 8px 20px color-mix(in srgb, var(--brand-dark) 10%, transparent);
 }
 
 /* Make media tiles square in media galleries */
@@ -3609,7 +3609,7 @@ text-shadow:
 
 .visitor-gallery-copy p {
   margin: 0;
-  color: #50708e;
+  color: color-mix(in srgb, var(--brand-dark) 72%, white);
   font-size: 0.88rem;
   line-height: 1.35;
   line-clamp: 2;
@@ -3621,7 +3621,7 @@ text-shadow:
 
 .visitor-gallery-empty {
   margin: 12px 0;
-  color: #50708e;
+  color: color-mix(in srgb, var(--brand-dark) 72%, white);
 }
 
 .visitor-gallery-lightbox {
@@ -3642,9 +3642,12 @@ text-shadow:
   width: min(1160px, calc(100% - 80px));
   min-height: min(720px, calc(100% - 120px));
   max-height: calc(100vh - 120px);
-  background: #f8fafb;
+  background: color-mix(in srgb, white 92%, var(--brand-light) 8%);
   border-radius: 18px;
-  box-shadow: 0 40px 80px rgba(6, 28, 46, 0.28);
+  box-shadow:
+    0 28px 60px color-mix(in srgb, var(--brand-dark) 28%, transparent),
+    0 10px 24px color-mix(in srgb, var(--brand-dark) 14%, transparent);
+  filter: drop-shadow(0 8px 18px color-mix(in srgb, var(--brand-light) 10%, transparent));
   display: grid;
   grid-template-columns: 300px minmax(0, 1fr);
   gap: 26px;
@@ -3661,46 +3664,50 @@ text-shadow:
   height: 44px;
   border-radius: 50%;
   border: 0;
-  background: #ffffff;
-  color: #0b4b80;
+  background: color-mix(in srgb, white 96%, var(--brand-light) 4%);
+  color: var(--visitor-color-dark);
   font-size: 1.6rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(11,63,116,0.12);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-dark) 14%, transparent);
   z-index: 60;
 }
 
 .visitor-gallery-lightbox-info {
-  background: #eaf6ff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 34%, white), color-mix(in srgb, var(--brand-light) 10%, white));
   border-radius: 14px;
   padding: 18px;
   display: grid;
   align-content: start;
   gap: 12px;
   height: 100%;
+  box-shadow:
+    0 18px 38px color-mix(in srgb, var(--brand-dark) 18%, transparent),
+    0 4px 10px color-mix(in srgb, var(--brand-dark) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--brand-dark) 10%, transparent);
 }
 
 .visitor-gallery-lightbox-info h3 {
   margin: 0;
   font-size: 2.2rem;
   line-height: 1.02;
-  color: #0b4b80;
+  color: var(--visitor-color-dark);
   font-weight: 800;
 }
 
 .visitor-gallery-lightbox-label {
   margin: 0;
-  color: #1a3550;
+  color: color-mix(in srgb, var(--visitor-color-dark) 82%, black);
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .visitor-gallery-lightbox-message {
   min-height: 160px;
-  background: #ffffff;
+  background: color-mix(in srgb, white 96%, var(--brand-light) 4%);
   border-radius: 10px;
   padding: 14px;
-  color: #2b485f;
+  color: color-mix(in srgb, var(--visitor-color-dark) 78%, black);
   font-size: 1rem;
   height: auto;
 }
@@ -3736,7 +3743,7 @@ text-shadow:
   cursor: pointer;
   display: grid;
   place-items: center;
-  color: #0b4b80;
+  color: var(--visitor-color-dark);
 }
 
 .visitor-gallery-comment-icon {
@@ -3744,7 +3751,7 @@ text-shadow:
   width: 24px;
   height: 18px;
   border-radius: 6px;
-  background: #0b4b80;
+  background: var(--visitor-color-dark);
 }
 
 .visitor-gallery-comment-icon::after {
@@ -3755,7 +3762,7 @@ text-shadow:
   width: 8px;
   height: 8px;
   border-radius: 2px;
-  background: #0b4b80;
+  background: var(--visitor-color-dark);
   transform: rotate(45deg);
 }
 
@@ -3766,9 +3773,9 @@ text-shadow:
   transform: translateY(-50%);
   /* match the width of the info card (parent is 100% of that card) but cap on very wide screens */
   width: min(480px, 100%);
-  background: #dfeeff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 28%, white), color-mix(in srgb, var(--brand-light) 10%, white));
   border-radius: 24px;
-  box-shadow: 0 16px 40px rgba(11, 63, 116, 0.16);
+  box-shadow: 0 16px 40px color-mix(in srgb, var(--brand-dark) 16%, transparent);
   border: 0;
   /* give extra top padding so the close button doesn't overlap comments */
   padding: 46px 12px 12px;
@@ -3789,12 +3796,12 @@ text-shadow:
   height: 36px;
   border-radius: 50%;
   border: 0;
-  background: #ffffff;
-  color: #06304a;
+  background: color-mix(in srgb, white 96%, var(--brand-light) 4%);
+  color: var(--visitor-color-dark);
   font-size: 1.2rem;
   line-height: 1;
   cursor: pointer;
-  box-shadow: 0 6px 18px rgba(11,63,116,0.12);
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--brand-dark) 14%, transparent);
 }
 
 /* Room reactions sidebar (fixed to right) */
@@ -3804,9 +3811,9 @@ text-shadow:
   top: 80px;
   width: min(420px, 38%);
   max-width: 520px;
-  background: #dfeeff;
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 28%, white), color-mix(in srgb, var(--brand-light) 10%, white));
   border-radius: 18px;
-  box-shadow: 0 20px 48px rgba(11,63,116,0.18);
+  box-shadow: 0 20px 48px color-mix(in srgb, var(--brand-dark) 18%, transparent);
   padding: 48px 16px 16px;
   z-index: 40;
   max-height: calc(100vh - 160px);
@@ -3830,9 +3837,9 @@ text-shadow:
 
 .visitor-gallery-comment-entry {
   display: block;
-  color: #193247;
+  color: color-mix(in srgb, var(--visitor-color-dark) 88%, black);
   padding-bottom: 12px;
-  border-bottom: 1px solid rgba(11,75,128,0.06);
+  border-bottom: 1px solid color-mix(in srgb, var(--visitor-color-dark) 10%, transparent);
 }
 
 .visitor-gallery-comment-author-row {
@@ -3846,8 +3853,8 @@ text-shadow:
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(180deg,#e8f7ff,#d7eefc);
-  box-shadow: 0 6px 16px rgba(11, 63, 116, 0.12);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 70%, white), color-mix(in srgb, var(--brand-light) 42%, var(--brand-dark)));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-dark) 14%, transparent);
   position: relative;
   flex: 0 0 auto;
 }
@@ -3861,7 +3868,7 @@ text-shadow:
   height: 10px;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: #0b4b80;
+  background: var(--visitor-color-dark);
 }
 
 .visitor-gallery-comment-avatar::after {
@@ -3896,7 +3903,7 @@ text-shadow:
 .visitor-gallery-reaction-btn {
   border: 0;
   background: transparent;
-  color: #0b4b80;
+  color: var(--visitor-color-dark);
   font-size: 1.1rem;
   cursor: pointer;
   display: inline-flex;
@@ -3909,8 +3916,8 @@ text-shadow:
   min-width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #0b4b80;
-  color: #fff;
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
   font-size: 0.66rem;
   display: inline-flex;
   align-items: center;
@@ -3930,15 +3937,15 @@ text-shadow:
   padding: 8px 10px;
   border-radius: 10px;
   border: 0;
-  box-shadow: inset 0 1px 2px rgba(11,63,116,0.04);
+  box-shadow: inset 0 1px 2px color-mix(in srgb, var(--brand-dark) 6%, transparent);
 }
 
 .visitor-gallery-comment-form button {
   flex: 0 0 auto;
   padding: 8px 12px;
   border-radius: 10px;
-  background: #0b4b80;
-  color: #fff;
+  background: var(--visitor-color-dark);
+  color: var(--visitor-btn-text);
   border: 0;
 }
 
@@ -3956,11 +3963,11 @@ text-shadow:
 }
 
 .visitor-gallery-comment-form input {
-  border: 1px solid rgba(11, 75, 128, 0.22);
+  border: 1px solid color-mix(in srgb, var(--visitor-color-dark) 22%, transparent);
   border-radius: 14px;
   padding: 10px 12px;
-  background: #ffffff;
-  color: #1b2d3d;
+  background: color-mix(in srgb, white 96%, var(--brand-light) 4%);
+  color: color-mix(in srgb, var(--visitor-color-dark) 82%, black);
 }
 
 .visitor-gallery-comment-form button {
