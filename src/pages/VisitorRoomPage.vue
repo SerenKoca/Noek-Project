@@ -717,12 +717,15 @@ async function startRoomAudioFromRoom(roomValue) {
 
   audioPlayer.value.src = musicUrl
   audioPlayer.value.volume = Math.min(1, Math.max(0, Number(roomValue?.ambience?.volume ?? 0.35)))
+  audioPlayer.value.muted = true
   roomMusicState.value = { loading: true, error: '', playing: false }
 
   try {
     await audioPlayer.value.play()
+    audioPlayer.value.muted = false
     roomMusicState.value = { loading: false, error: '', playing: true }
   } catch {
+    audioPlayer.value.muted = false
     roomMusicState.value = {
       loading: false,
       error: 'Geluid kon niet automatisch starten. Klik op afspelen.',
@@ -762,8 +765,8 @@ async function enterRoom() {
   persistEntryState(roomId.value)
 
   try {
-    await loadAll()
     await startRoomAudioFromRoom(room.value)
+    await loadAll()
   } finally {
     introLoading.value = false
   }
