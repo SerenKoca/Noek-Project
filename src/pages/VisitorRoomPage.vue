@@ -3313,9 +3313,9 @@ text-shadow:
   padding: 18px 16px 12px;
   box-sizing: border-box;
   background:
-    radial-gradient(circle at 8% 100%, rgba(255, 222, 106, 0.38) 0%, rgba(255, 222, 106, 0) 17%),
-    radial-gradient(circle at 92% 100%, rgba(255, 200, 94, 0.34) 0%, rgba(255, 200, 94, 0) 16%),
-    linear-gradient(180deg, color-mix(in srgb, var(--brand-dark) 78%, #0a4f84) 0%, color-mix(in srgb, var(--brand-light) 42%, #5e93c6) 100%);
+    radial-gradient(circle at 8% 100%, color-mix(in srgb, var(--brand-dark) 28%, transparent) 0%, rgba(255, 255, 255, 0) 17%),
+    radial-gradient(circle at 92% 100%, color-mix(in srgb, var(--brand-dark) 42%, transparent) 0%, rgba(255, 255, 255, 0) 16%),
+    linear-gradient(180deg, color-mix(in srgb, var(--brand-dark) 90%, black) 0%, color-mix(in srgb, var(--brand-dark) 78%, var(--brand-light)) 62%, color-mix(in srgb, var(--brand-dark) 68%, var(--brand-light)) 100%);
   color: var(--visitor-ink);
 }
 
@@ -3402,10 +3402,10 @@ text-shadow:
   width: min(1150px, calc(100vw - 180px));
   margin: 0 auto;
   min-height: min(560px, calc(100vh - 240px));
-  background: rgba(255, 255, 255, 0.96);
+  background: color-mix(in srgb, white 92%, var(--brand-light) 8%);
   border-radius: 12px;
-  border: 1px solid rgba(255, 255, 255, 0.9);
-  box-shadow: 0 24px 52px rgba(11, 63, 116, 0.22);
+  border: 1px solid color-mix(in srgb, var(--brand-dark) 16%, white);
+  box-shadow: 0 24px 52px color-mix(in srgb, var(--brand-dark) 16%, transparent);
   padding: 12px;
   display: grid;
   gap: 10px;
@@ -3519,8 +3519,8 @@ text-shadow:
   gap: 8px;
   padding: 10px;
   border-radius: 12px;
-  border: 1px solid rgba(18, 58, 98, 0.12);
-  background: rgba(242, 248, 255, 0.85);
+  border: 1px solid color-mix(in srgb, var(--brand-dark) 12%, transparent);
+  background: color-mix(in srgb, white 90%, var(--brand-light) 10%);
 }
 
 .visitor-gallery-media {
@@ -4107,13 +4107,15 @@ text-shadow:
   grid-column: 1;
   justify-self: start;
   align-self: center;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--visitor-color-dark) 38%, white);
   border-radius: 999px;
-  padding: 12px 20px;
-  font-weight: 700;
-  background: linear-gradient(90deg, #0b4b80, #145f9a);
-  color: #fff;
-  box-shadow: 0 12px 26px rgba(11, 63, 116, 0.18);
+  padding: 13px 22px;
+  font-weight: 800;
+  background: linear-gradient(25deg, var(--visitor-color-dark) 0%, color-mix(in srgb, var(--visitor-color-light) 74%, var(--visitor-color-dark)) 100%);
+  color: var(--visitor-btn-text);
+  box-shadow:
+    0 16px 30px color-mix(in srgb, var(--visitor-color-dark) 34%, transparent),
+    0 0 0 2px color-mix(in srgb, var(--visitor-color-light) 22%, transparent) inset;
   cursor: pointer;
 }
 
