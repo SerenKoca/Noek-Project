@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import ThreeScene from '../components/ThreeScene.vue'
@@ -17,6 +17,7 @@ const state = useNoekState()
 const showRoomReactions = false
 const showShareModal = ref(false)
 const shareRoomData = ref({ roomName: '', visitUrl: '', directorName: '' })
+let autoSaveIntervalId = null
 const TEMPLATE_OWNER_EMAIL = String(import.meta.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
 const canEditTemplate = computed(() => {
   const email = String(state.authState.value?.user?.email || '').trim().toLowerCase()
@@ -33,6 +34,7 @@ onMounted(async () => {
   const roomId = String(route.params.id || '')
   if (roomId === 'new') {
     await state.openEditor(null)
+    startAutoSave()
     return
   }
 
@@ -47,7 +49,25 @@ onMounted(async () => {
   }
 
   await state.openEditor(room)
+  startAutoSave()
 })
+
+onBeforeUnmount(() => {
+  stopAutoSave()
+})
+
+function startAutoSave() {
+  stopAutoSave()
+  autoSaveIntervalId = window.setInterval(() => {
+    state.onSave({ source: 'autosave' })
+  }, 10000)
+}
+
+function stopAutoSave() {
+  if (!autoSaveIntervalId) return
+  window.clearInterval(autoSaveIntervalId)
+  autoSaveIntervalId = null
+}
 
 async function backToHome() {
   state.showHome()

@@ -42,6 +42,7 @@ const saveStatus = ref('')
 const saveStatusType = ref('')
 const currentRoomData = ref(null)
 const currentRoom = ref(null)
+const isSavingRoom = ref(false)
 const activeContributionsRoomId = ref('')
 const settingsRoom = ref(null)
 const roomContributions = ref({})
@@ -970,7 +971,12 @@ function onLoadError(message) {
   }, 6000)
 }
 
-async function onSave() {
+async function onSave(options = {}) {
+  if (isSavingRoom.value) return
+
+  const saveSource = options?.source === 'autosave' ? 'autosave' : 'manual'
+  const isAutoSave = saveSource === 'autosave'
+
   if (!sceneRef.value?.serializeRoom) {
     await nextTick()
   }
@@ -991,8 +997,11 @@ async function onSave() {
   }
 
   roomName.value = name
-  saveStatus.value = 'Bezig met opslaan...'
-  saveStatusType.value = 'loading'
+  if (!isAutoSave) {
+    saveStatus.value = 'Bezig met opslaan...'
+    saveStatusType.value = 'loading'
+  }
+  isSavingRoom.value = true
 
   try {
     let saved
@@ -1001,22 +1010,31 @@ async function onSave() {
     } else {
       saved = await saveRoom({ name, sceneData })
     }
-    saveStatus.value = `Kamer "${saved.name || 'naamloos'}" is succesvol opgeslagen!`
-    saveStatusType.value = 'success'
+    if (!isAutoSave) {
+      saveStatus.value = `Kamer "${saved.name || 'naamloos'}" is succesvol opgeslagen!`
+      saveStatusType.value = 'success'
+    }
+    console.info(`[Editor Save] Kamer opgeslagen via ${saveSource}`, {
+      roomId: saved?._id || currentRoom.value?._id || null,
+      name: saved?.name || name
+    })
     await loadRooms({ skipLoader: true })
 
     if (!currentRoom.value) {
       currentRoom.value = saved
     }
 
-    setTimeout(() => {
-      if (saveStatusType.value === 'success') {
-        saveStatus.value = ''
-        saveStatusType.value = ''
-      }
-    }, 5000)
+    if (!isAutoSave) {
+      setTimeout(() => {
+        if (saveStatusType.value === 'success') {
+          saveStatus.value = ''
+          saveStatusType.value = ''
+        }
+      }, 5000)
+    }
   } catch (error) {
     console.error('Failed to save room', error)
+    console.error(`[Editor Save] Opslaan mislukt via ${saveSource}`)
     saveStatus.value = `Opslaan mislukt: ${error?.response?.data?.error || error?.message || 'Onbekende fout'}`
     saveStatusType.value = 'error'
 
@@ -1026,6 +1044,8 @@ async function onSave() {
         saveStatusType.value = ''
       }
     }, 8000)
+  } finally {
+    isSavingRoom.value = false
   }
 }
 
