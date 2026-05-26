@@ -48,6 +48,11 @@ const roomSchema = new mongoose.Schema({
     required: true,
     trim: true
   },
+  editKey: {
+    type: String,
+    default: '',
+    index: true
+  },
   userId: {
     type: String,
     default: null

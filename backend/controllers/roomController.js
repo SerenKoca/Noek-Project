@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const RoomContribution = require('../models/RoomContribution');
+const { createRoomEditKey } = require('../lib/roomEditAuth')
 
 const ROOM_TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
@@ -179,6 +180,28 @@ exports.getRoomTemplate = async (req, res) => {
   }
 };
 
+exports.issueRoomEditLink = async (req, res) => {
+  try {
+    const room = await Room.findOne({ _id: req.params.id, ownerId: req.auth?.userId })
+
+    if (!room) {
+      return res.status(404).json({ error: 'Kamer niet gevonden.' })
+    }
+
+    if (!room.editKey) {
+      room.editKey = createRoomEditKey(room._id.toString())
+      await room.save()
+    }
+
+    return res.json({
+      editKey: room.editKey
+    })
+  } catch (error) {
+    console.error('issueRoomEditLink error:', error)
+    return res.status(500).json({ error: 'Kon bewerklink niet maken.' })
+  }
+}
+
 exports.createRoom = async (req, res) => {
   try {
     if (req.auth?.role !== 'editor') {
@@ -197,7 +220,13 @@ exports.createRoom = async (req, res) => {
       return res.status(403).json({ error: 'Elk account mag maar 2 kamers hebben.' });
     }
 
-    const room = new Room({ name, userId: userId || null, ownerId, sceneData });
+    const room = new Room({
+      name,
+      userId: userId || null,
+      ownerId,
+      sceneData,
+      editKey: createRoomEditKey(String(ownerId))
+    });
     await room.save();
 
     res.status(201).json(room);

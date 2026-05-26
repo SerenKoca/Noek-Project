@@ -4,6 +4,7 @@ import { ref, computed } from 'vue'
 const props = defineProps({
   roomName: String,
   visitUrl: String,
+  editUrl: String,
   directorName: String,
 })
 
@@ -14,6 +15,16 @@ const copied = ref(false)
 function copyToClipboard() {
   if (props.visitUrl && navigator?.clipboard?.writeText) {
     navigator.clipboard.writeText(props.visitUrl)
+    copied.value = true
+    setTimeout(() => {
+      copied.value = false
+    }, 2000)
+  }
+}
+
+function copyEditLink() {
+  if (props.editUrl && navigator?.clipboard?.writeText) {
+    navigator.clipboard.writeText(props.editUrl)
     copied.value = true
     setTimeout(() => {
       copied.value = false
@@ -59,6 +70,16 @@ function downloadQR() {
               <button class="share-copy-btn" @click="copyToClipboard" :title="copied ? 'Gekopieerd!' : 'Kopiëren'">
                 📋
               </button>
+            </div>
+
+            <div v-if="editUrl" class="share-edit-link-block">
+              <div class="share-link-label">Bewerklink voor een externe editor:</div>
+              <div class="share-link-row">
+                <input type="text" class="share-link-input" :value="editUrl" readonly />
+                <button class="share-copy-btn" @click="copyEditLink" :title="copied ? 'Gekopieerd!' : 'Kopiëren'">
+                  🔗
+                </button>
+              </div>
             </div>
 
             <div class="share-modal-buttons">
@@ -198,6 +219,12 @@ function downloadQR() {
   display: flex;
   gap: 8px;
   align-items: center;
+}
+
+.share-edit-link-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .share-link-input {

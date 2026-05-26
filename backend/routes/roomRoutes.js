@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
-const { requireAuth } = require('../middleware/authMiddleware');
+const { requireAuth, requireRole } = require('../middleware/authMiddleware');
+const { requireRoomAccess } = require('../middleware/roomAccessMiddleware')
 const {
   getRoomTemplate,
   createRoom,
@@ -8,6 +9,7 @@ const {
   getRoomById,
   updateRoom,
   deleteRoom,
+  issueRoomEditLink,
   getRoomContributions,
   createRoomContribution,
   reactToRoomContribution,
@@ -17,11 +19,14 @@ const {
   addRoomComment
 } = require('../controllers/roomController');
 
-router.use(requireAuth);
+router.get('/template', requireAuth, getRoomTemplate);
+router.post('/', requireAuth, createRoom);
+router.get('/', requireAuth, getRooms);
 
-router.get('/template', getRoomTemplate);
-router.post('/', createRoom);
-router.get('/', getRooms);
+router.post('/:id/edit-link', requireAuth, requireRole('editor'), issueRoomEditLink)
+
+router.use('/:id', requireRoomAccess)
+
 router.get('/:id/contributions', getRoomContributions);
 router.post('/:id/contributions', createRoomContribution);
 router.post('/:id/contributions/:contributionId/reactions', reactToRoomContribution);

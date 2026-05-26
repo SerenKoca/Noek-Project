@@ -3,6 +3,7 @@ import { getAuthToken } from './authService.js'
 import { attachGlobalLoaderToAxios } from './globalLoading.js'
 
 const BACKEND_BASE_URL = import.meta.env.VITE_NOEK_BACKEND_URL || '/api'
+let currentRoomEditKey = ''
 
 const http = axios.create({
   baseURL: BACKEND_BASE_URL,
@@ -19,8 +20,25 @@ http.interceptors.request.use((config) => {
   if (token) {
     config.headers.Authorization = `Bearer ${token}`
   }
+
+  if (currentRoomEditKey) {
+    config.headers['X-Room-Edit-Key'] = currentRoomEditKey
+  }
+
   return config
 })
+
+export function setRoomEditKey(editKey) {
+  currentRoomEditKey = String(editKey || '').trim()
+}
+
+export function clearRoomEditKey() {
+  currentRoomEditKey = ''
+}
+
+export function getRoomEditKey() {
+  return currentRoomEditKey
+}
 
 export async function saveRoom(roomData) {
   const response = await http.post('/rooms', roomData)
@@ -29,6 +47,18 @@ export async function saveRoom(roomData) {
 
 export async function updateRoom(roomId, roomData) {
   const response = await http.put(`/rooms/${roomId}`, roomData)
+  return response.data
+}
+
+export async function getRoomById(roomId, options = {}) {
+  const response = await http.get(`/rooms/${roomId}`, {
+    loader: { skip: options.skipLoader === true }
+  })
+  return response.data
+}
+
+export async function createRoomEditLink(roomId) {
+  const response = await http.post(`/rooms/${roomId}/edit-link`)
   return response.data
 }
 

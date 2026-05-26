@@ -41,6 +41,11 @@ function requireAuth(to, from, next) {
 
 function requireEditor(to, from, next) {
   if (!hasToken()) {
+    if (String(to.query?.editKey || '').trim()) {
+      next()
+      return
+    }
+
     next('/login')
     return
   }

@@ -4,14 +4,18 @@ import {
   updateRoom,
   deleteRoom,
   getRooms,
+  getRoomById as fetchRoomById,
   getRoomTemplate,
+  createRoomEditLink,
   getRoomContributions,
   createRoomContribution,
   reactToRoomContribution,
   addRoomContributionComment,
   updateRoomMusic,
   reactToRoom,
-  addRoomComment
+  addRoomComment,
+  clearRoomEditKey,
+  setRoomEditKey
 } from '../services/roomService.js'
 import { getSoundLibrary } from '../services/soundLibraryService.js'
 import { loginAccount, registerAccount, getStoredAuth, clearAuth } from '../services/authService.js'
@@ -383,6 +387,18 @@ async function loadRooms(options = {}) {
   }
 }
 
+async function loadRoomById(roomId, options = {}) {
+  const id = String(roomId || '').trim()
+  if (!id) return null
+
+  const room = await fetchRoomById(id, { skipLoader: options.skipLoader === true })
+  if (room?._id) {
+    mergeRoomUpdate(room)
+  }
+
+  return room
+}
+
 function onDeleteRoom(room) {
   if (!room?._id) return
 
@@ -471,6 +487,18 @@ async function openRoomSettings(room) {
   resetContributionDrafts()
   contributionCreateState.value = { loading: false, error: '', success: '' }
   await ensureRoomContributionsLoaded(room._id)
+}
+
+async function createEditLinkForRoom(roomId) {
+  const id = String(roomId || '').trim()
+  if (!id) return ''
+
+  const result = await createRoomEditLink(id)
+  const editKey = String(result?.editKey || '').trim()
+  if (!editKey) return ''
+
+  const base = typeof window !== 'undefined' ? window.location.origin : ''
+  return `${base}/rooms/${id}/editor?editKey=${encodeURIComponent(editKey)}`
 }
 
 async function addCandleContribution(room) {
@@ -835,6 +863,7 @@ async function onAuthSubmit() {
 
 function onLogout() {
   clearAuth()
+  clearRoomEditKey()
   authState.value = null
   rooms.value = []
   roomContributions.value = {}
@@ -1136,11 +1165,13 @@ export function useNoekState() {
     videoYoutubeEmbedUrl,
     currentRoomSoundTitle,
     loadRooms,
+    loadRoomById,
     onDeleteRoom,
     closeDeleteRoomModal,
     confirmDeleteRoomFromModal,
     ensureRoomContributionsLoaded,
     openRoomSettings,
+    createEditLinkForRoom,
     addCandleContribution,
     addMusicUrlContribution,
     addVideoUrlContribution,
@@ -1174,6 +1205,8 @@ export function useNoekState() {
     handleVideoFileChange,
     resetContributionDrafts,
     bootstrap,
+    setRoomEditKey,
+    clearRoomEditKey,
     getRoomById
   }
 }

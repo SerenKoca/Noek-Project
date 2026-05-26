@@ -23,8 +23,10 @@ const userInitial = computed(() => { const label = userLabel.value.trim(); retur
 const templateScene = ref(null)
 const roomName = ref('Naam kamer')
 const collaboratorsEnabled = ref(false)
-const collaborators = ref([])
-const newCollaborator = ref('')
+const editLink = ref('')
+const editLinkLoading = ref(false)
+const editLinkError = ref('')
+const editLinkCopied = ref(false)
 const creating = ref(false)
 const showContributions = ref(false)
 const route = useRoute()
@@ -32,22 +34,59 @@ const roomId = computed(() => String(route.params.id || ''))
 
 onMounted(async () => {
   await state.bootstrap()
+  const editKey = String(route.query.editKey || '').trim()
+  if (editKey) {
+    state.setRoomEditKey(editKey)
+  } else {
+    state.clearRoomEditKey()
+  }
   try {
     const res = await getRoomTemplate({ skipLoader: true })
     templateScene.value = res?.sceneData || null
   } catch (e) {
     templateScene.value = null
   }
+
+  const room = await state.loadRoomById(roomId.value, { skipLoader: true })
+  if (room?.editKey) {
+    editLink.value = `${window.location.origin}/rooms/${roomId.value}/editor?editKey=${encodeURIComponent(room.editKey)}`
+  } else if (state.authState.value?.token) {
+    await generateEditLink()
+  }
 })
 
-function addCollaborator() {
-  const email = (newCollaborator.value || '').trim()
-  if (!email) return
-  collaborators.value.push({ email })
-  newCollaborator.value = ''
+async function generateEditLink() {
+  const id = roomId.value
+  if (!id) return
+
+  editLinkLoading.value = true
+  editLinkError.value = ''
+
+  try {
+    editLink.value = await state.createEditLinkForRoom(id)
+  } catch (error) {
+    console.error('Failed to create edit link', error)
+    editLinkError.value = error?.response?.data?.error || 'Bewerklink maken mislukt.'
+  } finally {
+    editLinkLoading.value = false
+  }
+}
+
+async function copyEditLink() {
+  if (!editLink.value || !navigator?.clipboard?.writeText) return
+  await navigator.clipboard.writeText(editLink.value)
+  editLinkCopied.value = true
+  window.setTimeout(() => {
+    editLinkCopied.value = false
+  }, 2000)
 }
 
 async function createFromTemplate() {
+  if (!state.authState.value?.token) {
+    window.alert('Inloggen is vereist om een nieuwe kamer aan te maken.')
+    return
+  }
+
   if (creating.value) return
   creating.value = true
   try {
@@ -68,7 +107,11 @@ function goBack() {
     router.push('/home')
     return
   }
-  router.push(`/rooms/${id}/editor`)
+  const editKey = String(route.query.editKey || '').trim()
+  router.push({
+    path: `/rooms/${id}/editor`,
+    query: editKey ? { editKey } : {}
+  })
 }
 
 function openProfile() {
@@ -133,17 +176,26 @@ function closeContributions() { showContributions.value = false }
           </div>
 
           <div class="collaborators-card" v-show="collaboratorsEnabled">
-            <div class="collaborator-top">
-              <div>
-                <div class="collab-name">Naam bijdrager 1</div>
-                <div class="collab-email">bijdrager@gmail.com</div>
+            <div class="edit-link-card inside-toggle">
+              <div class="edit-link-header">
+                <div>
+                  <div class="setting-label">Bewerklink</div>
+                  <div class="setting-sub">Deel deze link met iemand die de kamer zonder account mag aanpassen</div>
+                </div>
               </div>
-              <button type="button" class="close-x" @click="collaborators.splice(0,1)">✕</button>
-            </div>
 
-            <div class="collaborator-add">
-              <input v-model="newCollaborator" placeholder="Example@gmail.com" />
-              <button type="button" class="primary-btn small" @click="addCollaborator">Toevoegen</button>
+              <div v-if="editLink" class="edit-link-row">
+                <input type="text" class="edit-link-input" :value="editLink" readonly />
+                <button type="button" class="primary-btn small" @click="copyEditLink">
+                  {{ editLinkCopied ? 'Gekopieerd' : 'Kopiëren' }}
+                </button>
+              </div>
+
+              <div v-else class="setting-sub">
+                {{ editLinkLoading ? 'Bewerklink wordt geladen...' : 'Bewerklink verschijnt hier automatisch.' }}
+              </div>
+
+              <div v-if="editLinkError" class="edit-link-error">{{ editLinkError }}</div>
             </div>
           </div>
 
@@ -202,6 +254,39 @@ function closeContributions() { showContributions.value = false }
 .switch-wrap { display:flex; align-items:center; gap:10px }
 .switch-text { font-size:0.95rem; color:#2b4b6b }
 .settings-title { margin-top:0; margin-bottom:8px }
+.edit-link-card {
+  width: 100%;
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 76%, white);
+  border: 1px solid var(--editor-border);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.edit-link-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.edit-link-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.edit-link-input {
+  flex: 1;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid var(--editor-border);
+  background: #fff;
+  font-family: monospace;
+}
+.edit-link-error {
+  color: #8a2431;
+  font-size: 0.92rem;
+}
 .primary-btn.wide { width:100%; padding:14px 18px; min-height: 46px }
 .primary-btn.big { padding:18px 36px; font-size:1.25rem; min-height: 50px }
 .primary-btn.small { padding:8px 14px; font-size:0.95rem; min-height: 40px }

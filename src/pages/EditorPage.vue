@@ -16,11 +16,13 @@ const router = useRouter()
 const state = useNoekState()
 const showRoomReactions = false
 const showShareModal = ref(false)
-const shareRoomData = ref({ roomName: '', visitUrl: '', directorName: '' })
+const shareRoomData = ref({ roomName: '', visitUrl: '', editUrl: '', directorName: '' })
 let autoSaveIntervalId = null
 let desktopViewportQuery = null
 const TEMPLATE_OWNER_EMAIL = String(import.meta.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
 const EDITOR_DESKTOP_MIN_WIDTH = 1024
+const activeEditKey = computed(() => String(route.query.editKey || '').trim())
+const isAnonymousEditorSession = computed(() => !state.authState.value?.token && Boolean(activeEditKey.value))
 const canEditTemplate = computed(() => {
   const email = String(state.authState.value?.user?.email || '').trim().toLowerCase()
   return email === TEMPLATE_OWNER_EMAIL
@@ -37,6 +39,11 @@ function isEditorDesktopViewport() {
 async function redirectToHomeForMobileEditor() {
   window.alert('De editor is alleen beschikbaar op desktop.')
   state.showHome()
+  if (isAnonymousEditorSession.value && state.currentRoom.value?._id) {
+    await router.replace(`/visit/${state.currentRoom.value._id}`)
+    return
+  }
+
   await router.replace('/home')
 }
 
@@ -49,7 +56,13 @@ function handleDesktopViewportChange(event) {
 
 onMounted(async () => {
   await state.bootstrap()
-  if (!state.authState.value?.token) {
+  if (activeEditKey.value) {
+    state.setRoomEditKey(activeEditKey.value)
+  } else {
+    state.clearRoomEditKey()
+  }
+
+  if (!state.authState.value?.token && !activeEditKey.value) {
     await router.replace('/login')
     return
   }
@@ -65,17 +78,18 @@ onMounted(async () => {
   }
 
   const roomId = String(route.params.id || '')
+  if (roomId === 'new' && !state.authState.value?.token) {
+    await router.replace('/login')
+    return
+  }
+
   if (roomId === 'new') {
     await state.openEditor(null)
     startAutoSave()
     return
   }
 
-  if (state.rooms.value.length === 0) {
-    await state.loadRooms()
-  }
-
-  const room = state.getRoomById(roomId)
+  const room = await state.loadRoomById(roomId, { skipLoader: true })
   if (!room) {
     await router.replace('/home')
     return
@@ -109,6 +123,11 @@ function stopAutoSave() {
 
 async function backToHome() {
   state.showHome()
+  if (isAnonymousEditorSession.value && state.currentRoom.value?._id) {
+    await router.push(`/visit/${state.currentRoom.value._id}`)
+    return
+  }
+
   await router.push('/home')
 }
 
@@ -125,12 +144,21 @@ async function shareCurrentRoom() {
   }
 
   const visitUrl = buildVisitUrl(roomId)
+  let editUrl = ''
+  try {
+    editUrl = activeEditKey.value
+      ? `${window.location.origin}/rooms/${roomId}/editor?editKey=${encodeURIComponent(activeEditKey.value)}`
+      : await state.createEditLinkForRoom(roomId)
+  } catch {
+    editUrl = ''
+  }
   const roomName = state.currentRoom.value?.name || 'deze kamer'
   const directorName = state.brandingState.value?.directorName || 'Thibaut DELA'
 
   shareRoomData.value = {
     roomName,
     visitUrl,
+    editUrl,
     directorName,
   }
   showShareModal.value = true
@@ -140,7 +168,10 @@ async function openSettings() {
   const roomId = state.currentRoom.value?._id || String(route.params.id || '')
   if (!roomId) return
   await state.openRoomSettings(state.currentRoom.value || state.getRoomById(roomId))
-  await router.push(`/rooms/${roomId}/settings`)
+  await router.push({
+    path: `/rooms/${roomId}/settings`,
+    query: activeEditKey.value ? { editKey: activeEditKey.value } : {}
+  })
 }
 </script>
 
@@ -285,6 +316,7 @@ async function openSettings() {
       v-if="showShareModal"
       :room-name="shareRoomData.roomName"
       :visit-url="shareRoomData.visitUrl"
+      :edit-url="shareRoomData.editUrl"
       :director-name="shareRoomData.directorName"
       @close="showShareModal = false"
     />
