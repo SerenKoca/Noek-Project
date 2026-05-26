@@ -1359,9 +1359,6 @@ onBeforeUnmount(() => {
               </template>
             </template>
           </div>
-          <button type="button" class="visitor-reactions-btn" :aria-expanded="roomReactionsOpen" @click="toggleRoomReactions">
-            Reacties
-          </button>
           <button type="button" class="visitor-user-btn" @click="isLoggedIn ? openProfile() : openLogin()">
             {{ isLoggedIn ? 'Profiel' : 'Inloggen' }}
           </button>
@@ -2434,6 +2431,18 @@ background: linear-gradient(
   cursor: pointer;
 }
 
+.visitor-reactions-btn {
+  pointer-events: auto;
+  border: 1px solid color-mix(in srgb, var(--visitor-color-dark) 16%, transparent);
+  background: rgba(255, 255, 255, 0.94);
+  border-radius: 999px;
+  color: var(--visitor-color-dark);
+  height: 44px;
+  padding: 0 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .visitor-name-input {
   padding: 8px 12px;
   border-radius: 12px;
@@ -2448,6 +2457,13 @@ background: linear-gradient(
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  max-width: 220px;
+}
+
+.visitor-name-btn > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .visitor-user-btn {
@@ -4475,29 +4491,418 @@ text-shadow:
   .visitor-gallery-grid {
     grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
   }
+
+  .visitor-entry-wrap {
+    padding: 14px;
+  }
+
+  .visitor-entry-card {
+    min-height: 0;
+    border-radius: 20px;
+    padding: 22px 16px;
+  }
+
+  .visitor-entry-candle-scene {
+    min-height: 124px;
+    gap: 12px;
+  }
+
+  .visitor-entry-candle.is-large .visitor-entry-candle-wax {
+    width: 88px;
+    height: 116px;
+  }
+
+  .visitor-entry-candle.is-small .visitor-entry-candle-wax {
+    width: 66px;
+    height: 88px;
+  }
+
+  .visitor-gallery-lightbox {
+    place-items: end center;
+    padding: 0;
+  }
+
+  .visitor-gallery-lightbox-card {
+    width: 100%;
+    min-height: 100vh;
+    max-height: 100vh;
+    border-radius: 18px 18px 0 0;
+    padding: 50px 12px 12px;
+    gap: 10px;
+    overflow: auto;
+  }
+
+  .visitor-gallery-lightbox-close {
+    top: 10px;
+    right: 10px;
+    width: 36px;
+    height: 36px;
+  }
+
+  .visitor-gallery-lightbox-info {
+    order: 2;
+    height: auto;
+    padding: 12px;
+  }
+
+  .visitor-gallery-lightbox-info h3 {
+    font-size: 1.16rem;
+  }
+
+  .visitor-gallery-lightbox-message {
+    min-height: 120px;
+  }
+
+  .visitor-gallery-lightbox-media {
+    order: 1;
+    width: 100%;
+    height: min(44vh, 340px);
+    min-height: 220px;
+    padding: 4px 24px 4px 4px;
+  }
+
+  .visitor-gallery-lightbox-next {
+    right: 2px;
+    font-size: 2rem;
+  }
+
+  .visitor-gallery-comment-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  .visitor-gallery-comment-bubble {
+    margin-left: 38px;
+    padding: 10px 12px;
+  }
 }
 
 @media (max-width: 900px) {
   .visitor-shell {
-    padding: 14px 10px 12px;
+    gap: 10px;
+    padding: 10px 10px calc(116px + env(safe-area-inset-bottom));
+  }
+
+  .visitor-stage {
+    position: relative;
+    min-height: calc(100vh - 260px);
+    border-radius: 18px;
+    overflow: hidden;
+  }
+
+  .visitor-topbar {
+    display: grid;
+    gap: 8px;
+    align-items: start;
+  }
+
+  .visitor-topbar h1 {
+    font-size: 1.05rem;
+    line-height: 1.25;
+  }
+
+  .visitor-topbar-right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 8px;
+  }
+
+  .visitor-topbar-right > div {
+    order: 2;
+  }
+
+  .visitor-topbar-right .visitor-user-btn {
+    order: 1;
+  }
+
+  .visitor-topbar-right .visitor-reactions-btn {
+    order: 3;
+  }
+
+  .visitor-gallery-topbar .visitor-topbar-right {
+    justify-content: flex-end;
+  }
+
+  .visitor-gallery-topbar .visitor-topbar-right > div {
+    order: 1;
+  }
+
+  .visitor-gallery-topbar .visitor-topbar-right .visitor-user-btn {
+    order: 2;
+    margin-left: 0;
+  }
+
+  .visitor-name-btn,
+  .visitor-user-btn,
+  .visitor-reactions-btn {
+    height: 38px;
+    font-size: 0.82rem;
+  }
+
+  .visitor-name-btn {
+    max-width: 52vw;
+    padding: 0 12px;
+  }
+
+  .visitor-user-btn {
+    min-width: 84px;
+    padding: 0 12px;
   }
 
   .visitor-footer {
-    grid-template-columns: 1fr;
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 40;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    padding: 0;
+    align-items: center;
     justify-items: stretch;
   }
 
+  .visitor-gallery-footer {
+    position: fixed;
+    left: 10px;
+    right: 10px;
+    bottom: calc(8px + env(safe-area-inset-bottom));
+    z-index: 40;
+    border-radius: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+    box-shadow: none;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    padding: 0;
+    align-items: stretch;
+  }
+
+  .visitor-footer > .visitor-pill-btn,
+  .visitor-gallery-add {
+    width: 100%;
+    padding: 10px 14px;
+    font-size: 0.9rem;
+    grid-column: auto;
+    justify-self: stretch;
+    order: 2;
+  }
+
+  .visitor-footer > .visitor-pill-btn {
+    width: auto;
+    padding: 7px 12px;
+    font-size: 0.78rem;
+    border-radius: 10px;
+    justify-self: start;
+  }
+
+  .visitor-action-bar {
+    grid-column: auto;
+    justify-self: stretch;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    flex-wrap: nowrap;
+    order: 1;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  .visitor-footer .visitor-action-bar {
+    grid-column: 1 / -1;
+  }
+
+  .visitor-gallery-tabs {
+    grid-column: auto;
+    justify-self: stretch;
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 8px;
+    flex-wrap: nowrap;
+    order: 1;
+    padding: 0;
+    border-radius: 0;
+    background: transparent;
+    border: 0;
+    box-shadow: none;
+  }
+
+  /* On mobile gallery screens, hide the category menu buttons. */
+  .visitor-gallery-footer .visitor-gallery-tabs {
+    display: none;
+  }
+
+  .visitor-action-btn {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .visitor-action-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+  }
+
+  .icon-shape {
+    width: 28px;
+    height: 28px;
+  }
+
+  .visitor-action-label {
+    font-size: 0.72rem;
+    line-height: 1.1;
+    text-shadow: none;
+    padding: 0;
+  }
+
+  .visitor-gallery-footer > .visitor-brand-card,
+  .visitor-footer > .visitor-brand-card {
+    display: grid;
+    justify-self: center;
+    min-width: 0;
+    padding: 6px 10px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid color-mix(in srgb, var(--brand-dark) 14%, white);
+    box-shadow: 0 8px 18px color-mix(in srgb, var(--brand-dark) 14%, transparent);
+    order: 3;
+  }
+
+  .visitor-footer > .visitor-brand-card {
+    grid-column: 2;
+    justify-self: end;
+    order: 2;
+  }
+
+  .visitor-gallery-footer > .visitor-brand-card .visitor-brand-logo,
+  .visitor-footer > .visitor-brand-card .visitor-brand-logo {
+    max-width: 124px;
+    max-height: 32px;
+  }
+
+  .visitor-gallery-shell {
+    gap: 10px;
+    padding: 10px 10px calc(126px + env(safe-area-inset-bottom));
+  }
+
+  .visitor-gallery-topbar {
+    gap: 8px;
+  }
+
+  .visitor-title-card {
+    width: 100%;
+    min-height: 40px;
+    padding: 0 12px;
+  }
+
+  .visitor-back-btn-gallery {
+    position: static;
+    justify-self: start;
+    margin-bottom: 6px;
+  }
+
+  .visitor-gallery-frame {
+    grid-template-columns: 1fr;
+    align-content: start;
+    gap: 10px;
+    padding: 0;
+  }
+
+  .visitor-gallery-panel {
+    width: 100%;
+    min-height: 0;
+    max-height: calc(100vh - 320px);
+    padding: 10px;
+  }
+
+  .visitor-gallery-grid {
+    grid-auto-rows: 68px;
+  }
+
+  .visitor-gallery-grid.is-media {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .visitor-gallery-candle,
+  .visitor-gallery-next,
   .visitor-candles {
     display: none;
   }
 
-  .visitor-action-bar {
-    justify-content: flex-start;
+  .visitor-vr-entry-btn {
+    top: auto;
+    right: 14px;
+    bottom: calc(122px + env(safe-area-inset-bottom));
+    min-width: 86px;
+    min-height: 44px;
+    padding: 0 14px;
+    font-size: 0.92rem;
   }
 
-  .visitor-action-btn {
-    flex: 1;
-    min-width: 120px;
+  .visitor-room-reaction-panel {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: calc(126px + env(safe-area-inset-bottom));
+    width: auto;
+    max-width: none;
+    max-height: min(66vh, 520px);
+    border-radius: 16px;
+    padding: 46px 12px 12px;
+  }
+
+  .visitor-panel {
+    left: 10px;
+    right: 10px;
+    bottom: calc(126px + env(safe-area-inset-bottom));
+    transform: none;
+    width: auto;
+    max-height: min(66vh, 560px);
+    border-radius: 16px;
+  }
+
+  .visitor-panel--side,
+  .visitor-panel--side-right {
+    left: 10px;
+    right: 10px;
+    top: auto;
+    bottom: calc(126px + env(safe-area-inset-bottom));
+    width: auto;
+    height: auto;
+    max-height: min(66vh, 560px);
+    border-radius: 16px;
+  }
+
+  .visitor-panel--candle-detail {
+    top: auto;
+    bottom: calc(126px + env(safe-area-inset-bottom));
+    left: 10px;
+    right: 10px;
+    width: auto;
+    max-height: min(66vh, 560px);
+    transform: none;
+    padding-bottom: 78px;
+  }
+
+  .candle-panel-footer {
+    left: 12px;
+    right: 12px;
+    bottom: -62px;
+  }
+
+  .item-comment-form {
+    grid-template-columns: 1fr;
   }
 
   .item-comment-form {
