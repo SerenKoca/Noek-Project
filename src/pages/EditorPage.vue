@@ -207,6 +207,7 @@ async function openSettings() {
             :scene-command="state.sceneCommand.value"
             :room-data="state.currentRoomData.value"
             :can-edit-template="canEditTemplate"
+            :admin-mode="false"
             @selected="state.onSelected"
             @selected-anchor="state.onSelectedAnchor"
             @load-error="state.onLoadError"

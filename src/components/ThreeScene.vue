@@ -27,6 +27,10 @@ const props = defineProps({
     type: Boolean,
     default: false
   },
+  adminMode: {
+    type: Boolean,
+    default: false
+  },
   useStoredTemplate: {
     type: Boolean,
     default: true
@@ -82,6 +86,7 @@ let selectedRoot = null
 
 const sceneReady = ref(false)
 const canEditTemplate = computed(() => props.canEditTemplate === true)
+const adminMode = computed(() => props.adminMode === true)
 // Debug/test helper: 'off' | 'canvas-red' | 'cover-red'
 const debugMode = ref('off')
 
@@ -2602,7 +2607,7 @@ onBeforeUnmount(() => {
   <div class="three-scene-shell">
     <div ref="containerEl" class="three-scene-canvas"></div>
 
-    <div v-if="canEditTemplate" class="template-editor-overlay">
+    <div v-if="canEditTemplate && adminMode" class="template-editor-overlay admin-visible">
       <button type="button" class="template-editor-toggle" @click="templateEditorOpen = !templateEditorOpen">
         {{ templateEditorOpen ? 'Sluit template editor' : 'Open template editor' }}
       </button>
@@ -2730,9 +2735,13 @@ onBeforeUnmount(() => {
   top: 16px;
   z-index: 20;
   width: min(420px, calc(100% - 32px));
-  display: grid;
+  display: none;
   gap: 10px;
   pointer-events: none;
+}
+
+.template-editor-overlay.admin-visible {
+  display: grid;
 }
 
 .template-editor-toggle,

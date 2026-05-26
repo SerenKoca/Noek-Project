@@ -379,6 +379,7 @@ async function logout() {
               class="template-scene template-scene-large"
               :room-data="templateSceneData"
               :can-edit-template="true"
+              :admin-mode="true"
               :use-stored-template="false"
               :hide-local-template-actions="true"
             />
