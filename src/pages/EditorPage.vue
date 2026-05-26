@@ -18,17 +18,50 @@ const showRoomReactions = false
 const showShareModal = ref(false)
 const shareRoomData = ref({ roomName: '', visitUrl: '', directorName: '' })
 let autoSaveIntervalId = null
+let desktopViewportQuery = null
 const TEMPLATE_OWNER_EMAIL = String(import.meta.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
+const EDITOR_DESKTOP_MIN_WIDTH = 1024
 const canEditTemplate = computed(() => {
   const email = String(state.authState.value?.user?.email || '').trim().toLowerCase()
   return email === TEMPLATE_OWNER_EMAIL
 })
+
+function isEditorDesktopViewport() {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+    return true
+  }
+
+  return window.matchMedia(`(min-width: ${EDITOR_DESKTOP_MIN_WIDTH}px)`).matches
+}
+
+async function redirectToHomeForMobileEditor() {
+  window.alert('De editor is alleen beschikbaar op desktop.')
+  state.showHome()
+  await router.replace('/home')
+}
+
+function handleDesktopViewportChange(event) {
+  if (event.matches) return
+
+  stopAutoSave()
+  redirectToHomeForMobileEditor()
+}
 
 onMounted(async () => {
   await state.bootstrap()
   if (!state.authState.value?.token) {
     await router.replace('/login')
     return
+  }
+
+  if (!isEditorDesktopViewport()) {
+    await redirectToHomeForMobileEditor()
+    return
+  }
+
+  if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+    desktopViewportQuery = window.matchMedia(`(min-width: ${EDITOR_DESKTOP_MIN_WIDTH}px)`)
+    desktopViewportQuery.addEventListener('change', handleDesktopViewportChange)
   }
 
   const roomId = String(route.params.id || '')
@@ -53,6 +86,11 @@ onMounted(async () => {
 })
 
 onBeforeUnmount(() => {
+  if (desktopViewportQuery) {
+    desktopViewportQuery.removeEventListener('change', handleDesktopViewportChange)
+    desktopViewportQuery = null
+  }
+
   stopAutoSave()
 })
 

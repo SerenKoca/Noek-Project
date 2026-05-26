@@ -150,7 +150,7 @@ function closeContributions() { showContributions.value = false }
           <button type="button" class="primary-btn wide" style="margin-top:18px" @click="openContributions">Bekijk bijdrages van de kamer</button>
 
           <div class="bottom-actions">
-            <button type="button" class="text-back" @click="goBack"></button>
+            <button type="button" class="text-back" @click="goBack">Terug</button>
             <button type="button" class="primary-btn big" @click="goBack">Terug naar kamer</button>
           </div>
         </div>
@@ -171,7 +171,8 @@ function closeContributions() { showContributions.value = false }
   margin-bottom: 18px;
 }
 .create-room-name.big {
-  width: 70%;
+  width: 100%;
+  max-width: 680px;
   font-size: 2.6rem;
   padding: 22px 24px;
   background: #e9f2fb;
@@ -201,11 +202,20 @@ function closeContributions() { showContributions.value = false }
 .switch-wrap { display:flex; align-items:center; gap:10px }
 .switch-text { font-size:0.95rem; color:#2b4b6b }
 .settings-title { margin-top:0; margin-bottom:8px }
-.primary-btn.wide { width:100%; padding:14px 18px }
-.primary-btn.big { padding:18px 36px; font-size:1.25rem }
-.primary-btn.small { padding:8px 14px; font-size:0.95rem }
+.primary-btn.wide { width:100%; padding:14px 18px; min-height: 46px }
+.primary-btn.big { padding:18px 36px; font-size:1.25rem; min-height: 50px }
+.primary-btn.small { padding:8px 14px; font-size:0.95rem; min-height: 40px }
 .bottom-actions { display:flex; justify-content:space-between; align-items:center; margin-top:28px }
-.text-back { background:transparent; border:none; font-weight:700; font-size:1.05rem }
+.text-back {
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 45%, white);
+  border: 1px solid var(--editor-border);
+  border-radius: 10px;
+  padding: 12px 16px;
+  font-weight:700;
+  font-size:1rem;
+  color: var(--editor-text);
+  min-height: 46px;
+}
 
 /* Topbar */
 .create-topbar { display:flex; align-items:center; justify-content:space-between; padding:14px 48px; background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light, #d7ebff) 80%, white), #f2f9ff); border-bottom:1px solid color-mix(in srgb, var(--brand-dark, #0c4f82) 10%, white) }
@@ -216,13 +226,13 @@ function closeContributions() { showContributions.value = false }
 /* Two column layout */
 .settings-content-v2.two-column { display:grid; grid-template-columns: 1fr 1fr; gap:48px; align-items:start; padding:40px 48px; max-width:1600px; margin:0 auto; box-sizing:border-box }
 .left-column { display:flex; flex-direction:column; gap:28px; align-items:flex-start }
-.right-column { display:flex; flex-direction:column }
+.right-column { display:flex; flex-direction:column; gap: 14px }
 
 /* Make columns occupy roughly half the viewport */
 .left-column, .right-column { min-width: 0 }
 .preview-shell.large { min-height: 380px; width: 100%; max-width: 640px; background: transparent; border: none; padding: 0 }
-.create-room-name.big { width: 72%; background: #eef6fb; border: none }
-.collaborators-card { width: 84%; background: color-mix(in srgb, var(--brand-light, #d7ebff) 88%, white); border: none; box-shadow: none }
+.create-room-name.big { width: 100%; background: #eef6fb; border: none }
+.collaborators-card { width: 100%; background: color-mix(in srgb, var(--brand-light, #d7ebff) 88%, white); border: none; box-shadow: none }
 .primary-btn.wide { max-width: 480px; margin-left:0 }
 
 /* Progress bars */
@@ -245,6 +255,81 @@ function closeContributions() { showContributions.value = false }
 .primary-btn.big { background: linear-gradient(90deg, var(--editor-brand), color-mix(in srgb, var(--editor-brand) 40%, white)); color:#fff; border:0 }
 
 @media (max-width: 900px) {
-  .settings-content-v2.two-column { grid-template-columns: 1fr; padding:28px }
+  .home-topbar-v2.editor-home-topbar {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .settings-page-v2.create-room-v2.editor-home-shell {
+    min-height: auto;
+  }
+
+  .settings-content-v2.two-column {
+    grid-template-columns: 1fr;
+    gap: 20px;
+    padding: 22px 16px 26px;
+  }
+
+  .left-column,
+  .right-column {
+    gap: 14px;
+  }
+
+  .create-room-name.big {
+    max-width: none;
+    font-size: 1.35rem;
+    padding: 14px 14px;
+    border-radius: 10px;
+    margin-bottom: 8px;
+  }
+
+  .preview-shell.large {
+    min-height: 280px;
+    max-width: none;
+  }
+
+  .settings-title {
+    font-size: 1.1rem;
+    margin-bottom: 2px;
+  }
+
+  .setting-row.spaced {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .switch-wrap {
+    justify-content: space-between;
+  }
+
+  .collaborator-add {
+    flex-direction: column;
+  }
+
+  .primary-btn.small,
+  .primary-btn.wide,
+  .primary-btn.big,
+  .text-back {
+    width: 100%;
+  }
+
+  .bottom-actions {
+    flex-direction: column-reverse;
+    gap: 10px;
+    margin-top: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .editor-home-user-name {
+    display: none;
+  }
+
+  .editor-home-brand-logo {
+    max-height: 40px;
+    max-width: 150px;
+  }
 }
 </style>

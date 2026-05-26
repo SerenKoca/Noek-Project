@@ -8,6 +8,8 @@ const router = useRouter()
 const state = useNoekState()
 const createRoomModal = ref(false)
 const creatingRoom = ref(false)
+const showDesktopOnlyOverlay = ref(false)
+const EDITOR_DESKTOP_MIN_WIDTH = 1024
 
 import { saveRoom } from '../services/roomService.js'
 
@@ -26,6 +28,11 @@ async function openEditorRoute(room) {
     return
   }
 
+  if (typeof window !== 'undefined' && window.innerWidth < EDITOR_DESKTOP_MIN_WIDTH) {
+    showDesktopOnlyOverlay.value = true
+    return
+  }
+
   await state.openEditor(room || null)
   if (room?._id) {
     await router.push(`/rooms/${room._id}/editor`)
@@ -33,6 +40,10 @@ async function openEditorRoute(room) {
   }
 
   await router.push('/rooms/new/editor')
+}
+
+function closeDesktopOnlyOverlay() {
+  showDesktopOnlyOverlay.value = false
 }
 
 async function openSettingsRoute(room) {
@@ -327,6 +338,20 @@ function openTemplates() {
               <h4>Templates</h4>
               <p>Kies een vooraf ontworpen kamer die je zelf kan aanpassen</p>
             </button>
+          </div>
+        </div>
+      </div>
+
+      <div
+        v-if="showDesktopOnlyOverlay"
+        class="modal-backdrop desktop-only-overlay"
+        @click.self="closeDesktopOnlyOverlay"
+      >
+        <div class="modal-card desktop-only-overlay-card" role="dialog" aria-modal="true" aria-label="Alleen desktop">
+          <h3>Alleen beschikbaar op desktop</h3>
+          <p>De kamereditor werkt alleen op desktop. Open deze kamer op een laptop of computer.</p>
+          <div class="modal-actions">
+            <button type="button" class="primary-btn" @click="closeDesktopOnlyOverlay">Oké, begrepen</button>
           </div>
         </div>
       </div>
