@@ -400,6 +400,26 @@ watch(allowedSubCategories, (list) => {
     activeSubCategory.value = list[0]
   }
 })
+
+// When an object in the scene is selected, open the Models panel
+watch(() => props.selected, (sel) => {
+  if (!sel) return
+
+  // Ensure we're in the furniture category and open the content panel
+  activeCategory.value = 'Meubels'
+
+  // Prefer the slot's first category if present and allowed, otherwise fall back to allowed sub-categories
+  const selCategory = Array.isArray(sel.slotCategories) && sel.slotCategories.length ? sel.slotCategories[0] : ''
+  if (selCategory && (DEFAULT_FURNITURE_SUBCATEGORIES.includes(selCategory) || (allowedSubCategories.value && allowedSubCategories.value.includes(selCategory)))) {
+    activeSubCategory.value = selCategory
+  } else if (allowedSubCategories.value && allowedSubCategories.value.length) {
+    activeSubCategory.value = allowedSubCategories.value[0]
+  } else {
+    activeSubCategory.value = 'Alle'
+  }
+
+  panelStage.value = 'content'
+})
 </script>
 
 <template>
