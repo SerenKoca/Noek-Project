@@ -3,12 +3,51 @@
     "id": "vogels",
     "title": "Vogels",
     "url": "/sounds/vogels.mp3",
-    "category": "Vogels"
+    "category": "Natuur"
   },
   {
     "id": "klassiek",
     "title": "klassiek",
     "url": "/sounds/klassiek.mp3",
-    "category": "Klassiek"
+    "category": "Instrumentaal"
+  },
+  {
+    "id": "gitaar",
+    "title": "Gitaar",
+    "url": "/sounds/guitar.mp3",
+    "category": "Instrumentaal"
+  }, 
+  {
+    "id": "viool",
+    "title": "Viool",
+    "url": "/sounds/viool.mp3",
+    "category": "Instrumentaal"
+  },
+  {
+    "id": "strand",
+    "title": "Strand",
+    "url": "/sounds/strand.mp3",
+    "category": "Natuur"
+  },
+  {
+    "id": "kampvuur",
+    "title": "Kampvuur",
+    "url": "/sounds/kampvuur.mp3",
+    "category": "Overig"
+  },
+  {
+    "id": "regen",
+    "title": "Regen",
+    "url": "/sounds/regen.mp3",
+    "category": "Natuur"
+  },
+    {
+    "id": "bos",
+    "title": "Bos",
+    "url": "/sounds/bos.mp3",
+    "category": "Natuur"
   }
+
+
+
 ]
