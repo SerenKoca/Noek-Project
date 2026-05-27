@@ -6,7 +6,7 @@ export const DEFAULT_WALL_TEXTURE_ID = 'linen-soft'
 export const FLOOR_TEXTURE_PRESETS = [
   {
     id: 'oak-warm',
-    label: 'Warm eiken',
+    label: 'Hout',
     preview: 'linear-gradient(135deg, #c18a55 0%, #8b5a34 100%)'
   },
   {
@@ -20,9 +20,14 @@ export const FLOOR_TEXTURE_PRESETS = [
     preview: 'linear-gradient(135deg, #e8dccd 0%, #c9b39c 100%)'
   },
   {
-    id: 'terracotta-tiles',
-    label: 'Terracotta tegels',
-    preview: 'repeating-linear-gradient(135deg, #c97b4f 0 18px, #b5653f 18px 36px)'
+    id: 'concrete-slab',
+    label: 'Beton',
+    preview: 'linear-gradient(135deg, #d7d3cb 0%, #a9a49a 100%)'
+  },
+  {
+    id: 'checker-tiles',
+    label: 'Tegelpatroon',
+    preview: 'repeating-linear-gradient(45deg, #f4efe6 0 18px, #2d2a26 18px 36px)'
   },
   {
     id: 'woven-carpet',
@@ -56,11 +61,95 @@ export const WALL_TEXTURE_PRESETS = [
     id: 'paneled-wainscot',
     label: 'Paneelwand',
     preview: 'linear-gradient(180deg, #efe4d5 0 54%, #d9c1a7 54% 100%)'
+  },
+  {
+    id: 'paper-bloom',
+    label: 'Papierbloesem',
+    preview: 'radial-gradient(circle at 24% 28%, #d7b4a6 0 6px, transparent 7px), radial-gradient(circle at 72% 64%, #bea881 0 5px, transparent 6px), linear-gradient(135deg, #f6efe7 0%, #ebdfd4 100%)'
+  },
+  {
+    id: 'chalk-ridge',
+    label: 'Krijtstuc',
+    preview: 'linear-gradient(135deg, #f1e8dd 0%, #d8cdc2 100%)'
   }
 ]
 
 const FLOOR_PRESET_IDS = new Set(FLOOR_TEXTURE_PRESETS.map((preset) => preset.id))
 const WALL_PRESET_IDS = new Set(WALL_TEXTURE_PRESETS.map((preset) => preset.id))
+
+function toHexColor(value, fallback) {
+  const input = String(value || '').trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(input) ? input : fallback
+}
+
+function getSurfaceTextureDefaults(surface, textureId) {
+  if (surface === 'floor') {
+    if (textureId === 'herringbone-oak') {
+      return { primaryColor: '#a56d43', secondaryColor: '#c7925e' }
+    }
+
+    if (textureId === 'terrazzo-sand') {
+      return { primaryColor: '#e6dccf', secondaryColor: '#9f8d79' }
+    }
+
+    if (textureId === 'concrete-slab') {
+      return { primaryColor: '#d9d4ca', secondaryColor: '#9c958a' }
+    }
+
+    if (textureId === 'checker-tiles') {
+      return { primaryColor: '#f4efe6', secondaryColor: '#2d2a26' }
+    }
+
+    if (textureId === 'woven-carpet') {
+      return { primaryColor: '#b79682', secondaryColor: '#d7c3b4' }
+    }
+
+    return { primaryColor: '#9f6f42', secondaryColor: '#b57a4c' }
+  }
+
+  if (textureId === 'vertical-stripes') {
+    return { primaryColor: '#f3ebdf', secondaryColor: '#e8d6c3' }
+  }
+
+  if (textureId === 'vintage-floral') {
+    return { primaryColor: '#f6efe5', secondaryColor: '#d89f92' }
+  }
+
+  if (textureId === 'soft-plaster') {
+    return { primaryColor: '#e9dfd3', secondaryColor: '#cdb9a9' }
+  }
+
+  if (textureId === 'paneled-wainscot') {
+    return { primaryColor: '#f0e5d6', secondaryColor: '#d1b79c' }
+  }
+
+  if (textureId === 'paper-bloom') {
+    return { primaryColor: '#f6efe7', secondaryColor: '#d7b4a6' }
+  }
+
+  if (textureId === 'chalk-ridge') {
+    return { primaryColor: '#f1e8dd', secondaryColor: '#d8cdc2' }
+  }
+
+  return { primaryColor: '#efe3d6', secondaryColor: '#d9ccc0' }
+}
+
+export function getFloorTextureDefaults(textureId = DEFAULT_FLOOR_TEXTURE_ID) {
+  return getSurfaceTextureDefaults('floor', normalizeFloorTextureId(textureId))
+}
+
+export function getWallTextureDefaults(textureId = DEFAULT_WALL_TEXTURE_ID) {
+  return getSurfaceTextureDefaults('wall', normalizeWallTextureId(textureId))
+}
+
+export function normalizeSurfaceTextureColors(surface, textureId, colors = {}) {
+  const normalizedTextureId = surface === 'wall' ? normalizeWallTextureId(textureId) : normalizeFloorTextureId(textureId)
+  const defaults = getSurfaceTextureDefaults(surface, normalizedTextureId)
+  return {
+    primaryColor: toHexColor(colors?.primaryColor, defaults.primaryColor),
+    secondaryColor: toHexColor(colors?.secondaryColor, defaults.secondaryColor)
+  }
+}
 
 function createTextureCanvas(size, draw) {
   const canvas = document.createElement('canvas')
@@ -122,12 +211,12 @@ function createWoodTexture({ base, accent, grain, plankCount = 6, diagonal = fal
   })
 }
 
-function createTerrazzoTexture() {
+function createTerrazzoTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#e6dccf'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
-    const speckles = ['#7b846f', '#bb8164', '#f0b98e', '#7c6a5b', '#d9c2b4']
+    const speckles = [accent, '#7b846f', '#bb8164', '#f0b98e', '#7c6a5b']
     for (let i = 0; i < 1800; i++) {
       const x = Math.random() * size
       const y = Math.random() * size
@@ -149,9 +238,9 @@ function createTerrazzoTexture() {
   })
 }
 
-function createTerracottaTexture() {
+function createTerracottaTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#b96d42'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
     const tile = 72
@@ -178,15 +267,25 @@ function createTerracottaTexture() {
         context.fillRect(x + 1, y + 1, tile - 2, tile - 2)
       }
     }
+
+    context.strokeStyle = accent
+    context.lineWidth = 1
+    for (let i = 0; i < 7; i++) {
+      const y = (i * size) / 7 + 12
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
   })
 }
 
-function createCarpetTexture() {
+function createCarpetTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#b79682'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
-    context.strokeStyle = 'rgba(255, 246, 237, 0.12)'
+    context.strokeStyle = accent
     context.lineWidth = 1
     for (let y = 0; y < size; y += 6) {
       context.beginPath()
@@ -203,38 +302,111 @@ function createCarpetTexture() {
   })
 }
 
-function createPlasterTexture() {
+function createCheckerTileTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#e9dfd3'
+    const tile = 64
+
+    for (let y = 0; y < size; y += tile) {
+      for (let x = 0; x < size; x += tile) {
+        const isDark = ((x / tile) + (y / tile)) % 2 === 1
+        context.fillStyle = isDark ? accent : base
+        context.fillRect(x, y, tile, tile)
+      }
+    }
+
+    context.strokeStyle = 'rgba(0, 0, 0, 0.16)'
+    context.lineWidth = 2
+    for (let x = 0; x <= size; x += tile) {
+      context.beginPath()
+      context.moveTo(x, 0)
+      context.lineTo(x, size)
+      context.stroke()
+    }
+    for (let y = 0; y <= size; y += tile) {
+      context.beginPath()
+      context.moveTo(0, y)
+      context.lineTo(size, y)
+      context.stroke()
+    }
+
+    context.fillStyle = 'rgba(255, 255, 255, 0.06)'
+    for (let i = 0; i < 120; i++) {
+      context.fillRect(Math.random() * size, Math.random() * size, 2, 2)
+    }
+  })
+}
+
+function createConcreteTexture({ base, accent } = {}) {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
-    context.fillStyle = 'rgba(166, 137, 116, 0.08)'
-    for (let i = 0; i < 2200; i++) {
+    context.fillStyle = accent
+    for (let i = 0; i < 1500; i++) {
+      const x = Math.random() * size
+      const y = Math.random() * size
+      context.fillRect(x, y, 1, 1)
+    }
+
+    context.strokeStyle = 'rgba(95, 91, 84, 0.28)'
+    context.lineWidth = 3
+    const slabs = [170, 342]
+    for (const slab of slabs) {
+      context.beginPath()
+      context.moveTo(slab, 0)
+      context.lineTo(slab, size)
+      context.stroke()
+      context.beginPath()
+      context.moveTo(0, slab)
+      context.lineTo(size, slab)
+      context.stroke()
+    }
+
+    context.strokeStyle = 'rgba(255, 255, 255, 0.08)'
+    context.lineWidth = 1.5
+    context.beginPath()
+    context.moveTo(0, 90)
+    context.lineTo(size, 120)
+    context.stroke()
+    context.beginPath()
+    context.moveTo(70, size)
+    context.lineTo(120, 0)
+    context.stroke()
+  })
+}
+
+function createPlasterTexture({ base, accent } = {}) {
+  return createTextureCanvas(512, (context, size) => {
+    context.fillStyle = base
+    context.fillRect(0, 0, size, size)
+
+    context.fillStyle = accent
+    for (let i = 0; i < 900; i++) {
       context.fillRect(Math.random() * size, Math.random() * size, 1, 1)
     }
 
-    context.fillStyle = 'rgba(255, 255, 255, 0.10)'
-    for (let i = 0; i < 120; i++) {
+    context.fillStyle = 'rgba(255, 255, 255, 0.04)'
+    for (let i = 0; i < 45; i++) {
       const x = Math.random() * size
       const y = Math.random() * size
       context.beginPath()
-      context.arc(x, y, 8 + Math.random() * 18, 0, Math.PI * 2)
+      context.arc(x, y, 6 + Math.random() * 10, 0, Math.PI * 2)
       context.fill()
     }
   })
 }
 
-function createVerticalStripeWallpaperTexture() {
+function createVerticalStripeWallpaperTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#f3ebdf'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
     for (let x = 0; x < size; x += 32) {
-      context.fillStyle = x % 64 === 0 ? 'rgba(166, 126, 95, 0.10)' : 'rgba(255, 255, 255, 0.05)'
+      context.fillStyle = x % 64 === 0 ? accent : 'rgba(255, 255, 255, 0.025)'
       context.fillRect(x, 0, 32, size)
     }
 
-    context.strokeStyle = 'rgba(126, 93, 67, 0.11)'
+    context.strokeStyle = 'rgba(126, 93, 67, 0.06)'
     context.lineWidth = 1.25
     for (let y = 18; y < size; y += 36) {
       context.beginPath()
@@ -245,15 +417,15 @@ function createVerticalStripeWallpaperTexture() {
   })
 }
 
-function createFloralWallpaperTexture() {
+function createFloralWallpaperTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#f6efe5'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
     const blooms = [
-      ['#d89f92', '#9f6d63'],
-      ['#c6b07e', '#8f7a4d'],
-      ['#a9c0ad', '#73907b']
+      [accent, '#9f6d63'],
+      ['rgba(198, 176, 126, 0.92)', '#8f7a4d'],
+      ['rgba(169, 192, 173, 0.9)', '#73907b']
     ]
 
     for (let y = 32; y < size; y += 96) {
@@ -268,7 +440,7 @@ function createFloralWallpaperTexture() {
         context.arc(x, y, 5, 0, Math.PI * 2)
         context.fill()
 
-        context.strokeStyle = 'rgba(103, 77, 63, 0.16)'
+        context.strokeStyle = 'rgba(103, 77, 63, 0.08)'
         context.lineWidth = 1.5
         context.beginPath()
         context.moveTo(x - 18, y)
@@ -281,12 +453,12 @@ function createFloralWallpaperTexture() {
   })
 }
 
-function createWainscotTexture() {
+function createWainscotTexture({ base, accent } = {}) {
   return createTextureCanvas(512, (context, size) => {
-    context.fillStyle = '#f0e5d6'
+    context.fillStyle = base
     context.fillRect(0, 0, size, size)
 
-    context.fillStyle = '#d1b79c'
+    context.fillStyle = accent
     context.fillRect(0, size * 0.55, size, size * 0.45)
 
     context.strokeStyle = 'rgba(104, 76, 52, 0.20)'
@@ -317,46 +489,60 @@ export function normalizeWallTextureId(value) {
   return WALL_PRESET_IDS.has(input) ? input : DEFAULT_WALL_TEXTURE_ID
 }
 
-export function createFloorTexture(textureId = DEFAULT_FLOOR_TEXTURE_ID) {
+export function createFloorTexture(textureId = DEFAULT_FLOOR_TEXTURE_ID, colors = {}) {
   const id = normalizeFloorTextureId(textureId)
+  const palette = normalizeSurfaceTextureColors('floor', id, colors)
 
   if (id === 'herringbone-oak') {
-    return createWoodTexture({ base: '#a56d43', accent: '#c7925e', grain: 'rgba(76, 46, 26, 0.22)', plankCount: 8, diagonal: true })
+    return createWoodTexture({ base: palette.primaryColor, accent: palette.secondaryColor, grain: 'rgba(76, 46, 26, 0.22)', plankCount: 8, diagonal: true })
   }
 
   if (id === 'terrazzo-sand') {
-    return createTerrazzoTexture()
+    return createTerrazzoTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
-  if (id === 'terracotta-tiles') {
-    return createTerracottaTexture()
+  if (id === 'concrete-slab') {
+    return createConcreteTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
+  }
+
+  if (id === 'checker-tiles') {
+    return createCheckerTileTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
   if (id === 'woven-carpet') {
-    return createCarpetTexture()
+    return createCarpetTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
-  return createWoodTexture({ base: '#9f6f42', accent: '#b57a4c', grain: 'rgba(75, 42, 18, 0.18)', plankCount: 6 })
+  return createWoodTexture({ base: palette.primaryColor, accent: palette.secondaryColor, grain: 'rgba(75, 42, 18, 0.18)', plankCount: 6 })
 }
 
-export function createWallTexture(textureId = DEFAULT_WALL_TEXTURE_ID) {
+export function createWallTexture(textureId = DEFAULT_WALL_TEXTURE_ID, colors = {}) {
   const id = normalizeWallTextureId(textureId)
+  const palette = normalizeSurfaceTextureColors('wall', id, colors)
 
   if (id === 'vertical-stripes') {
-    return createVerticalStripeWallpaperTexture()
+    return createVerticalStripeWallpaperTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
   if (id === 'vintage-floral') {
-    return createFloralWallpaperTexture()
+    return createFloralWallpaperTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
   if (id === 'soft-plaster') {
-    return createPlasterTexture()
+    return createPlasterTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
   if (id === 'paneled-wainscot') {
-    return createWainscotTexture()
+    return createWainscotTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
   }
 
-  return createPlasterTexture()
+  if (id === 'paper-bloom') {
+    return createFloralWallpaperTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
+  }
+
+  if (id === 'chalk-ridge') {
+    return createPlasterTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
+  }
+
+  return createPlasterTexture({ base: palette.primaryColor, accent: palette.secondaryColor })
 }

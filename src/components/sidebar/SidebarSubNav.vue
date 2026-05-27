@@ -27,13 +27,24 @@ const subCategories = computed(() => {
     return ['Alle', 'Natuur', 'Instrumentaal', 'Overig']
   }
 
-  if (props.activeCategory === 'Kleuren') {
-    return ['Paletten', 'Neutraal', 'Aarde', 'Koel']
+  if (props.activeCategory === 'Kamer') {
+    return ['Muren', 'Vloer']
   }
 
   return ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Decoratie klein', 'Decoratie groot', 'Persoonlijk', 'Media']
 })
+
 </script>
+
+<style scoped>
+.editor-sub-nav {
+  height: auto;
+  min-height: 620px;
+  max-height: 620px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+</style>
 
 <template>
   <section class="editor-sub-nav">

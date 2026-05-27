@@ -436,10 +436,15 @@ body {
 }
 
 .editor-sub-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   margin-top: 4px;
   font-size: 18px;
   font-weight: 700;
   line-height: 1;
+  padding: 8px 0 10px;
+  background: linear-gradient(180deg, color-mix(in srgb, white 88%, var(--editor-panel) 12%), color-mix(in srgb, white 82%, var(--editor-panel-soft) 18%));
 }
 
 .editor-sub-nav {
@@ -456,6 +461,8 @@ body {
   min-height: 0;
   overflow-y: auto;
   padding-right: 6px;
+  align-content: start;
+  grid-auto-rows: min-content;
 }
 
 /* Back button in subnav */
@@ -491,6 +498,8 @@ body {
   max-height: none;
   overflow-y: auto;
   padding-right: 6px;
+  align-content: start;
+  grid-auto-rows: min-content;
 }
 
 .editor-sub-item {

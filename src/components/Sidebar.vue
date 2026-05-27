@@ -28,7 +28,7 @@ const activeSubCategory = ref('Alle')
 const panelStage = ref('categories')
 
 const isSoundCategory = computed(() => activeCategory.value === 'Geluid')
-const isColorCategory = computed(() => activeCategory.value === 'Kleuren')
+const isColorCategory = computed(() => activeCategory.value === 'Kamer')
 const showSubNav = computed(() => panelStage.value !== 'categories')
 const showContentPanel = computed(() => panelStage.value === 'content')
 const DEFAULT_FURNITURE_SUBCATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Dieren', 'Foto', 'Video', 'Muziek', 'Persoonlijk']
@@ -246,8 +246,8 @@ const allowedSubCategories = computed(() => {
     return ['Alle', 'Natuur', 'Instrumentaal', 'Overig']
   }
 
-  if (activeCategory.value === 'Kleuren') {
-    return ['Paletten', 'Neutraal', 'Aarde', 'Koel']
+  if (activeCategory.value === 'Kamer') {
+    return ['Muren', 'Vloer']
   }
 
   const allowed = getAllowedSubtypesForSelectedSlot()
@@ -384,12 +384,12 @@ watch(activeCategory, (value) => {
     return
   }
 
-  if (value === 'Kleuren') {
-    activeSubCategory.value = 'Kleuren'
+  if (value === 'Kamer') {
+    activeSubCategory.value = 'Muren'
     return
   }
 
-  if (activeSubCategory.value === 'Paletten') {
+  if (activeSubCategory.value === 'Paletten' || activeSubCategory.value === 'Kamer') {
     activeSubCategory.value = 'Alle'
   }
 })

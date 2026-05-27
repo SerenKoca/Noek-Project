@@ -8,7 +8,7 @@ import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.
 import { adaptStaticAssetUrl, fetchModels } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
-import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, createFloorTexture, createWallTexture, normalizeFloorTextureId, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
+import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, createFloorTexture, createWallTexture, getFloorTextureDefaults, getWallTextureDefaults, normalizeFloorTextureId, normalizeSurfaceTextureColors, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
 
 const props = defineProps({
   loadRequest: {
@@ -163,6 +163,27 @@ let wallTexture = null
 let sideWallTexture = null
 let floorTextureId = DEFAULT_FLOOR_TEXTURE_ID
 let wallTextureId = DEFAULT_WALL_TEXTURE_ID
+let floorTextureColorsById = {}
+let wallTextureColorsById = {}
+let floorTexturePaletteKey = ''
+let wallTexturePaletteKey = ''
+
+function normalizeTextureColorMap(surface, value = {}) {
+  const out = {}
+  for (const [textureId, colors] of Object.entries(value || {})) {
+    out[textureId] = normalizeSurfaceTextureColors(surface, textureId, colors)
+  }
+  return out
+}
+
+function getTexturePalette(surface, textureId, paletteMap) {
+  const defaults = surface === 'wall' ? getWallTextureDefaults(textureId) : getFloorTextureDefaults(textureId)
+  return normalizeSurfaceTextureColors(surface, textureId, paletteMap?.[textureId] || defaults)
+}
+
+function paletteKey(palette) {
+  return `${palette?.primaryColor || ''}|${palette?.secondaryColor || ''}`
+}
 
 function createTextureCanvas(size, draw) {
   const canvas = document.createElement('canvas')
@@ -897,19 +918,38 @@ function getBrandWallHex() {
   return DEFAULT_WALL_COLOR
 }
 
-function applyRoomColors({ floorTextureId: incomingFloorTextureId, wallTextureId: incomingWallTextureId } = {}) {
+function applyRoomColors({
+  floorTextureId: incomingFloorTextureId,
+  wallTextureId: incomingWallTextureId,
+  floorTextureColorsById: incomingFloorTextureColorsById,
+  wallTextureColorsById: incomingWallTextureColorsById
+} = {}) {
+  if (incomingFloorTextureColorsById) {
+    floorTextureColorsById = normalizeTextureColorMap('floor', incomingFloorTextureColorsById)
+  }
+
+  if (incomingWallTextureColorsById) {
+    wallTextureColorsById = normalizeTextureColorMap('wall', incomingWallTextureColorsById)
+  }
+
   const nextFloorTextureId = normalizeFloorTextureId(incomingFloorTextureId || floorTextureId)
   const nextWallTextureId = normalizeWallTextureId(incomingWallTextureId || wallTextureId)
+  const nextFloorPalette = getTexturePalette('floor', nextFloorTextureId, floorTextureColorsById)
+  const nextWallPalette = getTexturePalette('wall', nextWallTextureId, wallTextureColorsById)
+  const nextFloorPaletteKey = paletteKey(nextFloorPalette)
+  const nextWallPaletteKey = paletteKey(nextWallPalette)
 
-  if (nextFloorTextureId !== floorTextureId) {
+  if (nextFloorTextureId !== floorTextureId || nextFloorPaletteKey !== floorTexturePaletteKey) {
     floorTextureId = nextFloorTextureId
-    floorTexture = createFloorTexture(floorTextureId)
+    floorTexturePaletteKey = nextFloorPaletteKey
+    floorTexture = createFloorTexture(floorTextureId, nextFloorPalette)
     setMaterialMap(floorMaterial, floorTexture)
   }
 
-  if (nextWallTextureId !== wallTextureId) {
+  if (nextWallTextureId !== wallTextureId || nextWallPaletteKey !== wallTexturePaletteKey) {
     wallTextureId = nextWallTextureId
-    wallTexture = createWallTexture(wallTextureId)
+    wallTexturePaletteKey = nextWallPaletteKey
+    wallTexture = createWallTexture(wallTextureId, nextWallPalette)
     sideWallTexture = wallTexture
     setMaterialMap(wallMaterial, wallTexture)
     setMaterialMap(sideWallMaterial, sideWallTexture)
@@ -917,7 +957,13 @@ function applyRoomColors({ floorTextureId: incomingFloorTextureId, wallTextureId
 
   return {
     floorTextureId,
-    wallTextureId
+    wallTextureId,
+    floorTextureColorsById,
+    wallTextureColorsById,
+    floorColor: nextFloorPalette.primaryColor,
+    wallColor: nextWallPalette.primaryColor,
+    floorAccentColor: nextFloorPalette.secondaryColor,
+    wallAccentColor: nextWallPalette.secondaryColor
   }
 }
 
@@ -1115,7 +1161,7 @@ function createScene() {
   scene.add(accent.target)
 
   // Large room surfaces to keep borders out of view while zooming.
-  const TILE_BAND_HEIGHT = 4.2
+  const TILE_BAND_HEIGHT = 0
   const floorGeo = new THREE.PlaneGeometry(ROOM_SIZE, ROOM_SIZE)
   floorTexture = createFloorTexture(floorTextureId)
   floorMaterial = createBaseMaterial(floorTexture, 0xffffff)
@@ -1138,52 +1184,29 @@ function createScene() {
   tileMaterial = createBaseMaterial(createTileTexture(), brandWallHex)
   tileMaterial.side = THREE.DoubleSide
 
-  const backWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-  backWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, -ROOM_SIZE / 2)
-  backWallTiles.receiveShadow = true
-  scene.add(backWallTiles)
-
-  const backWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
-  backWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, -ROOM_SIZE / 2)
+  const backWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
+  backWallWallpaper.position.set(0, WALL_HEIGHT / 2, -ROOM_SIZE / 2)
   backWallWallpaper.receiveShadow = true
   scene.add(backWallWallpaper)
 
   // Right wall
-  const rightWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-  rightWallTiles.rotation.y = -Math.PI / 2
-  rightWallTiles.position.set(ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
-  rightWallTiles.receiveShadow = true
-  scene.add(rightWallTiles)
-
-  const rightWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
+  const rightWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), sideWallMaterial)
   rightWallWallpaper.rotation.y = -Math.PI / 2
-  rightWallWallpaper.position.set(ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
+  rightWallWallpaper.position.set(ROOM_SIZE / 2, WALL_HEIGHT / 2, 0)
   rightWallWallpaper.receiveShadow = true
   scene.add(rightWallWallpaper)
 
   // Left wall and front wall only in VR mode
   if (props.vrMode) {
-    const leftWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-    leftWallTiles.rotation.y = Math.PI / 2
-    leftWallTiles.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT / 2, 0)
-    leftWallTiles.receiveShadow = true
-    scene.add(leftWallTiles)
-
-    const leftWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), sideWallMaterial)
+    const leftWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), sideWallMaterial)
     leftWallWallpaper.rotation.y = Math.PI / 2
-    leftWallWallpaper.position.set(-ROOM_SIZE / 2, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, 0)
+    leftWallWallpaper.position.set(-ROOM_SIZE / 2, WALL_HEIGHT / 2, 0)
     leftWallWallpaper.receiveShadow = true
     scene.add(leftWallWallpaper)
 
-    const frontWallTiles = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, TILE_BAND_HEIGHT), tileMaterial)
-    frontWallTiles.rotation.y = Math.PI
-    frontWallTiles.position.set(0, TILE_BAND_HEIGHT / 2, ROOM_SIZE / 2)
-    frontWallTiles.receiveShadow = true
-    scene.add(frontWallTiles)
-
-    const frontWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT - TILE_BAND_HEIGHT), wallMaterial)
+    const frontWallWallpaper = new THREE.Mesh(new THREE.PlaneGeometry(ROOM_SIZE, WALL_HEIGHT), wallMaterial)
     frontWallWallpaper.rotation.y = Math.PI
-    frontWallWallpaper.position.set(0, TILE_BAND_HEIGHT + (WALL_HEIGHT - TILE_BAND_HEIGHT) / 2, ROOM_SIZE / 2)
+    frontWallWallpaper.position.set(0, WALL_HEIGHT / 2, ROOM_SIZE / 2)
     frontWallWallpaper.receiveShadow = true
     scene.add(frontWallWallpaper)
   }
@@ -1951,7 +1974,9 @@ function serializeRoom() {
     furniture,
     appearance: applyRoomColors({
       floorTextureId,
-      wallTextureId
+      wallTextureId,
+      floorTextureColorsById,
+      wallTextureColorsById
     }),
     camera: {
       position: camera?.position?.toArray?.() || null,
@@ -1970,7 +1995,6 @@ async function loadRoom(sceneData) {
   if (!sceneData || !Array.isArray(sceneData.furniture)) {
     // Reset to default state for new rooms
     resetSceneToDefault({ hydrateCurated: true })
-    applyRoomColors()
     return
   }
 
@@ -2062,7 +2086,12 @@ function resetSceneToDefault({ hydrateCurated = true } = {}) {
   if (hydrateCurated) {
     hydrateCuratedDefaultFurniture()
   }
-  applyRoomColors()
+  applyRoomColors({
+    floorTextureId: DEFAULT_FLOOR_TEXTURE_ID,
+    wallTextureId: DEFAULT_WALL_TEXTURE_ID,
+    floorTextureColorsById: {},
+    wallTextureColorsById: {}
+  })
 }
 
 defineExpose({ serializeRoom, loadRoom })
@@ -2496,7 +2525,9 @@ watch(
     if (command.type === 'apply-room-colors') {
       applyRoomColors({
         floorTextureId: command.floorTextureId,
-        wallTextureId: command.wallTextureId
+        wallTextureId: command.wallTextureId,
+        floorTextureColorsById: command.floorTextureColorsById,
+        wallTextureColorsById: command.wallTextureColorsById
       })
     }
   }

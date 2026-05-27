@@ -36,6 +36,20 @@ onMounted(() => {
 })
 </script>
 
+<style scoped>
+.editor-models-panel {
+  max-height: calc(100vh - 180px);
+  overflow-y: auto;
+  min-height: 0;
+  padding-right: 4px;
+}
+
+.editor-sound-list {
+  overflow-y: auto;
+  min-height: 0;
+}
+</style>
+
 <template>
   <section class="editor-models-panel">
     <div class="editor-models-header">
