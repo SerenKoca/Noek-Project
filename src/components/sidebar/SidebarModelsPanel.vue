@@ -18,7 +18,22 @@ defineProps({
   }
 })
 
-defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mode', 'close'])
+const emit = defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mode', 'edit-selected', 'rotate-selected', 'close'])
+
+function handleEditSelected() {
+  console.debug('[SidebarModelsPanel] emit edit-selected')
+  emit('edit-selected')
+}
+
+function handleRotateSelected() {
+  console.debug('[SidebarModelsPanel] emit rotate-selected 90')
+  emit('rotate-selected', 90)
+}
+
+function handleDeleteSelected() {
+  console.debug('[SidebarModelsPanel] emit delete-selected')
+  emit('delete-selected')
+}
 </script>
 
 <style scoped>
@@ -52,9 +67,17 @@ defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mod
     </div>
 
     <div class="editor-quick-actions">
-      <button type="button" class="editor-action-btn" :disabled="!selected || selected?.isSlotMarker" @click="$emit('delete-selected')">Verwijder</button>
-      <button type="button" class="editor-action-btn" @click="$emit('reload')">Herladen</button>
+      <template v-if="selected">
+        <button type="button" class="editor-action-btn" @click="handleEditSelected">Aanpassen</button>
+        <button type="button" class="editor-action-btn" @click="handleRotateSelected">Draaien 90°</button>
+        <button type="button" class="editor-action-btn" @click="handleDeleteSelected">Verwijder</button>
+      </template>
+      <template v-else>
+        <button type="button" class="editor-action-btn" @click="$emit('reload')">Herladen</button>
+      </template>
     </div>
+
+    
 
     <div v-if="error" class="editor-inline-error">
       {{ error }}

@@ -14,6 +14,11 @@ import { useNoekState } from '../composables/useNoekState.js'
 const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
+
+function handleRotateSelected(angle) {
+  console.debug('[EditorPage] handleRotateSelected ->', angle)
+  state.onRotateSelected(angle)
+}
 const showRoomReactions = false
 const showShareModal = ref(false)
 const shareRoomData = ref({ roomName: '', visitUrl: '', editUrl: '', directorName: '' })
@@ -278,7 +283,7 @@ async function openSettings() {
       </aside>
 
       <div class="editor-content">
-        <Sidebar
+          <Sidebar
           class="editor-sidebar"
           :selected="state.selected.value"
           :room-appearance="state.roomAppearanceDraft.value"
@@ -286,6 +291,8 @@ async function openSettings() {
           @delete-selected="state.onDeleteSelected"
           @select-sound="state.onSelectRoomSound"
           @apply-room-colors="state.onApplyRoomColors"
+            @edit-selected="state.onSelected"
+            @rotate-selected="handleRotateSelected"
         />
 
         <div class="editor-scene-panel">

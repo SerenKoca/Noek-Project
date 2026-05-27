@@ -18,7 +18,24 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['load-model', 'delete-selected', 'select-sound', 'apply-room-colors'])
+const emit = defineEmits([
+  'load-model',
+  'delete-selected',
+  'select-sound',
+  'apply-room-colors',
+  'edit-selected',
+  'rotate-selected'
+])
+
+function handleEditSelected() {
+  console.debug('[Sidebar] forward edit-selected')
+  emit('edit-selected')
+}
+
+function handleRotateSelected(angle) {
+  console.debug('[Sidebar] forward rotate-selected', angle)
+  emit('rotate-selected', angle)
+}
 
 const loading = ref(false)
 const error = ref('')
@@ -464,6 +481,8 @@ watch(() => props.selected, (sel) => {
         @delete-selected="deleteSelected"
         @request-load="requestLoad"
         @request-load-with-mode="requestLoadWithMode"
+        @edit-selected="handleEditSelected"
+        @rotate-selected="handleRotateSelected"
         @close="closeContentPanel"
       />
     </div>

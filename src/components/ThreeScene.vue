@@ -1835,7 +1835,16 @@ function assignRootToSlot(root, slotId) {
   root.userData.rotationYOffset = effectiveYOffset
   slot.preferredRotationYOffset = effectiveYOffset
   root.userData.isSlotMarker = false
-  root.position.set(slot.position.x, slot.position.y, slot.position.z)
+  // apply saved positionOffset (relative to slot) if present
+  const posOff = root.userData?.positionOffset
+  if (Array.isArray(posOff) && posOff.length >= 3) {
+    const ox = Number(posOff[0] || 0)
+    const oy = Number(posOff[1] || 0)
+    const oz = Number(posOff[2] || 0)
+    root.position.set(slot.position.x + ox, slot.position.y + oy, slot.position.z + oz)
+  } else {
+    root.position.set(slot.position.x, slot.position.y, slot.position.z)
+  }
   root.rotation.set(0, slot.rotationY + Number(root.userData.rotationYOffset || 0), 0)
   snapRootToFloor(root, FLOOR_Y)
   root.updateMatrixWorld(true)
@@ -1878,6 +1887,7 @@ function getRootModel(obj) {
 }
 
 function deselect() {
+  console.debug('[ThreeScene] deselect() - clearing selectedRoot', selectedRoot?.uuid || null)
   selectedRoot = null
   selectedTemplateTarget.value = null
   if (transform) {
@@ -1915,6 +1925,7 @@ function select(root) {
     isSlotMarker: !!root?.userData?.isSlotMarker
   }
   updateTemplateDragBinding()
+  console.debug('[ThreeScene] select() ->', info)
   emit('selected', info)
   updateSelectedAnchor()
 }
@@ -1937,6 +1948,93 @@ function getRootByUuid(uuid) {
   return selectableRoots.find((root) => root.uuid === uuid) || null
 }
 
+function animateRotation(target, deltaRad, duration = 300) {
+  return new Promise((resolve) => {
+    if (!target) return resolve()
+    const start = performance.now()
+    const initial = target.rotation.y
+    const end = initial + deltaRad
+
+    // add a temporary box helper as highlight (safer than mutating shared materials)
+    let boxHelper = null
+    try {
+      boxHelper = new THREE.BoxHelper(target, 0xffff66)
+      scene.add(boxHelper)
+    } catch (e) {
+      boxHelper = null
+    }
+
+    // rotate around object's world center
+    const box = new THREE.Box3().setFromObject(target)
+    const center = new THREE.Vector3()
+    box.getCenter(center)
+    const axis = new THREE.Vector3(0, 1, 0)
+    let prevAngle = 0
+
+    function tick(now) {
+      const t = Math.min(1, (now - start) / duration)
+      const eased = 1 - (1 - t) * (1 - t)
+      const angle = (end - initial) * eased
+      const delta = angle - prevAngle
+      prevAngle = angle
+
+      // move position around center
+      try {
+        target.position.sub(center)
+        target.position.applyAxisAngle(axis, delta)
+        target.position.add(center)
+        // rotate orientation around world axis
+        target.rotateOnWorldAxis(axis, delta)
+      } catch (e) {
+        // fallback: apply local rotation
+        target.rotation.y = initial + angle
+      }
+
+      target.updateMatrixWorld(true)
+
+      if (t < 1) {
+        requestAnimationFrame(tick)
+      } else {
+        // remove box helper highlight
+        try {
+          if (boxHelper) scene.remove(boxHelper)
+        } catch (e) {
+          /* ignore */
+        }
+
+        // Persist rotation offset to userData so scene hydration doesn't overwrite it
+        try {
+          const slotId = String(target.userData?.slotId || '')
+          const prevYOffset = Number(target.userData?.rotationYOffset || 0)
+          const added = end - initial
+          const newYOffset = prevYOffset + added
+          target.userData.rotationYOffset = newYOffset
+
+          if (slotId && slotStates.has(slotId)) {
+            const slot = slotStates.get(slotId)
+            slot.preferredRotationYOffset = newYOffset
+            // also update slot.root userData if present
+            if (slot.root) slot.root.userData = slot.root.userData || {}
+            if (slot.root) slot.root.userData.rotationYOffset = newYOffset
+            // apply consolidated rotation
+            try {
+              slot.root.rotation.set(0, (slot.rotationY || 0) + Number(slot.root.userData.rotationYOffset || 0), 0)
+            } catch (e) {
+              /* ignore */
+            }
+          }
+        } catch (e) {
+          /* ignore persistence errors */
+        }
+
+        resolve()
+      }
+    }
+
+    requestAnimationFrame(tick)
+  })
+}
+
 function serializeRoom() {
   const furniture = []
 
@@ -1952,12 +2050,24 @@ function serializeRoom() {
     const root = slot?.root
     if (!root || root.userData?.isSlotMarker) continue
 
+    // persist position as an offset relative to the slot position so small drags are preserved
+    let positionOffset = null
+    if (slot) {
+      const dx = root.position.x - slot.position.x
+      const dy = root.position.y - slot.position.y
+      const dz = root.position.z - slot.position.z
+      positionOffset = [dx, dy, dz]
+    } else {
+      positionOffset = root.position.toArray()
+    }
+
     furniture.push({
       slotId,
       title: root.userData?.title || '',
       url: root.userData?.url || null,
-      position: root.position.toArray(),
+      positionOffset,
       rotationY: root.rotation.y,
+      rotationYOffset: Number(root.userData?.rotationYOffset || 0),
       scale: root.scale.toArray(),
       sizeMultiplier: Number(root.userData?.sizeMultiplier || 1),
       isEmpty: false
@@ -2018,13 +2128,28 @@ async function loadRoom(sceneData) {
     if (item.url) {
       // Load custom model
       try {
+        // compute positionOffset to pass to loader (supporting old saved `position` as fallback)
+        const savedOffset = item.positionOffset || null
+        let positionOffset = null
+        if (Array.isArray(savedOffset) && savedOffset.length >= 3) {
+          positionOffset = savedOffset.map((v) => Number(v) || 0)
+        } else if (Array.isArray(item.position) && item.position.length >= 3 && slot) {
+          positionOffset = [
+            Number(item.position[0] || 0) - slot.position.x,
+            Number(item.position[1] || 0) - slot.position.y,
+            Number(item.position[2] || 0) - slot.position.z
+          ]
+        }
+
         await loadModelAssetWithFallback({
           url: adaptStaticAssetUrl(item.url),
           title: item.title || 'Loaded model',
           id: item.id || `loaded-${Date.now()}`,
           replaceRoot: { slotId },
           transform: {
-            sizeMultiplier: Number(item.sizeMultiplier) || 1
+            sizeMultiplier: Number(item.sizeMultiplier) || 1,
+            rotationYOffset: Number(item.rotationYOffset || 0),
+            positionOffset
           }
         })
       } catch (error) {
@@ -2039,7 +2164,17 @@ async function loadRoom(sceneData) {
       if (Array.isArray(item.position) && item.position.length >= 3) {
         defaultRoot.position.set(Number(item.position[0]) || 0, FLOOR_Y, Number(item.position[2]) || 0)
       }
-      if (item.rotationY !== undefined) defaultRoot.rotation.y = item.rotationY
+      // Prefer rotationYOffset if provided (persisted offset), otherwise fall back to rotationY
+      if (item.rotationYOffset !== undefined) {
+        defaultRoot.userData = defaultRoot.userData || {}
+        defaultRoot.userData.rotationYOffset = Number(item.rotationYOffset || 0)
+      } else if (item.rotationY !== undefined) {
+        // convert absolute rotationY to offset relative to slot.rotationY
+        const slotRot = Number(slot.rotationY || 0)
+        const offset = Number(item.rotationY) - slotRot
+        defaultRoot.userData = defaultRoot.userData || {}
+        defaultRoot.userData.rotationYOffset = offset
+      }
       snapRootToFloor(defaultRoot, FLOOR_Y)
       assignRootToSlot(defaultRoot, slotId)
     }
@@ -2431,6 +2566,10 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
             holder.position.y += transform.yOffset
           }
 
+          // apply saved positionOffset if provided
+          if (Array.isArray(transform?.positionOffset) && transform.positionOffset.length >= 3) {
+            holder.userData.positionOffset = transform.positionOffset.map((v) => Number(v) || 0)
+          }
           assignRootToSlot(holder, targetSlotId)
           snapRootToFloor(holder, FLOOR_Y)
 
@@ -2515,11 +2654,57 @@ watch(
 watch(
   () => props.sceneCommand,
   (command) => {
+    console.debug('[ThreeScene] received sceneCommand ->', command)
     if (!command || !command.type) return
     if (command.type === 'delete-selected' && selectedRoot && !selectedRoot.userData?.isSlotMarker) {
       const slotId = selectedRoot.userData?.slotId || ''
       if (slotId) removeFurnitureFromSlot(slotId)
       return
+    }
+
+    if (command.type === 'rotate-selected') {
+      const angleDeg = Number(command.angle) || 90
+      const angleRad = (angleDeg * Math.PI) / 180
+      let target = selectedRoot
+      if (!target && command.targetUuid) {
+        target = getRootByUuid(command.targetUuid)
+      }
+      // fallback: try matching by userData.id or title if uuid lookup failed
+      if (!target && command.targetId) {
+        target = selectableRoots.find((r) => r.userData && String(r.userData.id || r.userData.ID || '') === String(command.targetId)) || null
+        console.debug('[ThreeScene] fallback lookup by targetId ->', target?.uuid || null)
+      }
+      if (!target && command.targetTitle) {
+        const titleLower = String(command.targetTitle || '').toLowerCase()
+        target = selectableRoots.find((r) => {
+          const t = String(r.userData?.title || r.userData?.name || r.name || '').toLowerCase()
+          return t && t.includes(titleLower)
+        }) || null
+        console.debug('[ThreeScene] fallback lookup by targetTitle ->', target?.uuid || null)
+      }
+      console.debug('[ThreeScene] rotate-selected target ->', target?.uuid || null)
+      if (target && !target.userData?.isSlotMarker) {
+        // animate rotation for clearer visual feedback
+        animateRotation(target, angleRad, 300).then(() => {
+          console.debug('[ThreeScene] rotated target', target?.uuid, 'by', angleDeg)
+          try {
+            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+              window.alert(`Rotated object ${target.uuid} by ${angleDeg}°`)
+            }
+          } catch (e) {
+            /* ignore */
+          }
+        })
+        return
+      }
+      console.debug('[ThreeScene] rotate-selected: no valid target found')
+      try {
+        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+          window.alert('Rotate command received but no valid target was found in the scene.')
+        }
+      } catch (e) {
+        /* ignore */
+      }
     }
 
     if (command.type === 'apply-room-colors') {
@@ -2647,9 +2832,9 @@ onBeforeUnmount(() => {
         <div class="template-editor-head">
           <div>
             <strong>Template editor</strong>
-            <p>Pas hier de kamer aan: kies een slot, verplaats het en wijs een object toe.</p>
+            <p>Werk in 3 stappen: kies een slot, pas snel de positie aan en vervang daarna het object als dat nodig is.</p>
           </div>
-          <button type="button" class="template-editor-mini-btn" @click="saveTemplateToLocalStorage">Opslaan</button>
+          <button type="button" class="template-editor-mini-btn template-editor-mini-btn-primary" @click="saveTemplateToLocalStorage">Opslaan</button>
         </div>
 
         <div v-if="templateEditorMessage" class="template-editor-message">{{ templateEditorMessage }}</div>
@@ -2657,7 +2842,10 @@ onBeforeUnmount(() => {
 
         <div class="template-editor-grid">
           <section class="template-editor-section">
-            <h4>Slots</h4>
+            <div class="template-section-title-row">
+              <h4>1. Slot kiezen</h4>
+              <span class="template-editor-help">{{ filteredTemplateSlots.length }} zichtbaar</span>
+            </div>
             <div class="template-slot-list">
               <button
                 v-for="slot in filteredTemplateSlots"
@@ -2670,6 +2858,10 @@ onBeforeUnmount(() => {
                 {{ slot.label || slot.id }}
               </button>
             </div>
+            <div class="template-slot-summary">
+              <span class="template-slot-summary-label">Actief slot</span>
+              <strong>{{ templateEditorSlotId || 'Geen' }}</strong>
+            </div>
             <div class="template-editor-actions">
               <button type="button" class="template-editor-mini-btn" @click="createNewTemplateSlot">Nieuw slot</button>
               <button type="button" class="template-editor-mini-btn" @click="resetTemplateDefaults">Reset</button>
@@ -2677,30 +2869,29 @@ onBeforeUnmount(() => {
           </section>
 
           <section class="template-editor-section">
-            <h4>Geselecteerd slot</h4>
-            <label class="template-editor-field">
-              <span>Positie X</span>
-              <input v-model="templateDraft.x" type="number" step="0.1" />
-            </label>
-            <label class="template-editor-field">
-              <span>Positie Y</span>
-              <input v-model="templateDraft.y" type="number" step="0.1" />
-            </label>
-            <label class="template-editor-field">
-              <span>Positie Z</span>
-              <input v-model="templateDraft.z" type="number" step="0.1" />
-            </label>
-            <label class="template-editor-field">
-              <span>Rotatie</span>
-              <input v-model="templateDraft.rotationDeg" type="number" step="0.1" />
-            </label>
+            <div class="template-section-title-row">
+              <h4>2. Snel bijstellen</h4>
+              <span class="template-editor-help">Direct toepassen op het gekozen slot</span>
+            </div>
 
-            <label class="template-editor-field">
-              <span>Categorie</span>
-              <select v-model="templateDraft.slotCategories">
-                <option v-for="category in TEMPLATE_SLOT_EDITOR_CATEGORIES" :key="category" :value="category">{{ category }}</option>
-              </select>
-            </label>
+            <div class="template-editor-field-grid">
+              <label class="template-editor-field">
+                <span>Positie X</span>
+                <input v-model="templateDraft.x" type="number" step="0.1" />
+              </label>
+              <label class="template-editor-field">
+                <span>Positie Y</span>
+                <input v-model="templateDraft.y" type="number" step="0.1" />
+              </label>
+              <label class="template-editor-field">
+                <span>Positie Z</span>
+                <input v-model="templateDraft.z" type="number" step="0.1" />
+              </label>
+              <label class="template-editor-field">
+                <span>Rotatie</span>
+                <input v-model="templateDraft.rotationDeg" type="number" step="0.1" />
+              </label>
+            </div>
 
             <div class="template-editor-checks">
               <label><input v-model="templateDraft.acceptsMeubel" type="checkbox" /> Meubel</label>
@@ -2708,18 +2899,36 @@ onBeforeUnmount(() => {
               <label><input v-model="templateDraft.acceptsDecoratie" type="checkbox" /> Decoratie</label>
             </div>
 
-            <div class="template-editor-actions">
-              <button type="button" class="template-editor-mini-btn" @click="applyTemplateDraft">Toepassen</button>
+            <div class="template-editor-actions template-editor-actions-wrap">
+              <button type="button" class="template-editor-mini-btn template-editor-mini-btn-primary" @click="applyTemplateDraft">Toepassen</button>
               <button type="button" class="template-editor-mini-btn" @click="toggleTemplateDrag">
                 {{ templateDragEnabled ? 'Drag uit' : 'Drag aan' }}
               </button>
-              <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('translate')">Verplaats</button>
-              <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('rotate')">Roteer</button>
             </div>
+
+            <details class="template-editor-details">
+              <summary>Geavanceerd</summary>
+              <div class="template-editor-details-body">
+                <label class="template-editor-field">
+                  <span>Categorie</span>
+                  <select v-model="templateDraft.slotCategories">
+                    <option v-for="category in TEMPLATE_SLOT_EDITOR_CATEGORIES" :key="category" :value="category">{{ category }}</option>
+                  </select>
+                </label>
+
+                <div class="template-editor-actions">
+                  <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('translate')">Verplaats</button>
+                  <button type="button" class="template-editor-mini-btn" @click="setTemplateDragMode('rotate')">Roteer</button>
+                </div>
+              </div>
+            </details>
           </section>
 
           <section class="template-editor-section template-editor-section-wide">
-            <h4>Object vervangen</h4>
+            <div class="template-section-title-row">
+              <h4>3. Object vervangen</h4>
+              <span class="template-editor-help">Zoek op naam, id of categorie</span>
+            </div>
             <label class="template-editor-field">
               <span>Zoeken</span>
               <input v-model="templateReplacementSearch" type="text" placeholder="zoek model..." />
@@ -2739,6 +2948,8 @@ onBeforeUnmount(() => {
                 <span class="template-replacement-label">{{ model.title || model.id || 'Onbekend model' }}</span>
               </button>
             </div>
+
+            <p class="template-tip">Tip: selecteer eerst een slot in de scène. Daarna kun je met een klik een vervangobject kiezen.</p>
           </section>
         </div>
       </div>
@@ -2962,6 +3173,208 @@ onBeforeUnmount(() => {
 
   .template-editor-section-wide {
     grid-column: span 1;
+  }
+}
+
+.template-editor-overlay {
+  width: min(560px, calc(100% - 32px));
+}
+
+.template-editor-panel {
+  max-height: min(86vh, 860px);
+}
+
+.template-editor-head p {
+  margin: 4px 0 0;
+  color: rgba(241, 241, 244, 0.8);
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.template-editor-mini-btn-primary {
+  background: rgba(51, 102, 255, 0.95);
+  border-color: rgba(51, 102, 255, 1);
+}
+
+.template-editor-mini-btn-primary:hover {
+  background: rgba(73, 123, 255, 1);
+}
+
+.template-editor-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.template-editor-section {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 14px;
+  padding: 14px;
+  display: grid;
+  gap: 10px;
+}
+
+.template-editor-section-wide {
+  grid-column: 1 / -1;
+}
+
+.template-section-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.template-editor-help {
+  color: rgba(241, 241, 244, 0.68);
+  font-size: 12px;
+}
+
+.template-slot-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  max-height: none;
+  overflow: visible;
+}
+
+.template-slot-btn {
+  text-align: left;
+  transition: transform 0.15s ease, background 0.15s ease, border-color 0.15s ease;
+}
+
+.template-slot-btn:hover {
+  transform: translateY(-1px);
+}
+
+.template-slot-btn.active {
+  background: rgba(51, 102, 255, 0.25);
+  border-color: rgba(51, 102, 255, 0.9);
+}
+
+.template-slot-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.template-slot-summary-label {
+  color: rgba(241, 241, 244, 0.7);
+  font-size: 12px;
+}
+
+.template-slot-summary strong {
+  font-size: 13px;
+}
+
+.template-editor-field-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.template-editor-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.88rem;
+}
+
+.template-editor-field span {
+  color: rgba(241, 241, 244, 0.8);
+}
+
+.template-editor-field input,
+.template-editor-field select {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #fff;
+  padding: 10px 12px;
+  font: inherit;
+}
+
+.template-editor-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}
+
+.template-editor-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.template-editor-actions-wrap {
+  align-items: center;
+}
+
+.template-editor-details {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.template-editor-details summary {
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+}
+
+.template-editor-details-body {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.template-replacement-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+}
+
+.template-replacement-card {
+  display: grid;
+  gap: 8px;
+  justify-items: center;
+  align-content: start;
+  padding: 10px;
+  text-align: center;
+}
+
+.template-replacement-thumb {
+  width: 100%;
+  max-width: 120px;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+
+.template-replacement-label {
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.template-tip {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+@media (max-width: 920px) {
+  .template-editor-grid,
+  .template-editor-field-grid,
+  .template-slot-list {
+    grid-template-columns: 1fr;
+  }
+
+  .template-editor-section-wide {
+    grid-column: 1 / -1;
   }
 }
 </style>

@@ -1009,6 +1009,19 @@ function onSelected(info) {
   selected.value = info
 }
 
+function onRotateSelected(angle = 90) {
+  const cmd = {
+    type: 'rotate-selected',
+    angle: Number(angle) || 90,
+    targetUuid: selected.value?.uuid || '',
+    targetId: selected.value?.id || selected.value?.ID || '',
+    targetTitle: selected.value?.title || selected.value?.name || '',
+    _requestId: Date.now()
+  }
+  console.debug('[useNoekState] onRotateSelected ->', cmd)
+  sceneCommand.value = cmd
+}
+
 function onSelectedAnchor(anchor) {
   selectedAnchor.value = anchor
 }
@@ -1212,6 +1225,7 @@ export function useNoekState() {
     onSelectRoomSound,
     onApplyRoomColors,
     onSelected,
+    onRotateSelected,
     onSelectedAnchor,
     onLoadError,
     onSave,
