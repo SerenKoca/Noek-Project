@@ -8,7 +8,7 @@ import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.
 import { adaptStaticAssetUrl, fetchModels } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
-import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, createFloorTexture, createWallTexture, getFloorTextureDefaults, getWallTextureDefaults, normalizeFloorTextureId, normalizeSurfaceTextureColors, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
+import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, FLOOR_TEXTURE_PRESETS, WALL_TEXTURE_PRESETS, createFloorTexture, createWallTexture, getFloorTextureDefaults, getWallTextureDefaults, normalizeFloorTextureId, normalizeSurfaceTextureColors, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
 
 const props = defineProps({
   loadRequest: {
@@ -511,6 +511,12 @@ const templateReplacementLoading = ref(false)
 const templateReplacementError = ref('')
 const templateReplacementSearch = ref('')
 const templateReplacementModels = ref([])
+const templateFloorTextureId = ref(DEFAULT_FLOOR_TEXTURE_ID)
+const templateFloorPrimaryColor = ref(getFloorTextureDefaults(DEFAULT_FLOOR_TEXTURE_ID).primaryColor)
+const templateFloorSecondaryColor = ref(getFloorTextureDefaults(DEFAULT_FLOOR_TEXTURE_ID).secondaryColor)
+const templateWallTextureId = ref(DEFAULT_WALL_TEXTURE_ID)
+const templateWallPrimaryColor = ref(getWallTextureDefaults(DEFAULT_WALL_TEXTURE_ID).primaryColor)
+const templateWallSecondaryColor = ref(getWallTextureDefaults(DEFAULT_WALL_TEXTURE_ID).secondaryColor)
 const templateDraft = ref({
   x: 0,
   y: 0,
@@ -539,6 +545,92 @@ const filteredReplacementModels = computed(() => {
 
 function getTemplateReplacementPreview(model) {
   return model?.thumbnailUrl || model?.previewUrl || model?.Thumbnail || model?.preview || ''
+}
+
+function syncTemplateSurfaceEditorFromScene() {
+  const nextFloorTextureId = normalizeFloorTextureId(floorTextureId)
+  const nextWallTextureId = normalizeWallTextureId(wallTextureId)
+  const nextFloorPalette = getTexturePalette('floor', nextFloorTextureId, floorTextureColorsById)
+  const nextWallPalette = getTexturePalette('wall', nextWallTextureId, wallTextureColorsById)
+
+  templateFloorTextureId.value = nextFloorTextureId
+  templateFloorPrimaryColor.value = nextFloorPalette.primaryColor
+  templateFloorSecondaryColor.value = nextFloorPalette.secondaryColor
+  templateWallTextureId.value = nextWallTextureId
+  templateWallPrimaryColor.value = nextWallPalette.primaryColor
+  templateWallSecondaryColor.value = nextWallPalette.secondaryColor
+}
+
+function applyTemplateSurfaceTexture(surface, textureId) {
+  const normalizedTextureId = surface === 'wall' ? normalizeWallTextureId(textureId) : normalizeFloorTextureId(textureId)
+
+  const nextFloorTextureId = surface === 'floor' ? normalizedTextureId : normalizeFloorTextureId(floorTextureId)
+  const nextWallTextureId = surface === 'wall' ? normalizedTextureId : normalizeWallTextureId(wallTextureId)
+  const nextFloorPalette = surface === 'floor'
+    ? normalizeSurfaceTextureColors('floor', normalizedTextureId, getFloorTextureDefaults(normalizedTextureId))
+    : getTexturePalette('floor', nextFloorTextureId, floorTextureColorsById)
+  const nextWallPalette = surface === 'wall'
+    ? normalizeSurfaceTextureColors('wall', normalizedTextureId, getWallTextureDefaults(normalizedTextureId))
+    : getTexturePalette('wall', nextWallTextureId, wallTextureColorsById)
+
+  applyRoomColors({
+    floorTextureId: nextFloorTextureId,
+    wallTextureId: nextWallTextureId,
+    floorTextureColorsById: surface === 'floor'
+      ? {
+          ...floorTextureColorsById,
+          [normalizedTextureId]: nextFloorPalette
+        }
+      : floorTextureColorsById,
+    wallTextureColorsById: surface === 'wall'
+      ? {
+          ...wallTextureColorsById,
+          [normalizedTextureId]: nextWallPalette
+        }
+      : wallTextureColorsById
+  })
+
+  syncTemplateSurfaceEditorFromScene()
+}
+
+function updateTemplateSurfaceColor(surface, field, value) {
+  const textureId = surface === 'wall' ? normalizeWallTextureId(templateWallTextureId.value) : normalizeFloorTextureId(templateFloorTextureId.value)
+  const currentPalette = surface === 'wall'
+    ? normalizeSurfaceTextureColors('wall', textureId, getTexturePalette('wall', textureId, wallTextureColorsById))
+    : normalizeSurfaceTextureColors('floor', textureId, getTexturePalette('floor', textureId, floorTextureColorsById))
+  const nextPalette = normalizeSurfaceTextureColors(surface, textureId, {
+    ...currentPalette,
+    [field]: value
+  })
+
+  if (surface === 'wall') {
+    templateWallTextureId.value = textureId
+    templateWallPrimaryColor.value = nextPalette.primaryColor
+    templateWallSecondaryColor.value = nextPalette.secondaryColor
+  } else {
+    templateFloorTextureId.value = textureId
+    templateFloorPrimaryColor.value = nextPalette.primaryColor
+    templateFloorSecondaryColor.value = nextPalette.secondaryColor
+  }
+
+  applyRoomColors({
+    floorTextureId: normalizeFloorTextureId(surface === 'floor' ? textureId : floorTextureId),
+    wallTextureId: normalizeWallTextureId(surface === 'wall' ? textureId : wallTextureId),
+    floorTextureColorsById: surface === 'floor'
+      ? {
+          ...floorTextureColorsById,
+          [textureId]: nextPalette
+        }
+      : floorTextureColorsById,
+    wallTextureColorsById: surface === 'wall'
+      ? {
+          ...wallTextureColorsById,
+          [textureId]: nextPalette
+        }
+      : wallTextureColorsById
+  })
+
+  syncTemplateSurfaceEditorFromScene()
 }
 
 function getDefaultTemplateCategories(slotId) {
@@ -597,6 +689,47 @@ function writeDraftFromSlot(slotId = templateEditorSlotId.value) {
     acceptsPersoonlijk: accepts.includes('persoonlijk') || accepts.includes('alles'),
     acceptsDecoratie: accepts.includes('decoratie') || accepts.includes('alles')
   }
+}
+
+function deleteTemplateSlot(slotId = templateEditorSlotId.value) {
+  if (!canEditTemplate.value) return
+  if (TEMPLATE_SLOTS.value.length <= 1) {
+    templateEditorMessage.value = 'Minstens één slot moet blijven bestaan.'
+    return
+  }
+
+  const slot = getTemplateSlot(slotId)
+  if (!slot) {
+    templateEditorMessage.value = 'Geen slot geselecteerd om te verwijderen.'
+    return
+  }
+
+  const label = String(slot.label || slot.id)
+  if (typeof window !== 'undefined' && !window.confirm(`Slot "${label}" verwijderen?`)) {
+    return
+  }
+
+  const slotState = slotStates.get(slot.id)
+  if (slotState?.root) removeRoot(slotState.root)
+  if (slotState?.marker) removeRoot(slotState.marker)
+  slotStates.delete(slot.id)
+  TEMPLATE_SLOTS.value = TEMPLATE_SLOTS.value.filter((item) => item.id !== slot.id)
+
+  let fallbackSlot = filteredTemplateSlots.value[0] || null
+  if (!fallbackSlot) {
+    templateSlotCategory.value = 'Alle'
+    fallbackSlot = TEMPLATE_SLOTS.value[0] || null
+  }
+
+  if (fallbackSlot) {
+    templateEditorSlotId.value = fallbackSlot.id
+    if (templateSlotCategory.value !== 'Alle' && !matchesTemplateCategoryFilter(fallbackSlot, templateSlotCategory.value)) {
+      templateSlotCategory.value = getTemplateEditorSlotCategories(fallbackSlot)[0] || 'Alle'
+    }
+    writeDraftFromSlot(fallbackSlot.id)
+  }
+
+  templateEditorMessage.value = `Slot "${label}" verwijderd.`
 }
 
 async function loadTemplateReplacementModels() {
@@ -2111,6 +2244,7 @@ async function loadRoom(sceneData) {
   // Reset scene to default state first
   resetSceneToDefault({ hydrateCurated: false })
   applyRoomColors(sceneData.appearance || {})
+  syncTemplateSurfaceEditorFromScene()
 
   // Load saved furniture
   for (const item of sceneData.furniture) {
@@ -2227,6 +2361,7 @@ function resetSceneToDefault({ hydrateCurated = true } = {}) {
     floorTextureColorsById: {},
     wallTextureColorsById: {}
   })
+  syncTemplateSurfaceEditorFromScene()
 }
 
 defineExpose({ serializeRoom, loadRoom })
@@ -2714,6 +2849,7 @@ watch(
         floorTextureColorsById: command.floorTextureColorsById,
         wallTextureColorsById: command.wallTextureColorsById
       })
+      syncTemplateSurfaceEditorFromScene()
     }
   }
 )
@@ -2763,6 +2899,7 @@ watch(templateEditorOpen, (isOpen) => {
     templateDragEnabled.value = false
   } else {
     loadTemplateReplacementModels()
+    syncTemplateSurfaceEditorFromScene()
   }
   updateTemplateDragBinding()
 })
@@ -2782,6 +2919,7 @@ onMounted(() => {
     restoreTemplateFromBase()
   }
   createScene()
+  syncTemplateSurfaceEditorFromScene()
   writeDraftFromSlot(templateEditorSlotId.value)
   loadTemplateReplacementModels()
   sceneReady.value = true
@@ -2864,6 +3002,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="template-editor-actions">
               <button type="button" class="template-editor-mini-btn" @click="createNewTemplateSlot">Nieuw slot</button>
+              <button type="button" class="template-editor-mini-btn template-editor-mini-btn-danger" @click="deleteTemplateSlot">Verwijder slot</button>
               <button type="button" class="template-editor-mini-btn" @click="resetTemplateDefaults">Reset</button>
             </div>
           </section>
@@ -2926,7 +3065,88 @@ onBeforeUnmount(() => {
 
           <section class="template-editor-section template-editor-section-wide">
             <div class="template-section-title-row">
-              <h4>3. Object vervangen</h4>
+              <h4>3. Vloer en muren</h4>
+              <span class="template-editor-help">Kies textuur en kleur voor beide oppervlakken</span>
+            </div>
+
+            <div class="template-surface-grid">
+              <div class="template-surface-card">
+                <div class="template-surface-head">
+                  <strong>Vloer</strong>
+                  <span>{{ templateFloorTextureId }}</span>
+                </div>
+
+                <div class="template-surface-preset-grid">
+                  <button
+                    v-for="preset in FLOOR_TEXTURE_PRESETS"
+                    :key="preset.id"
+                    type="button"
+                    class="template-surface-preset-btn"
+                    :class="{ active: templateFloorTextureId === preset.id }"
+                    :style="{ backgroundImage: preset.preview }"
+                    @click="applyTemplateSurfaceTexture('floor', preset.id)"
+                  >
+                    <span>{{ preset.label }}</span>
+                  </button>
+                </div>
+
+                <div class="template-surface-color-grid">
+                  <label class="template-editor-field">
+                    <span>Hoofdkleur</span>
+                    <input :value="templateFloorPrimaryColor" type="color" @input="updateTemplateSurfaceColor('floor', 'primaryColor', $event.target.value)" />
+                  </label>
+                  <label class="template-editor-field">
+                    <span>Accentkleur</span>
+                    <input :value="templateFloorSecondaryColor" type="color" @input="updateTemplateSurfaceColor('floor', 'secondaryColor', $event.target.value)" />
+                  </label>
+                </div>
+
+                <div class="template-editor-actions">
+                  <button type="button" class="template-editor-mini-btn" @click="applyTemplateSurfaceTexture('floor', DEFAULT_FLOOR_TEXTURE_ID)">Reset vloer</button>
+                </div>
+              </div>
+
+              <div class="template-surface-card">
+                <div class="template-surface-head">
+                  <strong>Muur</strong>
+                  <span>{{ templateWallTextureId }}</span>
+                </div>
+
+                <div class="template-surface-preset-grid">
+                  <button
+                    v-for="preset in WALL_TEXTURE_PRESETS"
+                    :key="preset.id"
+                    type="button"
+                    class="template-surface-preset-btn"
+                    :class="{ active: templateWallTextureId === preset.id }"
+                    :style="{ backgroundImage: preset.preview }"
+                    @click="applyTemplateSurfaceTexture('wall', preset.id)"
+                  >
+                    <span>{{ preset.label }}</span>
+                  </button>
+                </div>
+
+                <div class="template-surface-color-grid">
+                  <label class="template-editor-field">
+                    <span>Hoofdkleur</span>
+                    <input :value="templateWallPrimaryColor" type="color" @input="updateTemplateSurfaceColor('wall', 'primaryColor', $event.target.value)" />
+                  </label>
+                  <label class="template-editor-field">
+                    <span>Accentkleur</span>
+                    <input :value="templateWallSecondaryColor" type="color" @input="updateTemplateSurfaceColor('wall', 'secondaryColor', $event.target.value)" />
+                  </label>
+                </div>
+
+                <div class="template-editor-actions">
+                  <button type="button" class="template-editor-mini-btn" @click="applyTemplateSurfaceTexture('wall', DEFAULT_WALL_TEXTURE_ID)">Reset muur</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="template-editor-section template-editor-section-wide">
+            <div class="template-section-title-row">
+              <h4>4. Object vervangen</h4>
               <span class="template-editor-help">Zoek op naam, id of categorie</span>
             </div>
             <label class="template-editor-field">
@@ -3312,6 +3532,16 @@ onBeforeUnmount(() => {
   align-items: center;
 }
 
+.template-editor-mini-btn-danger {
+  background: rgba(180, 56, 74, 0.16);
+  border-color: rgba(180, 56, 74, 0.45);
+  color: #ffdce0;
+}
+
+.template-editor-mini-btn-danger:hover {
+  background: rgba(180, 56, 74, 0.25);
+}
+
 .template-editor-details {
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 12px;
@@ -3330,6 +3560,84 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 10px;
   margin-top: 10px;
+}
+
+.template-surface-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.template-surface-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.template-surface-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.template-surface-head strong {
+  font-size: 0.95rem;
+}
+
+.template-surface-head span {
+  font-size: 12px;
+  color: rgba(241, 241, 244, 0.68);
+  word-break: break-word;
+}
+
+.template-surface-preset-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.template-surface-preset-btn {
+  min-height: 72px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background-color: rgba(255, 255, 255, 0.08);
+  background-size: cover;
+  background-position: center;
+  color: #fff;
+  cursor: pointer;
+  display: grid;
+  align-items: end;
+  text-align: left;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+.template-surface-preset-btn span {
+  padding: 5px 7px;
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.38);
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.template-surface-preset-btn.active {
+  border-color: rgba(51, 102, 255, 0.95);
+  box-shadow: inset 0 0 0 1px rgba(51, 102, 255, 0.2), 0 0 0 2px rgba(51, 102, 255, 0.18);
+}
+
+.template-surface-color-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.template-surface-color-grid input[type='color'] {
+  padding: 4px;
+  min-height: 42px;
 }
 
 .template-replacement-list {
@@ -3369,7 +3677,10 @@ onBeforeUnmount(() => {
 @media (max-width: 920px) {
   .template-editor-grid,
   .template-editor-field-grid,
-  .template-slot-list {
+  .template-slot-list,
+  .template-surface-grid,
+  .template-surface-preset-grid,
+  .template-surface-color-grid {
     grid-template-columns: 1fr;
   }
 
