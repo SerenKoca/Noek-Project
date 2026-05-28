@@ -1,6 +1,7 @@
 const Room = require('../models/Room');
 const RoomContribution = require('../models/RoomContribution');
 const { createRoomEditKey } = require('../lib/roomEditAuth')
+const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
 
 const ROOM_TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
@@ -132,14 +133,15 @@ function normalizeRoomReactionType(value) {
   return { reactionType, reactionField };
 }
 
-function buildFallbackTemplateSceneData(templateSlots = []) {
+function buildFallbackTemplateSceneData(templateSlots = [], templateKey = 'template-a') {
   return {
     templateSlots: Array.isArray(templateSlots) ? templateSlots : [],
     furniture: [],
     appearance: {},
     metadata: {
       generatedAt: new Date().toISOString(),
-      source: 'fallback-template'
+      source: 'fallback-template',
+      templateKey: normalizeTemplateKey(templateKey)
     }
   };
 }
@@ -149,6 +151,8 @@ exports.getRoomTemplate = async (req, res) => {
     if (req.auth?.role !== 'editor') {
       return res.status(403).json({ error: 'Alleen editors kunnen de template gebruiken.' });
     }
+
+    const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
 
     // Load User model first, then optionally attempt to load the frontend ROOM_TEMPLATE.
     const userModule = await import('../models/User.js')
@@ -160,18 +164,52 @@ exports.getRoomTemplate = async (req, res) => {
     });
 
     if (templateOwner) {
-      const templateRoom = await Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 });
+      const templateRoom = templateKey === 'template-a'
+        ? await Room.findOne({
+            ownerId: templateOwner._id,
+            $or: [
+              { templateKey: 'template-a' },
+              { templateKey: '' },
+              { templateKey: { $exists: false } }
+            ]
+          }).sort({ createdAt: 1 })
+        : await Room.findOne({ ownerId: templateOwner._id, templateKey }).sort({ createdAt: 1 });
       if (templateRoom?.sceneData) {
         return res.json({
           sceneData: templateRoom.sceneData,
           roomId: templateRoom._id,
+          templateKey,
+          name: templateRoom.name || getTemplateRoomName(templateKey),
           source: 'template-room'
         });
+      }
+
+      if (templateKey === 'template-b') {
+        const seedRoom = await Room.findOne({
+          ownerId: templateOwner._id,
+          $or: [
+            { templateKey: 'template-a' },
+            { templateKey: '' },
+            { templateKey: { $exists: false } }
+          ]
+        }).sort({ createdAt: 1 });
+
+        if (seedRoom?.sceneData) {
+          return res.json({
+            sceneData: JSON.parse(JSON.stringify(seedRoom.sceneData)),
+            roomId: seedRoom._id,
+            templateKey,
+            name: getTemplateRoomName(templateKey),
+            source: 'template-copy'
+          });
+        }
       }
     }
 
     return res.json({
-      sceneData: buildFallbackTemplateSceneData(templateSlots),
+      sceneData: buildFallbackTemplateSceneData(templateSlots, templateKey),
+      templateKey,
+      name: getTemplateRoomName(templateKey),
       source: 'fallback-template'
     });
   } catch (error) {
@@ -208,11 +246,16 @@ exports.createRoom = async (req, res) => {
       return res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' });
     }
 
-    const { name, userId, sceneData } = req.body;
+    const { name, userId, sceneData, templateKey } = req.body;
     const ownerId = req.auth?.userId;
+    const normalizedTemplateKey = normalizeTemplateKey(templateKey, '')
 
     if (!name || !sceneData) {
       return res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' });
+    }
+
+    if (templateKey && !normalizedTemplateKey) {
+      return res.status(400).json({ error: 'Onbekende template.' });
     }
 
     const existingRoomCount = await Room.countDocuments({ ownerId });
@@ -225,6 +268,7 @@ exports.createRoom = async (req, res) => {
       userId: userId || null,
       ownerId,
       sceneData,
+      templateKey: normalizedTemplateKey || '',
       editKey: createRoomEditKey(String(ownerId))
     });
     await room.save();

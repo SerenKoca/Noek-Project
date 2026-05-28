@@ -32,7 +32,12 @@ const templateError = ref('')
 const templateStatus = ref('')
 const templateRoomName = ref('')
 const templateSceneData = ref(null)
+const selectedTemplateKey = ref('template-a')
 const templateSceneRef = ref(null)
+const templateOptions = [
+  { key: 'template-a', label: 'Template 1' },
+  { key: 'template-b', label: 'Template 2' }
+]
 const form = ref({
   displayName: '',
   email: '',
@@ -70,13 +75,14 @@ async function loadDirectors() {
   }
 }
 
-async function loadTemplateRoom() {
+async function loadTemplateRoom(templateKey = selectedTemplateKey.value) {
+  selectedTemplateKey.value = String(templateKey || 'template-a').trim() || 'template-a'
   templateLoading.value = true
   templateError.value = ''
   templateStatus.value = ''
 
   try {
-    const result = await getTemplateRoom()
+    const result = await getTemplateRoom({ templateKey: selectedTemplateKey.value })
     templateRoomName.value = String(result?.name || 'Template kamer')
     templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : null
   } catch (err) {
@@ -105,7 +111,7 @@ async function saveTemplateRoom() {
 
   try {
     const sceneData = templateSceneRef.value.serializeRoom()
-    const result = await updateTemplateRoom({ sceneData })
+    const result = await updateTemplateRoom({ sceneData, templateKey: selectedTemplateKey.value })
     templateRoomName.value = String(result?.name || templateRoomName.value || 'Template kamer')
     templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : sceneData
     templateStatus.value = 'Template opgeslagen.'
@@ -359,9 +365,22 @@ async function logout() {
           <div class="template-panel-header">
             <div>
               <h2>Template kamer</h2>
-              <p>Hier pas je direct de punten, voorwerpen en basisopstelling van de template aan.</p>
+              <p>Hier pas je direct de punten, voorwerpen en basisopstelling van de gekozen template aan.</p>
             </div>
             <button type="button" class="admin-secondary-btn" @click="loadTemplateRoom">Herladen</button>
+          </div>
+
+          <div class="template-switcher">
+            <button
+              v-for="option in templateOptions"
+              :key="option.key"
+              type="button"
+              class="template-switch-btn"
+              :class="{ active: selectedTemplateKey === option.key }"
+              @click="loadTemplateRoom(option.key)"
+            >
+              {{ option.label }}
+            </button>
           </div>
 
           <div v-if="templateStatus" class="admin-inline-status success">{{ templateStatus }}</div>
@@ -854,6 +873,29 @@ async function logout() {
 .admin-client-head {
   margin: 0.25rem 0 0;
   color: var(--editor-text-soft);
+}
+
+.template-switcher {
+  display: inline-flex;
+  gap: 10px;
+  margin: 14px 0 8px;
+  flex-wrap: wrap;
+}
+
+.template-switch-btn {
+  border: 1px solid var(--editor-border);
+  border-radius: 999px;
+  background: #fff;
+  padding: 10px 16px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--editor-text);
+}
+
+.template-switch-btn.active {
+  background: var(--editor-brand);
+  color: #fff;
+  border-color: var(--editor-brand);
 }
 
 .template-scene-shell {

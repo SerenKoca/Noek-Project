@@ -62,6 +62,11 @@ const roomSchema = new mongoose.Schema({
     default: null,
     index: true
   },
+  templateKey: {
+    type: String,
+    default: '',
+    index: true
+  },
   isPublic: {
     type: Boolean,
     default: true,

@@ -76,6 +76,7 @@ export async function getRooms(options = {}) {
 
 export async function getRoomTemplate(options = {}) {
   const response = await http.get('/rooms/template', {
+    params: options.templateKey ? { templateKey: options.templateKey } : undefined,
     loader: { skip: options.skipLoader === true }
   })
   return response.data

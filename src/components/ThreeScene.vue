@@ -477,7 +477,8 @@ function normalizeTemplateSlots(slots = []) {
             ? new THREE.Vector3(Number(slot.position.x) || 0, Number(slot.position.y) || FLOOR_Y, Number(slot.position.z) || 0)
             : new THREE.Vector3(0, 0, 0),
         rotationY: Number(slot?.rotationY) || 0,
-        initialModel: slot?.initialModel || null
+        initialModel: slot?.initialModel || null,
+        markerSize: typeof slot?.markerSize === 'number' ? slot.markerSize : Number(slot?.markerSize) || 1
       }))
       .filter((slot) => String(slot?.id || '').trim())
     : []
@@ -486,10 +487,11 @@ function normalizeTemplateSlots(slots = []) {
 function cloneTemplateSlots(slots = []) {
   return slots.map((slot) => ({
     ...slot,
-    accepts: Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel'],
-    categories: Array.isArray(slot?.categories) ? [...slot.categories] : getDefaultTemplateCategories(slot?.id),
+    accepts: Array.isArray(slot?.accepts) ? [...slot?.accepts] : ['meubel'],
+    categories: Array.isArray(slot?.categories) ? [...slot?.categories] : getDefaultTemplateCategories(slot?.id),
     position: slot?.position?.isVector3 ? slot.position.clone() : new THREE.Vector3(0, FLOOR_Y, 0),
-    initialModel: slot?.initialModel ? { ...slot.initialModel } : null
+    initialModel: slot?.initialModel ? { ...slot.initialModel } : null,
+    markerSize: typeof slot?.markerSize === 'number' ? slot.markerSize : Number(slot?.markerSize) || 1
   }))
 }
 
@@ -526,7 +528,9 @@ const templateDraft = ref({
   slotCategories: ['Zetel'],
   acceptsMeubel: true,
   acceptsPersoonlijk: false,
-  acceptsDecoratie: false
+  acceptsDecoratie: false,
+  markerSize: 1
+  ,modelScale: 1
 })
 let isSyncingSlotFromTransform = false
 
@@ -688,7 +692,11 @@ function writeDraftFromSlot(slotId = templateEditorSlotId.value) {
     slotCategories,
     acceptsMeubel: accepts.includes('meubel') || accepts.includes('alles'),
     acceptsPersoonlijk: accepts.includes('persoonlijk') || accepts.includes('alles'),
-    acceptsDecoratie: accepts.includes('decoratie') || accepts.includes('alles')
+    acceptsDecoratie: accepts.includes('decoratie') || accepts.includes('alles'),
+    markerSize: typeof slot.markerSize === 'number' ? slot.markerSize : Number(slot.markerSize) || 1,
+    modelScale: (slot.initialModel && typeof slot.initialModel.scaleMultiplier === 'number')
+      ? slot.initialModel.scaleMultiplier
+      : (slot.appliedModelScale || 1)
   }
 }
 
@@ -843,6 +851,13 @@ function applyTemplateSlotToScene(slotId) {
     slotState.marker.userData.slotAccepts = [...slotState.accepts]
     slotState.marker.userData.slotCategories = [...slotState.categories]
     slotState.marker.userData.title = `Plaats hier (${slotState.label})`
+    // Update marker scale if slot has markerSize
+    try {
+      const ms = Number(slot.markerSize) || 1
+      slotState.marker.scale.set(ms, ms, ms)
+    } catch (err) {
+      // ignore invalid markerSize
+    }
   }
 
   if (selectedRoot?.userData?.slotId === slotId) {
@@ -951,6 +966,31 @@ function applyTemplateDraft() {
   slot.rotationY = (rotationDeg * Math.PI) / 180
   slot.accepts = accepts
   slot.categories = slotCategories
+  // apply markerSize if present
+  if (Object.prototype.hasOwnProperty.call(templateDraft.value, 'markerSize')) {
+    const ms = Number(templateDraft.value.markerSize)
+    slot.markerSize = Number.isFinite(ms) && ms > 0 ? ms : 1
+  }
+  // apply model scale if present
+  if (Object.prototype.hasOwnProperty.call(templateDraft.value, 'modelScale')) {
+    const newScale = Number(templateDraft.value.modelScale) || 1
+    // persist to initialModel if present
+    if (slot.initialModel) {
+      slot.initialModel.scaleMultiplier = newScale
+    }
+    // adjust live root scale relatively
+    const slotState = slotStates.get(slot.id)
+    try {
+      if (slotState?.root) {
+        const prev = Number(slotState.appliedModelScale) || 1
+        const ratio = prev > 0 ? newScale / prev : newScale
+        slotState.root.scale.multiplyScalar(ratio)
+        slotState.appliedModelScale = newScale
+      }
+    } catch (err) {
+      // ignore scaling errors
+    }
+  }
   applyTemplateSlotToScene(slot.id)
   templateDraft.value.y = yValue
   templateEditorMessage.value = 'Template slot bijgewerkt.'
@@ -1026,7 +1066,8 @@ function getTemplateSnapshot() {
     categories: getTemplateEditorSlotCategories(slot),
     position: [slot.position.x, slot.position.y, slot.position.z],
     rotationY: slot.rotationY,
-    initialModel: slot.initialModel ? { ...slot.initialModel } : null
+    initialModel: slot.initialModel ? { ...slot.initialModel } : null,
+    markerSize: typeof slot.markerSize === 'number' ? slot.markerSize : Number(slot.markerSize) || 1
   }))
 }
 
@@ -1985,6 +2026,14 @@ function createSlotMarker(slotId) {
   v.position.set(0, 0.3, 0)
   root.add(v)
 
+  // Apply per-slot marker size scaling (default 1)
+  try {
+    const size = Number(slot?.markerSize) || 1
+    if (size !== 1) root.scale.set(size, size, size)
+  } catch {
+    // ignore invalid markerSize
+  }
+
   return root
 }
 
@@ -2055,6 +2104,8 @@ function assignRootToSlot(root, slotId) {
   scene.add(root)
   selectableRoots.push(root)
   slot.root = root
+  // track applied model scale for relative adjustments
+  slot.appliedModelScale = Number(root.userData?.appliedModelScale) || (root.scale ? Number(root.scale.x) || 1 : 1)
   select(root)
 }
 
@@ -2810,6 +2861,8 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
           if (!ENFORCE_UNIFORM_MODEL_SIZE && Number.isFinite(transform?.scaleMultiplier) && transform.scaleMultiplier > 0) {
             holder.scale.multiplyScalar(transform.scaleMultiplier)
           }
+          // record applied model scale (accept either scaleMultiplier or sizeMultiplier)
+          holder.userData.appliedModelScale = Number(transform?.scaleMultiplier) || Number(transform?.sizeMultiplier) || 1
 
           if (!ENFORCE_UNIFORM_MODEL_SIZE && Number.isFinite(transform?.yOffset)) {
             holder.position.y += transform.yOffset
@@ -2819,6 +2872,8 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
           if (Array.isArray(transform?.positionOffset) && transform.positionOffset.length >= 3) {
             holder.userData.positionOffset = transform.positionOffset.map((v) => Number(v) || 0)
           }
+          // record applied model scale before assigning
+          if (!holder.userData.appliedModelScale) holder.userData.appliedModelScale = Number(transform?.scaleMultiplier) || 1
           assignRootToSlot(holder, targetSlotId)
           // don't force-snap small decorations to the floor so saved Y offsets are preserved
           if (!isSmallDecorationSlot(targetSlotId)) {
@@ -3149,6 +3204,14 @@ onBeforeUnmount(() => {
               <label class="template-editor-field">
                 <span>Rotatie</span>
                 <input v-model="templateDraft.rotationDeg" type="number" step="0.1" />
+              </label>
+              <label class="template-editor-field">
+                <span>Puntgrootte</span>
+                <input v-model="templateDraft.markerSize" type="number" step="0.1" min="0.1" />
+              </label>
+              <label class="template-editor-field">
+                <span>Modelgrootte</span>
+                <input v-model="templateDraft.modelScale" type="number" step="0.1" min="0.1" />
               </label>
             </div>
 

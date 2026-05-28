@@ -20,20 +20,40 @@ const userLabel = computed(() => {
 const userInitial = computed(() => { const label = userLabel.value.trim(); return label ? label.charAt(0).toUpperCase() : 'D' })
 
 const templateScene = ref(null)
+const templateKey = ref('template-a')
+const templateChoices = [
+  {
+    key: 'template-a',
+    title: 'Template 1',
+    description: 'Rustige basis met een klassieke opstelling.'
+  },
+  {
+    key: 'template-b',
+    title: 'Template 2',
+    description: 'Alternatieve opstelling voor een andere sfeer.'
+  }
+]
 const roomName = ref('Naam kamer')
 const collaboratorsEnabled = ref(false)
 const collaborators = ref([])
 const newCollaborator = ref('')
 const creating = ref(false)
 
-onMounted(async () => {
-  await state.bootstrap()
+async function loadTemplate(key) {
+  const selectedKey = String(key || 'template-a').trim() || 'template-a'
+  templateKey.value = selectedKey
+
   try {
-    const res = await getRoomTemplate({ skipLoader: true })
-    templateScene.value = res?.sceneData || null
+    const res = await getRoomTemplate({ skipLoader: true, templateKey: selectedKey })
+    templateScene.value = res?.sceneData ? JSON.parse(JSON.stringify(res.sceneData)) : null
   } catch (e) {
     templateScene.value = null
   }
+}
+
+onMounted(async () => {
+  await state.bootstrap()
+  await loadTemplate(templateKey.value)
 })
 
 function addCollaborator() {
@@ -45,9 +65,17 @@ function addCollaborator() {
 
 async function createFromTemplate() {
   if (creating.value) return
+  if (!templateScene.value) {
+    window.alert('Kies eerst een template.')
+    return
+  }
   creating.value = true
   try {
-    const saved = await saveRoom({ name: roomName.value || 'Nieuwe kamer', sceneData: templateScene.value })
+    const saved = await saveRoom({
+      name: roomName.value || 'Nieuwe kamer',
+      sceneData: JSON.parse(JSON.stringify(templateScene.value)),
+      templateKey: templateKey.value
+    })
     await state.loadRooms()
     await router.push(`/rooms/${saved._id}/editor`)
   } catch (err) {
@@ -104,6 +132,20 @@ function openProfile() {
       <section class="settings-content-v2 two-column">
         <div class="settings-left-v2 left-column">
           <input v-model="roomName" class="create-room-name big" placeholder="Naam kamer" />
+
+          <div class="template-picker">
+            <button
+              v-for="choice in templateChoices"
+              :key="choice.key"
+              type="button"
+              class="template-choice"
+              :class="{ active: templateKey === choice.key }"
+              @click="loadTemplate(choice.key)"
+            >
+              <strong>{{ choice.title }}</strong>
+              <span>{{ choice.description }}</span>
+            </button>
+          </div>
 
           <div class="preview-shell large">
             <ThreeScene v-if="templateScene" :room-data="templateScene" />
@@ -171,6 +213,34 @@ function openProfile() {
   background: #e9f2fb;
   border-radius: 14px;
   box-shadow: none;
+}
+.template-picker {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.template-choice {
+  text-align: left;
+  border: 1px solid var(--editor-border);
+  background: rgba(255,255,255,0.82);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 4px;
+  cursor: pointer;
+}
+.template-choice strong {
+  font-size: 1rem;
+}
+.template-choice span {
+  font-size: 0.92rem;
+  color: #42607b;
+}
+.template-choice.active {
+  border-color: var(--editor-brand);
+  box-shadow: 0 10px 22px rgba(12, 79, 130, 0.12);
+  background: #f2f8ff;
 }
 .preview-shell {
   border-radius: 12px;
@@ -240,5 +310,6 @@ function openProfile() {
 
 @media (max-width: 900px) {
   .settings-content-v2.two-column { grid-template-columns: 1fr; padding:28px }
+  .template-picker { grid-template-columns: 1fr }
 }
 </style>

@@ -2,6 +2,7 @@ require('dotenv').config()
 const fs = require('fs')
 const path = require('path')
 const mongoose = require('mongoose')
+const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
 
 async function connectMongo() {
   const primaryMongoUri = process.env.MONGO_URI
@@ -25,7 +26,7 @@ async function connectMongo() {
 async function run() {
   const jsonPath = process.argv[2]
   if (!jsonPath) {
-    console.error('Usage: node updateTemplate.js <sceneData.json> [templateOwnerEmail]')
+    console.error('Usage: node updateTemplate.js <sceneData.json> [templateOwnerEmail] [templateKey]')
     process.exit(1)
   }
 
@@ -44,6 +45,7 @@ async function run() {
   }
 
   const templateEmailArg = String(process.argv[3] || process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be').trim().toLowerCase()
+  const templateKey = normalizeTemplateKey(process.argv[4] || process.env.ROOM_TEMPLATE_KEY || 'template-a')
 
   await connectMongo()
 
@@ -57,18 +59,29 @@ async function run() {
       process.exit(1)
     }
 
-    let templateRoom = await Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })
+    let templateRoom = templateKey === 'template-a'
+      ? await Room.findOne({
+          ownerId: templateOwner._id,
+          $or: [
+            { templateKey: 'template-a' },
+            { templateKey: '' },
+            { templateKey: { $exists: false } }
+          ]
+        }).sort({ createdAt: 1 })
+      : await Room.findOne({ ownerId: templateOwner._id, templateKey }).sort({ createdAt: 1 })
     if (!templateRoom) {
       templateRoom = new Room({
-        name: 'Template kamer',
+        name: getTemplateRoomName(templateKey),
         ownerId: templateOwner._id,
         isPublic: false,
+        templateKey,
         sceneData
       })
       await templateRoom.save()
       console.log('Created template room:', String(templateRoom._id))
     } else {
       templateRoom.sceneData = sceneData
+      templateRoom.templateKey = templateKey
       await templateRoom.save()
       console.log('Template updated on room:', String(templateRoom._id))
     }

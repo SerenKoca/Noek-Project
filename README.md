@@ -27,15 +27,29 @@ Optional overrides if you expose your own proxy endpoints:
 
 ## Implementation notes
 
-- API logic (proxy-aware, spec-compliant): `src/services/polyPizzaService.js`
-- Three scene: `src/components/ThreeScene.vue`
-- Sidebar UI: `src/components/Sidebar.vue`
 
 ### Local development
 
-- `npm run dev` configures Vite proxies so browser requests to `/poly-api` and `/poly-static` are transparently forwarded to the official Poly Pizza hosts. This sidesteps the CORS errors shown in the OpenAPI instructions.
+
+## Template editor & marker size
+
+- Each template slot can include a `markerSize` numeric property (scale factor, `1` = default). This controls the visual size of the placement point in the scene.
+- To edit a slot's marker size in the app: open the Template Editor (admin/editor), pick a slot and change `Puntgrootte` (point size). Click `Toepassen` and then save the template from the Admin page to persist to the database.
+- You can also update the template from a JSON file using the backend helper:
+
+```bash
+cd backend
+# update from backend/scripts/sample-scene.json (or another JSON file)
+npm run seed:template
+```
+
+Or run the script directly:
+
+```bash
+node backend/scripts/updateTemplate.js path/to/sceneData.json your_template_owner_email@example.com
+```
+
+Ensure `MONGO_URI` is configured and the template owner user exists (by default `admin@admin.be` in `backend/.env`).
 
 ### Deployment (Vercel)
-
-- The repo includes two serverless proxies under `api/poly-api/[...path].js` and `api/poly-static/[...path].js`. Deploying on Vercel automatically exposes them at `/api/poly-api/*` and `/api/poly-static/*`, and the frontend calls those endpoints by default in production.
 - Set `POLYPIZZA_API_KEY` (or reuse `VITE_POLYPIZZA_API_KEY`) in your Vercel project settings so the serverless proxy can attach the `x-auth-token` header server-side. The browser never talks to `api.poly.pizza` directly, eliminating CORS failures in the hosted version.

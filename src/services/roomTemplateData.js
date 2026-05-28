@@ -3,6 +3,7 @@ export const ROOM_TEMPLATE_SLOTS = [
     id: 'slot-sofa',
     label: 'Zetel',
     accepts: ['meubel'],
+    markerSize: 1.3,
     position: [-6.8, 0, -12.2],
     rotationY: Math.PI * 0.97,
     initialModel: {

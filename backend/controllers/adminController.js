@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs')
 const User = require('../models/User')
 const Room = require('../models/Room')
+const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
 
 const DEFAULT_BRAND_DARK = '#1e2b37'
 const DEFAULT_BRAND_LIGHT = '#d7e1eb'
@@ -45,11 +46,23 @@ function buildFallbackTemplateSceneData() {
   }
 }
 
-async function findTemplateRoom() {
+async function findTemplateRoom(templateKey) {
   const templateOwner = await User.findOne({ email: TEMPLATE_OWNER_EMAIL, role: { $in: ['editor', 'admin'] } })
   if (!templateOwner) return null
 
-  return Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })
+  const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+  if (normalizedTemplateKey === 'template-a') {
+    return Room.findOne({
+      ownerId: templateOwner._id,
+      $or: [
+        { templateKey: 'template-a' },
+        { templateKey: '' },
+        { templateKey: { $exists: false } }
+      ]
+    }).sort({ createdAt: 1 })
+  }
+
+  return Room.findOne({ ownerId: templateOwner._id, templateKey: normalizedTemplateKey }).sort({ createdAt: 1 })
 }
 
 exports.listFuneralDirectors = async (req, res) => {
@@ -194,21 +207,38 @@ exports.deleteFuneralDirector = async (req, res) => {
 
 exports.getTemplateRoom = async (req, res) => {
   try {
-    const templateRoom = await findTemplateRoom()
+    const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
+    const templateRoom = await findTemplateRoom(templateKey)
 
     if (templateRoom?.sceneData) {
       res.json({
         roomId: templateRoom._id,
-        name: templateRoom.name,
+        name: templateRoom.name || getTemplateRoomName(templateKey),
+        templateKey,
         sceneData: templateRoom.sceneData,
         source: 'template-room'
       })
       return
     }
 
+    if (templateKey === 'template-b') {
+      const seedRoom = await findTemplateRoom('template-a')
+      if (seedRoom?.sceneData) {
+        res.json({
+          roomId: seedRoom._id,
+          name: getTemplateRoomName(templateKey),
+          templateKey,
+          sceneData: JSON.parse(JSON.stringify(seedRoom.sceneData)),
+          source: 'template-copy'
+        })
+        return
+      }
+    }
+
     res.json({
       roomId: '',
-      name: 'Template kamer',
+      name: getTemplateRoomName(templateKey),
+      templateKey,
       sceneData: buildFallbackTemplateSceneData(),
       source: 'fallback-template'
     })
@@ -221,23 +251,38 @@ exports.getTemplateRoom = async (req, res) => {
 exports.updateTemplateRoom = async (req, res) => {
   try {
     const sceneData = req.body?.sceneData
+    const templateKey = normalizeTemplateKey(req.body?.templateKey || req.query?.templateKey || req.query?.variant)
     if (!sceneData || typeof sceneData !== 'object') {
       res.status(400).json({ error: 'sceneData is verplicht.' })
       return
     }
 
-    const templateRoom = await findTemplateRoom()
+    let templateRoom = await findTemplateRoom(templateKey)
     if (!templateRoom) {
-      res.status(404).json({ error: 'Template kamer niet gevonden.' })
-      return
+      const templateOwner = await User.findOne({ email: TEMPLATE_OWNER_EMAIL, role: { $in: ['editor', 'admin'] } })
+      if (!templateOwner) {
+        res.status(404).json({ error: 'Template kamer niet gevonden.' })
+        return
+      }
+
+      templateRoom = new Room({
+        name: getTemplateRoomName(templateKey),
+        ownerId: templateOwner._id,
+        templateKey,
+        isPublic: false,
+        sceneData
+      })
+    } else {
+      templateRoom.sceneData = sceneData
+      templateRoom.templateKey = templateKey
     }
 
-    templateRoom.sceneData = sceneData
     await templateRoom.save()
 
     res.json({
       roomId: templateRoom._id,
-      name: templateRoom.name,
+      name: templateRoom.name || getTemplateRoomName(templateKey),
+      templateKey,
       sceneData: templateRoom.sceneData,
       source: 'template-room'
     })

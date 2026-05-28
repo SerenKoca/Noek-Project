@@ -42,8 +42,11 @@ export async function getFuneralDirectorDetails(id) {
   return response.data
 }
 
-export async function getTemplateRoom() {
-  const response = await http.get('/admin/template-room')
+export async function getTemplateRoom(options = {}) {
+  const response = await http.get('/admin/template-room', {
+    params: options.templateKey ? { templateKey: options.templateKey } : undefined,
+    loader: { skip: options.skipLoader === true }
+  })
   return response.data
 }
 
