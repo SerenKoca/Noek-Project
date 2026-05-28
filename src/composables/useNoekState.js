@@ -47,6 +47,7 @@ const saveStatusType = ref('')
 const currentRoomData = ref(null)
 const currentRoom = ref(null)
 const isSavingRoom = ref(false)
+const pendingAutosave = ref(false)
 const activeContributionsRoomId = ref('')
 const settingsRoom = ref(null)
 const roomContributions = ref({})
@@ -1034,10 +1035,15 @@ function onLoadError(message) {
 }
 
 async function onSave(options = {}) {
-  if (isSavingRoom.value) return
-
   const saveSource = options?.source === 'autosave' ? 'autosave' : 'manual'
   const isAutoSave = saveSource === 'autosave'
+
+  if (isSavingRoom.value) {
+    if (isAutoSave) {
+      pendingAutosave.value = true
+    }
+    return
+  }
 
   if (!sceneRef.value?.serializeRoom) {
     await nextTick()
@@ -1108,6 +1114,11 @@ async function onSave(options = {}) {
     }, 8000)
   } finally {
     isSavingRoom.value = false
+
+    if (pendingAutosave.value) {
+      pendingAutosave.value = false
+      await onSave({ source: 'autosave' })
+    }
   }
 }
 

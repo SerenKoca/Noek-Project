@@ -307,6 +307,7 @@ async function openSettings() {
             @selected="state.onSelected"
             @selected-anchor="state.onSelectedAnchor"
             @load-error="state.onLoadError"
+            @scene-mutated="state.onSave({ source: 'autosave' })"
           />
 
           <SceneOverlays

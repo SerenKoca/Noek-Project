@@ -53,7 +53,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['selected', 'selected-anchor', 'load-error', 'contribution-candle-selected'])
+const emit = defineEmits(['selected', 'selected-anchor', 'load-error', 'contribution-candle-selected', 'scene-mutated'])
 
 const containerEl = ref(null)
 const cameraCoords = ref('')
@@ -139,6 +139,7 @@ const CONTRIBUTION_CANDLE_GROUP_POSITIONS = [
 const DEFAULT_FLOOR_COLOR = DEFAULT_ROOM_FLOOR_COLOR
 const DEFAULT_WALL_COLOR = DEFAULT_ROOM_WALL_COLOR
 const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
+const ROOM_TEMPLATE_DELETED_KEY = `${ROOM_TEMPLATE_STORAGE_KEY}.deleted`
 const FLOOR_Y = 0
 const ENFORCE_UNIFORM_MODEL_SIZE = true
 
@@ -698,9 +699,29 @@ function deleteTemplateSlot(slotId = templateEditorSlotId.value) {
     return
   }
 
+  const selectedSlotId = String(
+    selectedRoot?.userData?.slotId ||
+    selectedRoot?.slotId ||
+    selectedTemplateTarget.value?.slotId ||
+    ''
+  ).trim()
+
+  if (slotId && typeof slotId === 'object') {
+    slotId = templateEditorSlotId.value
+  }
+
+  slotId = String(selectedSlotId || slotId || templateEditorSlotId.value || '').trim()
+
   const slot = getTemplateSlot(slotId)
   if (!slot) {
-    templateEditorMessage.value = 'Geen slot geselecteerd om te verwijderen.'
+    if (slotId) {
+      purgeSlotObjects(slotId)
+      saveTemplateToLocalStorage()
+      emit('scene-mutated')
+      templateEditorMessage.value = `Restanten van slot "${slotId}" verwijderd.`
+    } else {
+      templateEditorMessage.value = 'Geen slot geselecteerd om te verwijderen.'
+    }
     return
   }
 
@@ -709,11 +730,20 @@ function deleteTemplateSlot(slotId = templateEditorSlotId.value) {
     return
   }
 
-  const slotState = slotStates.get(slot.id)
-  if (slotState?.root) removeRoot(slotState.root)
-  if (slotState?.marker) removeRoot(slotState.marker)
+  purgeSlotObjects(slot.id)
   slotStates.delete(slot.id)
   TEMPLATE_SLOTS.value = TEMPLATE_SLOTS.value.filter((item) => item.id !== slot.id)
+
+  // Persist deletion so slot blijft verwijderd, ook na herladen.
+  try {
+    addDeletedTemplateSlot(slot.id)
+  } catch {
+    // ignore
+  }
+
+  rebuildTemplateSlotScene({ hydrateCurated: true })
+  saveTemplateToLocalStorage()
+  emit('scene-mutated')
 
   let fallbackSlot = filteredTemplateSlots.value[0] || null
   if (!fallbackSlot) {
@@ -915,6 +945,7 @@ function applyTemplateDraft() {
   applyTemplateSlotToScene(slot.id)
   templateDraft.value.y = yValue
   templateEditorMessage.value = 'Template slot bijgewerkt.'
+  emit('scene-mutated')
 }
 
 function createNewTemplateSlot() {
@@ -974,6 +1005,7 @@ function createNewTemplateSlot() {
   writeDraftFromSlot(newSlot.id)
   select(marker)
   templateEditorMessage.value = 'Nieuw slot toegevoegd.'
+  emit('scene-mutated')
 }
 
 function getTemplateSnapshot() {
@@ -999,6 +1031,28 @@ function saveTemplateToLocalStorage() {
   }
 }
 
+function getDeletedTemplateSlotsSet() {
+  try {
+    const raw = localStorage.getItem(ROOM_TEMPLATE_DELETED_KEY)
+    const parsed = raw ? JSON.parse(raw) : null
+    if (!Array.isArray(parsed)) return new Set()
+    return new Set(parsed.map((id) => String(id || '').trim()).filter(Boolean))
+  } catch {
+    return new Set()
+  }
+}
+
+function addDeletedTemplateSlot(slotId) {
+  if (!slotId) return
+  try {
+    const set = getDeletedTemplateSlotsSet()
+    set.add(String(slotId))
+    localStorage.setItem(ROOM_TEMPLATE_DELETED_KEY, JSON.stringify(Array.from(set)))
+  } catch {
+    // ignore
+  }
+}
+
 function restoreTemplateFromBase() {
   TEMPLATE_SLOTS.value = cloneTemplateSlots(BASE_TEMPLATE_SLOTS)
 }
@@ -1015,6 +1069,7 @@ function resetTemplateDefaults() {
   rebuildTemplateSlotScene({ hydrateCurated: true })
   writeDraftFromSlot()
   templateEditorMessage.value = 'Template hersteld naar standaard.'
+  emit('scene-mutated')
 }
 
 function applyStoredTemplateIfAny() {
@@ -2001,13 +2056,12 @@ function removeFurnitureFromSlot(slotId) {
   removeRoot(slot.root)
   slot.root = null
 
-  const marker = createSlotMarker(slotId)
-  marker.position.set(slot.position.x, slot.position.y, slot.position.z)
-  marker.rotation.set(0, slot.rotationY, 0)
-  scene.add(marker)
-  selectableRoots.push(marker)
-  slot.marker = marker
-  select(marker)
+  if (slot.marker) {
+    removeRoot(slot.marker)
+    slot.marker = null
+  }
+
+  deselect()
 }
 
 function getRootModel(obj) {
@@ -2073,7 +2127,32 @@ function removeRoot(root) {
     deselect()
   }
 
-  scene.remove(root)
+  if (root.parent) {
+    root.parent.remove(root)
+  } else {
+    scene.remove(root)
+  }
+}
+
+function purgeSlotObjects(slotId) {
+  const normalizedSlotId = String(slotId || '').trim()
+  if (!normalizedSlotId) return
+
+  const rootsToRemove = selectableRoots.filter((root) => String(root?.userData?.slotId || root?.slotId || '') === normalizedSlotId)
+  const sceneRootsToRemove = scene
+    ? scene.children.filter((child) => String(child?.userData?.slotId || child?.slotId || '') === normalizedSlotId)
+    : []
+
+  const uniqueRoots = new Set([...rootsToRemove, ...sceneRootsToRemove])
+  for (const root of uniqueRoots) {
+    removeRoot(root)
+  }
+
+  const slotState = slotStates.get(normalizedSlotId)
+  if (slotState) {
+    slotState.root = null
+    slotState.marker = null
+  }
 }
 
 function getRootByUuid(uuid) {
@@ -2364,7 +2443,28 @@ function resetSceneToDefault({ hydrateCurated = true } = {}) {
   syncTemplateSurfaceEditorFromScene()
 }
 
-defineExpose({ serializeRoom, loadRoom })
+defineExpose({
+  serializeRoom,
+  loadRoom,
+  deleteTemplateSlot,
+  updateTemplateEditorSlotId: (slotId) => {
+    templateEditorSlotId.value = String(slotId || '')
+  },
+  setTemplateSlotCategory: (category) => {
+    templateSlotCategory.value = String(category || 'Alle')
+  },
+  updateTemplateDraftField: (field, value) => {
+    if (templateDraft.value && Object.prototype.hasOwnProperty.call(templateDraft.value, field)) {
+      templateDraft.value[field] = value
+    }
+  },
+  applyTemplateDraft,
+  createNewTemplateSlot,
+  saveTemplateToLocalStorage,
+  resetTemplateDefaults,
+  toggleTemplateDrag,
+  setTemplateDragMode
+})
 
 function onPointerDown(e) {
   // Avoid changing selection while dragging the transform gizmo.
@@ -2793,7 +2893,10 @@ watch(
     if (!command || !command.type) return
     if (command.type === 'delete-selected' && selectedRoot && !selectedRoot.userData?.isSlotMarker) {
       const slotId = selectedRoot.userData?.slotId || ''
-      if (slotId) removeFurnitureFromSlot(slotId)
+      if (slotId) {
+        removeFurnitureFromSlot(slotId)
+        emit('scene-mutated')
+      }
       return
     }
 
@@ -3002,7 +3105,7 @@ onBeforeUnmount(() => {
             </div>
             <div class="template-editor-actions">
               <button type="button" class="template-editor-mini-btn" @click="createNewTemplateSlot">Nieuw slot</button>
-              <button type="button" class="template-editor-mini-btn template-editor-mini-btn-danger" @click="deleteTemplateSlot">Verwijder slot</button>
+              <button type="button" class="template-editor-mini-btn template-editor-mini-btn-danger" @click="deleteTemplateSlot()">Verwijder slot</button>
               <button type="button" class="template-editor-mini-btn" @click="resetTemplateDefaults">Reset</button>
             </div>
           </section>

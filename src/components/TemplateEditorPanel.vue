@@ -15,12 +15,12 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 // Get template state from scene
-const templateEditorSlotId = computed(() => props.sceneRef?.templateEditorSlotId?.value || '')
-const templateSlotCategory = computed(() => props.sceneRef?.templateSlotCategory?.value || 'Alle')
-const templateDraft = computed(() => props.sceneRef?.templateDraft?.value || {})
+const templateEditorSlotId = computed(() => props.sceneRef?.templateEditorSlotId || '')
+const templateSlotCategory = computed(() => props.sceneRef?.templateSlotCategory || 'Alle')
+const templateDraft = computed(() => props.sceneRef?.templateDraft || {})
 const TEMPLATE_SLOT_EDITOR_CATEGORIES = computed(() => props.sceneRef?.TEMPLATE_SLOT_EDITOR_CATEGORIES || [])
-const filteredTemplateSlots = computed(() => props.sceneRef?.filteredTemplateSlots?.value || [])
-const templateEditorMessage = computed(() => props.sceneRef?.templateEditorMessage?.value || '')
+const filteredTemplateSlots = computed(() => props.sceneRef?.filteredTemplateSlots || [])
+const templateEditorMessage = computed(() => props.sceneRef?.templateEditorMessage || '')
 
 // Methods that delegate to scene
 function updateSlotId(newId) {
@@ -30,14 +30,14 @@ function updateSlotId(newId) {
 }
 
 function updateCategory(cat) {
-  if (props.sceneRef?.templateSlotCategory) {
-    props.sceneRef.templateSlotCategory.value = cat
+  if (props.sceneRef?.setTemplateSlotCategory) {
+    props.sceneRef.setTemplateSlotCategory(cat)
   }
 }
 
 function updateDraftField(field, value) {
-  if (props.sceneRef?.templateDraft) {
-    props.sceneRef.templateDraft.value[field] = value
+  if (props.sceneRef?.updateTemplateDraftField) {
+    props.sceneRef.updateTemplateDraftField(field, value)
   }
 }
 
@@ -50,6 +50,12 @@ function applyDraft() {
 function createSlot() {
   if (props.sceneRef?.createNewTemplateSlot) {
     props.sceneRef.createNewTemplateSlot()
+  }
+}
+
+function deleteSlot() {
+  if (props.sceneRef?.deleteTemplateSlot) {
+    props.sceneRef.deleteTemplateSlot()
   }
 }
 
@@ -123,6 +129,7 @@ function handleClose() {
               </option>
             </select>
           </label>
+          <button type="button" class="template-btn danger-btn full-width" @click="deleteSlot">Verwijder slot</button>
         </div>
 
         <div class="template-editor-section">
@@ -482,6 +489,16 @@ function handleClose() {
 
 .template-btn:hover {
   background: rgba(255, 255, 255, 0.12);
+}
+
+.template-btn.danger-btn {
+  border-color: rgba(180, 56, 74, 0.45);
+  background: rgba(180, 56, 74, 0.14);
+  color: #ffdce0;
+}
+
+.template-btn.danger-btn:hover {
+  background: rgba(180, 56, 74, 0.24);
 }
 
 .template-btn.full-width {
