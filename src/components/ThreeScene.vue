@@ -861,7 +861,9 @@ function syncSlotFromRoot(root) {
   const slotState = slotStates.get(slotId)
   if (!slot || !slotState) return
 
-  slot.position.set(root.position.x, FLOOR_Y, root.position.z)
+  // allow vertical positioning for small decorations
+  const allowVertical = isSmallDecorationSlot(slotId)
+  slot.position.set(root.position.x, allowVertical ? root.position.y : FLOOR_Y, root.position.z)
   slot.rotationY = root.rotation.y - Number(root.userData?.rotationYOffset || 0)
 
   applyTemplateSlotToScene(slotId)
@@ -887,6 +889,13 @@ function updateTemplateDragBinding() {
   }
 
   transform.setMode(templateDragMode.value)
+  // enable vertical axis for small decorations when translating
+  try {
+    const allowY = templateDragMode.value === 'translate' && selectedRoot && isSmallDecorationSlot(selectedRoot.userData?.slotId)
+    transform.showY = Boolean(allowY)
+  } catch (err) {
+    transform.showY = false
+  }
   transform.attach(selectedRoot)
   transform.visible = true
   transform.enabled = true
@@ -2034,9 +2043,14 @@ function assignRootToSlot(root, slotId) {
     root.position.set(slot.position.x, slot.position.y, slot.position.z)
   }
   root.rotation.set(0, slot.rotationY + Number(root.userData.rotationYOffset || 0), 0)
-  snapRootToFloor(root, FLOOR_Y)
+  const allowVertical = isSmallDecorationSlot(slotId)
+  if (!allowVertical) {
+    snapRootToFloor(root, FLOOR_Y)
+  }
   root.updateMatrixWorld(true)
-  snapRootToFloor(root, FLOOR_Y)
+  if (!allowVertical) {
+    snapRootToFloor(root, FLOOR_Y)
+  }
 
   scene.add(root)
   selectableRoots.push(root)
@@ -2806,7 +2820,10 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
             holder.userData.positionOffset = transform.positionOffset.map((v) => Number(v) || 0)
           }
           assignRootToSlot(holder, targetSlotId)
-          snapRootToFloor(holder, FLOOR_Y)
+          // don't force-snap small decorations to the floor so saved Y offsets are preserved
+          if (!isSmallDecorationSlot(targetSlotId)) {
+            snapRootToFloor(holder, FLOOR_Y)
+          }
 
           resolve(holder)
         } catch (e) {

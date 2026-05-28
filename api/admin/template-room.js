@@ -24,7 +24,7 @@ function buildFallbackTemplateSceneData() {
 }
 
 async function findTemplateRoom() {
-  const templateOwner = await User.findOne({ email: TEMPLATE_OWNER_EMAIL, role: 'editor' })
+  const templateOwner = await User.findOne({ email: TEMPLATE_OWNER_EMAIL, role: { $in: ['editor', 'admin'] } })
   if (!templateOwner) return null
 
   return Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })

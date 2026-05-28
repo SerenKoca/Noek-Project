@@ -156,7 +156,7 @@ exports.getRoomTemplate = async (req, res) => {
     const templateSlots = buildTemplateSlots()
     const templateOwner = await UserModel.findOne({
       email: ROOM_TEMPLATE_OWNER_EMAIL,
-      role: 'editor'
+      role: { $in: ['editor', 'admin'] }
     });
 
     if (templateOwner) {
