@@ -90,7 +90,10 @@ async function createFromTemplate() {
   if (creating.value) return
   creating.value = true
   try {
-    const saved = await saveRoom({ name: roomName.value || 'Nieuwe kamer', sceneData: templateScene.value })
+    const saved = await saveRoom({
+      name: roomName.value || 'Nieuwe kamer',
+      sceneData: JSON.parse(JSON.stringify(templateScene.value))
+    })
     await state.loadRooms()
     await router.push(`/rooms/${saved._id}/editor`)
   } catch (err) {

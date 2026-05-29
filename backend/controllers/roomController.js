@@ -240,6 +240,50 @@ exports.issueRoomEditLink = async (req, res) => {
   }
 }
 
+async function resolveTemplateSceneData(templateKey = 'template-a') {
+  const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+  const userModule = await import('../models/User.js')
+  const UserModel = userModule.default || userModule.User || userModule
+  const templateOwner = await UserModel.findOne({
+    email: ROOM_TEMPLATE_OWNER_EMAIL,
+    role: { $in: ['editor', 'admin'] }
+  })
+
+  if (templateOwner) {
+    const templateRoom = normalizedTemplateKey === 'template-a'
+      ? await Room.findOne({
+          ownerId: templateOwner._id,
+          $or: [
+            { templateKey: 'template-a' },
+            { templateKey: '' },
+            { templateKey: { $exists: false } }
+          ]
+        }).sort({ createdAt: 1 })
+      : await Room.findOne({ ownerId: templateOwner._id, templateKey: normalizedTemplateKey }).sort({ createdAt: 1 })
+
+    if (templateRoom?.sceneData) {
+      return JSON.parse(JSON.stringify(templateRoom.sceneData))
+    }
+
+    if (normalizedTemplateKey === 'template-b') {
+      const seedRoom = await Room.findOne({
+        ownerId: templateOwner._id,
+        $or: [
+          { templateKey: 'template-a' },
+          { templateKey: '' },
+          { templateKey: { $exists: false } }
+        ]
+      }).sort({ createdAt: 1 })
+
+      if (seedRoom?.sceneData) {
+        return JSON.parse(JSON.stringify(seedRoom.sceneData))
+      }
+    }
+  }
+
+  return buildFallbackTemplateSceneData(buildTemplateSlots(), normalizedTemplateKey)
+}
+
 exports.createRoom = async (req, res) => {
   try {
     if (req.auth?.role !== 'editor') {
@@ -248,13 +292,14 @@ exports.createRoom = async (req, res) => {
 
     const { name, userId, sceneData, templateKey } = req.body;
     const ownerId = req.auth?.userId;
-    const normalizedTemplateKey = normalizeTemplateKey(templateKey, '')
+    const requestedTemplateKey = String(templateKey || '').trim()
+    const normalizedTemplateKey = requestedTemplateKey ? normalizeTemplateKey(requestedTemplateKey, '') : 'template-a'
 
-    if (!name || !sceneData) {
-      return res.status(400).json({ error: 'Naam en sceneData zijn verplicht.' });
+    if (!name) {
+      return res.status(400).json({ error: 'Naam is verplicht.' });
     }
 
-    if (templateKey && !normalizedTemplateKey) {
+    if (requestedTemplateKey && !normalizedTemplateKey) {
       return res.status(400).json({ error: 'Onbekende template.' });
     }
 
@@ -263,12 +308,17 @@ exports.createRoom = async (req, res) => {
       return res.status(403).json({ error: 'Elk account mag maar 2 kamers hebben.' });
     }
 
+    const nextTemplateKey = normalizedTemplateKey || 'template-a'
+    const nextSceneData = sceneData && typeof sceneData === 'object'
+      ? sceneData
+      : await resolveTemplateSceneData(nextTemplateKey)
+
     const room = new Room({
       name,
       userId: userId || null,
       ownerId,
-      sceneData,
-      templateKey: normalizedTemplateKey || '',
+      sceneData: nextSceneData,
+      templateKey: nextTemplateKey,
       editKey: createRoomEditKey(String(ownerId))
     });
     await room.save();
@@ -304,6 +354,15 @@ exports.getRoomById = async (req, res) => {
     if (!room) {
       return res.status(404).json({ error: 'Kamer niet gevonden.' });
     }
+
+    if (!room.sceneData) {
+      room.sceneData = await resolveTemplateSceneData(room.templateKey || 'template-a')
+      if (!room.templateKey) {
+        room.templateKey = 'template-a'
+      }
+      await room.save()
+    }
+
     res.json(room);
   } catch (error) {
     console.error('getRoomById error:', error);

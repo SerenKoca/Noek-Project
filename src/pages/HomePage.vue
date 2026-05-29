@@ -137,7 +137,10 @@ async function createEmptyRoom() {
   if (state.rooms.value.length >= 2) return
   creatingRoom.value = true
   try {
-    const saved = await saveRoom({ name: 'Nieuwe kamer', sceneData: null })
+    const saved = await saveRoom({
+      name: 'Nieuwe kamer',
+      templateKey: 'template-a'
+    })
     await state.loadRooms()
     createRoomModal.value = false
     await router.push(`/rooms/${saved._id}/editor`)
