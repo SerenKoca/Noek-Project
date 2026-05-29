@@ -744,7 +744,16 @@ function matchesTemplateCategoryFilter(slot, filter = templateSlotCategory.value
 }
 
 const filteredTemplateSlots = computed(() => {
-  return TEMPLATE_SLOTS.value.filter((slot) => matchesTemplateCategoryFilter(slot))
+  const visibleSlots = TEMPLATE_SLOTS.value.filter((slot) => matchesTemplateCategoryFilter(slot))
+  const activeSlotId = String(templateEditorSlotId.value || '').trim()
+  if (!activeSlotId) return visibleSlots
+
+  const activeSlot = TEMPLATE_SLOTS.value.find((slot) => slot.id === activeSlotId)
+  if (!activeSlot) return visibleSlots
+
+  if (visibleSlots.some((slot) => slot.id === activeSlotId)) return visibleSlots
+
+  return [...visibleSlots, activeSlot]
 })
 
 function getTemplateSlot(slotId = templateEditorSlotId.value) {
@@ -1173,14 +1182,23 @@ function addDeletedTemplateSlot(slotId) {
   }
 }
 
+function filterDeletedTemplateSlots(slots = []) {
+  const deletedSlots = getDeletedTemplateSlotsSet()
+  if (!deletedSlots.size) return Array.isArray(slots) ? [...slots] : []
+  return Array.isArray(slots)
+    ? slots.filter((slot) => !deletedSlots.has(String(slot?.id || '').trim()))
+    : []
+}
+
 function restoreTemplateFromBase() {
-  TEMPLATE_SLOTS.value = cloneTemplateSlots(BASE_TEMPLATE_SLOTS)
+  TEMPLATE_SLOTS.value = filterDeletedTemplateSlots(cloneTemplateSlots(BASE_TEMPLATE_SLOTS))
 }
 
 function resetTemplateDefaults() {
   if (!canEditTemplate.value) return
   try {
     localStorage.removeItem(ROOM_TEMPLATE_STORAGE_KEY)
+    localStorage.removeItem(ROOM_TEMPLATE_DELETED_KEY)
   } catch {
     // ignore
   }
@@ -1204,7 +1222,7 @@ function applyStoredTemplateIfAny() {
 
   if (!Array.isArray(parsed) || parsed.length === 0) return
 
-  TEMPLATE_SLOTS.value = normalizeTemplateSlots(parsed)
+  TEMPLATE_SLOTS.value = filterDeletedTemplateSlots(normalizeTemplateSlots(parsed))
 }
 
 function toColorHex(value, fallback) {
