@@ -40,6 +40,13 @@ const CONFIGURED_PINNED_MODELS = String(import.meta.env.VITE_POLYPIZZA_PINNED_MO
 const CONFIGURED_EXCLUDE_IDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_IDS || '').trim()
 const CONFIGURED_EXCLUDE_KEYWORDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_KEYWORDS || '').trim().toLowerCase()
 const ONLY_CONFIGURED_SOURCES = String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
+const BACKEND_BASE_URL = String(import.meta.env.VITE_NOEK_BACKEND_URL || '/api').trim() || '/api'
+const POLY_PIZZA_CATEGORY_MAP_URL = `${BACKEND_BASE_URL.replace(/\/$/, '')}/public/polypizza-category-map`
+
+let categoryMapCachePromise = null
+let categoryMapCache = {}
+let categoryListCachePromise = null
+let categoryListCache = []
 
 const http = axios.create({
   baseURL: API_BASE_URL,
@@ -53,6 +60,107 @@ function splitConfigList(value) {
     .split(/[\n,;]+/)
     .map((item) => item.trim())
     .filter(Boolean)
+}
+
+function normalizeCategoryList(value) {
+  return [...new Set(
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => item !== 'Alle')
+  )]
+}
+
+function normalizeCategoryMap(input = {}) {
+  const out = {}
+  for (const [modelId, value] of Object.entries(input || {})) {
+    const id = String(modelId || '').trim()
+    const categories = normalizeCategoryList(value)
+    if (!id || !categories.length) continue
+    out[id] = categories
+  }
+  return out
+}
+
+async function loadPolyPizzaCategoryMap() {
+  if (!categoryMapCachePromise) {
+    categoryMapCachePromise = fetch(POLY_PIZZA_CATEGORY_MAP_URL, { credentials: 'same-origin' })
+      .then(async (response) => {
+        if (!response.ok) return { categoryMap: {}, categories: [] }
+        const data = await response.json()
+        return { categoryMap: normalizeCategoryMap(data?.categoryMap || {}), categories: Array.isArray(data?.categories) ? data.categories : [] }
+      })
+      .catch(() => ({ categoryMap: {}, categories: [] }))
+      .then((result) => {
+        categoryMapCache = result.categoryMap || {}
+        categoryListCache = Array.isArray(result.categories) ? result.categories : []
+        return categoryMapCache
+      })
+  }
+
+  return categoryMapCachePromise
+}
+
+export function setPolyPizzaCategoryMapCache(nextMap = {}) {
+  categoryMapCache = normalizeCategoryMap(nextMap || {})
+  categoryMapCachePromise = Promise.resolve(categoryMapCache)
+  return categoryMapCache
+}
+
+export function setPolyPizzaCategoryListCache(nextList = []) {
+  categoryListCache = Array.isArray(nextList) ? nextList.map((c) => String(c || '').trim()).filter(Boolean) : []
+  categoryListCachePromise = Promise.resolve(categoryListCache)
+  return categoryListCache
+}
+
+export function clearPolyPizzaCategoryListCache() {
+  categoryListCache = []
+  categoryListCachePromise = null
+}
+
+export async function getPolyPizzaCategories() {
+  if (categoryListCachePromise) return categoryListCachePromise
+  if (categoryMapCachePromise) {
+    // loadPolyPizzaCategoryMap sets both caches
+    await loadPolyPizzaCategoryMap()
+    categoryListCachePromise = Promise.resolve(categoryListCache)
+    return categoryListCache
+  }
+
+  await loadPolyPizzaCategoryMap()
+  categoryListCachePromise = Promise.resolve(categoryListCache)
+  return categoryListCache
+}
+
+export function clearPolyPizzaCategoryMapCache() {
+  categoryMapCache = {}
+  categoryMapCachePromise = null
+}
+
+function getOverrideCategoriesForModel(raw, categoryMap = categoryMapCache) {
+  const ids = [raw?.ID, raw?.id, raw?.raw?.ID]
+    .map((value) => String(value || '').trim())
+    .filter(Boolean)
+
+  for (const id of ids) {
+    if (Array.isArray(categoryMap?.[id]) && categoryMap[id].length) {
+      return normalizeCategoryList(categoryMap[id])
+    }
+  }
+
+  const categories = normalizeCategoryList(raw?.Categories || raw?.metadata?.categories || [])
+  if (categories.length) return categories
+
+  const single = String(raw?.Category || raw?.metadata?.category || '').trim()
+  return single ? [single] : []
+}
+
+export function getPolyPizzaOverrideCategories(model) {
+  try {
+    return getOverrideCategoriesForModel(model, categoryMapCache)
+  } catch (err) {
+    return []
+  }
 }
 
 function extractPolyErrorMessage(err, fallback = 'Unknown API error.') {
@@ -157,13 +265,15 @@ function isCompatibleAssetUrl(maybeUrl) {
   }
 }
 
-function normalizeModel(raw, source = 'api') {
+function normalizeModel(raw, source = 'api', categoryMap = categoryMapCache) {
   // Do not guess structure: these are the exact fields described in the OpenAPI schema `Model`.
   const id = raw?.ID
   const title = raw?.Title
   const download = adaptStaticAssetUrl(raw?.Download)
   const thumbnail = adaptStaticAssetUrl(raw?.Thumbnail)
   const tags = Array.isArray(raw?.Tags) ? raw.Tags : []
+  const overrideCategories = getOverrideCategoriesForModel(raw, categoryMap)
+  const resolvedCategory = overrideCategories[0] || raw?.Category || FALLBACK_CATEGORY
 
   return {
     // keep original keys too (useful for displaying without assumptions)
@@ -175,7 +285,7 @@ function normalizeModel(raw, source = 'api') {
     Thumbnail: thumbnail,
     Attribution: raw?.Attribution,
     Licence: raw?.Licence,
-    Category: raw?.Category,
+    Category: resolvedCategory,
     Tags: tags,
     // Standardized surface used by the UI + loaders
     id,
@@ -189,7 +299,8 @@ function normalizeModel(raw, source = 'api') {
     attribution: raw?.Attribution || '',
     licence: raw?.Licence || '',
     metadata: {
-      category: raw?.Category || null,
+      category: resolvedCategory || null,
+      categories: overrideCategories,
       tags
     }
   }
@@ -360,14 +471,16 @@ function resolveConfiguredPinnedModelIds() {
 async function fetchListModels(listId, headers) {
   const res = await http.get(`/list/${encodeURIComponent(listId)}`, { headers })
   const items = Array.isArray(res?.data?.Models) ? res.data.Models : []
+  const categoryMap = await loadPolyPizzaCategoryMap()
   return items
-    .map((model) => normalizeModel(model, 'api-list'))
+    .map((model) => normalizeModel(model, 'api-list', categoryMap))
     .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
 }
 
 async function fetchModelById(modelId, headers) {
   const res = await http.get(`/model/${encodeURIComponent(modelId)}`, { headers })
-  const normalized = normalizeModel(res?.data || {}, 'api-pinned')
+  const categoryMap = await loadPolyPizzaCategoryMap()
+  const normalized = normalizeModel(res?.data || {}, 'api-pinned', categoryMap)
   if (!isAllowedModel(normalized) || !isCompatibleAssetUrl(normalized?.Download) || !isAllowedCategory(normalized)) {
     return null
   }
@@ -424,11 +537,12 @@ async function fetchSearchPage({ limit, page, license }) {
     return {
       ok: false,
       error: 'Missing API key (VITE_POLYPIZZA_API_KEY).',
-      models: fallbackModels.map((model) => normalizeModel(model, 'fallback')).filter((m) => isAllowedCategory(m))
+      models: fallbackModels.map((model) => normalizeModel(model, 'fallback', categoryMapCache)).filter((m) => isAllowedCategory(m))
     }
   }
 
   try {
+    const categoryMap = await loadPolyPizzaCategoryMap()
     const res = await http.get('/search', {
       headers,
       // IMPORTANT: Parameter names are TitleCase in the spec.
@@ -446,7 +560,7 @@ async function fetchSearchPage({ limit, page, license }) {
     const results = res?.data?.results
     const arr = Array.isArray(results) ? results : []
 
-    return { ok: true, models: arr.map((model) => normalizeModel(model, 'api')), error: '' }
+    return { ok: true, models: arr.map((model) => normalizeModel(model, 'api', categoryMap)), error: '' }
   } catch (err) {
     const status = err?.response?.status
 
@@ -455,7 +569,7 @@ async function fetchSearchPage({ limit, page, license }) {
         ok: false,
         error: 'Rate limited by Poly Pizza API (HTTP 429).',
         models: fallbackModels
-          .map((model) => normalizeModel(model, 'fallback'))
+          .map((model) => normalizeModel(model, 'fallback', categoryMapCache))
           .filter((m) => isAllowedModel(m) && isAllowedCategory(m))
       }
     }
@@ -470,7 +584,7 @@ async function fetchSearchPage({ limit, page, license }) {
       ok: false,
       error: `Poly Pizza API request failed: ${details}`,
       models: fallbackModels
-        .map((model) => normalizeModel(model, 'fallback'))
+        .map((model) => normalizeModel(model, 'fallback', categoryMapCache))
         .filter((m) => isAllowedModel(m) && isAllowedCategory(m))
     }
   }
@@ -478,10 +592,11 @@ async function fetchSearchPage({ limit, page, license }) {
 
 export async function fetchModels({ max = 200 } = {}) {
   const limit = Math.min(Math.max(1, max), 500)
+  await loadPolyPizzaCategoryMap()
   const sourceResult = await fetchConfiguredFurnitureSources()
   const pinnedFromConfig = Array.isArray(sourceResult.models) ? sourceResult.models : []
   const fallbackList = fallbackModels
-    .map((model) => normalizeModel(model, 'fallback'))
+    .map((model) => normalizeModel(model, 'fallback', categoryMapCache))
     .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
 
   if (ONLY_CONFIGURED_SOURCES) {

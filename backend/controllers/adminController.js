@@ -1,6 +1,7 @@
 const bcrypt = require('bcryptjs')
 const User = require('../models/User')
 const Room = require('../models/Room')
+const PolyPizzaCategoryMap = require('../models/PolyPizzaCategoryMap')
 const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
 
 const DEFAULT_BRAND_DARK = '#1e2b37'
@@ -44,6 +45,30 @@ function buildFallbackTemplateSceneData() {
       source: 'fallback-template'
     }
   }
+}
+
+const POLY_PIZZA_CATEGORY_KEY = 'default'
+
+function normalizeCategoryList(value) {
+  return [...new Set(
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => item !== 'Alle')
+  )]
+}
+
+function normalizeCategoryMap(input = {}) {
+  const categoryMap = {}
+
+  for (const [modelId, value] of Object.entries(input || {})) {
+    const id = String(modelId || '').trim()
+    const categories = normalizeCategoryList(value)
+    if (!id || !categories.length) continue
+    categoryMap[id] = categories
+  }
+
+  return categoryMap
 }
 
 async function findTemplateRoom(templateKey) {
@@ -289,5 +314,50 @@ exports.updateTemplateRoom = async (req, res) => {
   } catch (error) {
     console.error('updateTemplateRoom error:', error)
     res.status(500).json({ error: 'Kon template kamer niet opslaan.' })
+  }
+}
+
+exports.getPolyPizzaCategoryMap = async (req, res) => {
+  try {
+    const doc = await PolyPizzaCategoryMap.findOne({ key: POLY_PIZZA_CATEGORY_KEY })
+    res.json({
+      key: POLY_PIZZA_CATEGORY_KEY,
+      categoryMap: doc?.categoryMap || {},
+      categories: Array.isArray(doc?.categories) ? doc.categories : [],
+      updatedAt: doc?.updatedAt || null
+    })
+  } catch (error) {
+    console.error('getPolyPizzaCategoryMap error:', error)
+    res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet ophalen.' })
+  }
+}
+
+exports.updatePolyPizzaCategoryMap = async (req, res) => {
+  try {
+    const categoryMap = normalizeCategoryMap(req.body?.categoryMap || {})
+    const categories = normalizeCategoryList(req.body?.categories || req.body?.categoryList || [])
+    const doc = await PolyPizzaCategoryMap.findOneAndUpdate(
+      { key: POLY_PIZZA_CATEGORY_KEY },
+      {
+        key: POLY_PIZZA_CATEGORY_KEY,
+        categoryMap,
+        categories
+      },
+      {
+        new: true,
+        upsert: true,
+        setDefaultsOnInsert: true
+      }
+    )
+
+    res.json({
+      key: POLY_PIZZA_CATEGORY_KEY,
+      categoryMap: doc.categoryMap || {},
+      categories: Array.isArray(doc.categories) ? doc.categories : [],
+      updatedAt: doc.updatedAt || null
+    })
+  } catch (error) {
+    console.error('updatePolyPizzaCategoryMap error:', error)
+    res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet opslaan.' })
   }
 }

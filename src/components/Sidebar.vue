@@ -1,6 +1,6 @@
 <script setup>
 import { computed, onMounted, ref, watch } from 'vue'
-import { fetchModels } from '../services/polyPizzaService'
+import { fetchModels, getPolyPizzaCategories, getPolyPizzaOverrideCategories } from '../services/polyPizzaService'
 import SidebarAssetsNav from './sidebar/SidebarAssetsNav.vue'
 import SidebarSubNav from './sidebar/SidebarSubNav.vue'
 import SidebarModelsPanel from './sidebar/SidebarModelsPanel.vue'
@@ -48,7 +48,8 @@ const isSoundCategory = computed(() => activeCategory.value === 'Geluid')
 const isColorCategory = computed(() => activeCategory.value === 'Kamer')
 const showSubNav = computed(() => panelStage.value !== 'categories')
 const showContentPanel = computed(() => panelStage.value === 'content')
-const DEFAULT_FURNITURE_SUBCATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Dieren', 'Foto', 'Video', 'Muziek', 'Persoonlijk']
+const FALLBACK_FURNITURE_SUBCATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Dieren', 'Foto', 'Video', 'Muziek', 'Persoonlijk']
+const dynamicCategories = ref([...FALLBACK_FURNITURE_SUBCATEGORIES])
 
 const VEHICLE_KEYWORDS = ['car', 'truck', 'vehicle', 'police', 'mitsubishi', 'bus', 'tractor', 'bike', 'motor']
 const SOFA_KEYWORDS = ['sofa', 'couch', 'armchair', 'chair', 'loveseat', 'stool', 'bench']
@@ -105,6 +106,12 @@ function getAllowedSubtypesForSelectedSlot() {
     return [...new Set(out)]
   }
 
+  // Unconfigured slots should not block newer categories; fall back to the live category list.
+  // This keeps old points usable even when they were created before category assignment existed.
+  if (!slotCategories.length) {
+    return dynamicCategories.value
+  }
+
   const slotId = String(props.selected?.slotId || '')
   if (slotId && SLOT_ALLOWED_SUBTYPES[slotId]) {
     return SLOT_ALLOWED_SUBTYPES[slotId]
@@ -112,6 +119,39 @@ function getAllowedSubtypesForSelectedSlot() {
 
   return []
 }
+
+function normalizeCategoryList(value) {
+  return [...new Set(
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => item !== 'Alle')
+  )]
+}
+
+function getModelCategoryList(model) {
+  const overrideCats = getPolyPizzaOverrideCategories(model)
+  if (overrideCats && overrideCats.length) return overrideCats
+
+  const categories = normalizeCategoryList(model?.metadata?.categories || model?.Categories || [])
+  if (categories.length) return categories
+
+  const single = String(model?.metadata?.category || model?.Category || '').trim()
+  if (single) return [single]
+
+  return [inferModelCategory(model)]
+}
+
+onMounted(async () => {
+  try {
+    const categories = await getPolyPizzaCategories()
+    if (Array.isArray(categories) && categories.length) {
+      dynamicCategories.value = ['Alle', ...categories.filter((c) => c !== 'Alle')]
+    }
+  } catch {
+    // ignore and keep fallback
+  }
+})
 
 function inferModelKind(model) {
   const text = modelText(model)
@@ -149,9 +189,9 @@ function inferDecorationSizeCategory(model) {
 function isAllowedForSelectedSlot(model) {
   const allowedSubtypes = getAllowedSubtypesForSelectedSlot()
   if (allowedSubtypes.length) {
-    const category = inferModelCategory(model)
+    const categories = getModelCategoryList(model)
     const decorationCategory = inferModelKind(model) === 'decoratie' ? inferDecorationSizeCategory(model) : null
-    return allowedSubtypes.includes(category) || (decorationCategory && allowedSubtypes.includes(decorationCategory))
+    return categories.some((category) => allowedSubtypes.includes(category)) || (decorationCategory && allowedSubtypes.includes(decorationCategory))
   }
 
   const accepts = Array.isArray(props.selected?.slotAccepts) ? props.selected.slotAccepts : []
@@ -164,7 +204,8 @@ function isAllowedForSelectedSlot(model) {
 
 function modelText(model) {
   const title = String(model?.title || model?.name || model?.Title || '').toLowerCase()
-  const category = String(model?.metadata?.category || model?.Category || '').toLowerCase()
+  const categories = normalizeCategoryList(model?.metadata?.categories || model?.Categories || [])
+  const category = String(model?.metadata?.category || model?.Category || categories[0] || '').toLowerCase()
   const tags = Array.isArray(model?.metadata?.tags)
     ? model.metadata.tags.join(' ').toLowerCase()
     : Array.isArray(model?.Tags)
@@ -203,6 +244,10 @@ function isVehicleModel(model) {
 
 function matchesActiveFurnitureSubCategory(model, subCategory = activeSubCategory.value) {
   if (subCategory === 'Alle') return true
+
+  if (getModelCategoryList(model).includes(subCategory)) {
+    return true
+  }
 
   if (subCategory === 'Muurdecoratie') {
     return inferModelCategory(model) === 'Muurdecoratie'
@@ -270,7 +315,7 @@ const allowedSubCategories = computed(() => {
   const allowed = getAllowedSubtypesForSelectedSlot()
 
   if (!allowed.length) {
-    return DEFAULT_FURNITURE_SUBCATEGORIES
+    return dynamicCategories.value
   }
 
   const out = ['Alle']
@@ -300,6 +345,7 @@ function buildLoadPayload(model) {
   const resolvedThumbnail = model?.thumbnailUrl || model?.previewUrl || model?.Thumbnail || ''
   const resolvedId = model?.id || model?.ID || ''
   const sizeMultiplier = getModelSizeMultiplier(model)
+  const modelCategories = getModelCategoryList(model)
 
   return {
     id: resolvedId,
@@ -312,7 +358,8 @@ function buildLoadPayload(model) {
     attribution: model?.attribution || model?.Attribution || '',
     licence: model?.licence || model?.Licence || '',
     sizeMultiplier,
-    modelCategory: inferModelCategory(model),
+    modelCategory: modelCategories[0] || inferModelCategory(model),
+    modelCategories,
     source: model?.source || 'unknown'
   }
 }
@@ -427,7 +474,7 @@ watch(() => props.selected, (sel) => {
 
   // Prefer the slot's first category if present and allowed, otherwise fall back to allowed sub-categories
   const selCategory = Array.isArray(sel.slotCategories) && sel.slotCategories.length ? sel.slotCategories[0] : ''
-  if (selCategory && (DEFAULT_FURNITURE_SUBCATEGORIES.includes(selCategory) || (allowedSubCategories.value && allowedSubCategories.value.includes(selCategory)))) {
+  if (selCategory && (dynamicCategories.value.includes(selCategory) || (allowedSubCategories.value && allowedSubCategories.value.includes(selCategory)))) {
     activeSubCategory.value = selCategory
   } else if (allowedSubCategories.value && allowedSubCategories.value.length) {
     activeSubCategory.value = allowedSubCategories.value[0]

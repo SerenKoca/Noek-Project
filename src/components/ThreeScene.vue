@@ -5,7 +5,7 @@ import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { TransformControls } from 'three/examples/jsm/controls/TransformControls.js'
 import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js'
 import { startGlobalLoading, endGlobalLoading } from '../services/globalLoading.js'
-import { adaptStaticAssetUrl, fetchModels } from '../services/polyPizzaService.js'
+import { adaptStaticAssetUrl, fetchModels, getPolyPizzaCategories } from '../services/polyPizzaService.js'
 import { ROOM_TEMPLATE } from '../services/roomTemplate.js'
 import { DEFAULT_ROOM_FLOOR_COLOR, DEFAULT_ROOM_WALL_COLOR } from '../services/roomAppearanceDefaults.js'
 import { DEFAULT_FLOOR_TEXTURE_ID, DEFAULT_WALL_TEXTURE_ID, FLOOR_TEXTURE_PRESETS, WALL_TEXTURE_PRESETS, createFloorTexture, createWallTexture, getFloorTextureDefaults, getWallTextureDefaults, normalizeFloorTextureId, normalizeSurfaceTextureColors, normalizeWallTextureId } from '../services/roomSurfaceTextures.js'
@@ -534,7 +534,18 @@ const templateDraft = ref({
 })
 let isSyncingSlotFromTransform = false
 
-const TEMPLATE_SLOT_EDITOR_CATEGORIES = ['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Persoonlijk', 'Media']
+const TEMPLATE_SLOT_EDITOR_CATEGORIES = ref(['Alle', 'Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Persoonlijk', 'Media'])
+
+onMounted(async () => {
+  try {
+    const categories = await getPolyPizzaCategories()
+    if (Array.isArray(categories) && categories.length) {
+      TEMPLATE_SLOT_EDITOR_CATEGORIES.value = ['Alle', ...categories.filter((c) => c !== 'Alle')]
+    }
+  } catch {
+    // ignore and keep fallback
+  }
+})
 
 const filteredReplacementModels = computed(() => {
   const query = String(templateReplacementSearch.value || '').trim().toLowerCase()
@@ -665,6 +676,68 @@ function getTemplateEditorSlotCategories(slot) {
   return normalizeCategoryList(getDefaultTemplateCategories(slot?.id))
 }
 
+function getTemplateSlotDisplayLabel(slot) {
+  const baseLabel = String(slot?.label || slot?.id || '').trim()
+  const categories = getTemplateEditorSlotCategories(slot)
+  if (!categories.length) return baseLabel
+  return `${baseLabel} — ${categories.join(', ')}`
+}
+
+function resolveTemplateSlotCategories(slot = getTemplateSlot()) {
+  const draftCategories = normalizeCategoryList(templateDraft.value?.slotCategories || [])
+  if (draftCategories.length) return draftCategories
+
+  const selectedCategories = normalizeCategoryList(getTemplateEditorSlotCategories(slot))
+  if (selectedCategories.length) return selectedCategories
+
+  const activeCategory = String(templateSlotCategory.value || '').trim()
+  if (activeCategory && activeCategory !== 'Alle') {
+    return [activeCategory]
+  }
+
+  return ['Decoratie groot']
+}
+
+function syncTemplateSlotCategories(slotId, categories) {
+  const normalizedSlotId = String(slotId || '').trim()
+  if (!normalizedSlotId) return
+
+  const nextCategories = normalizeCategoryList(categories)
+  if (!nextCategories.length) return
+
+  const slot = getTemplateSlot(normalizedSlotId)
+  if (!slot) return
+
+  slot.categories = [...nextCategories]
+
+  const slotState = slotStates.get(normalizedSlotId)
+  if (slotState) {
+    slotState.categories = [...nextCategories]
+    if (slotState.root) {
+      slotState.root.userData = slotState.root.userData || {}
+      slotState.root.userData.slotCategories = [...nextCategories]
+    }
+    if (slotState.marker) {
+      slotState.marker.userData = slotState.marker.userData || {}
+      slotState.marker.userData.slotCategories = [...nextCategories]
+    }
+  }
+
+  if (selectedRoot?.userData?.slotId === normalizedSlotId) {
+    selectedRoot.userData = selectedRoot.userData || {}
+    selectedRoot.userData.slotCategories = [...nextCategories]
+  }
+
+  if (String(templateEditorSlotId.value || '') === normalizedSlotId) {
+    templateDraft.value = {
+      ...templateDraft.value,
+      slotCategories: [...nextCategories]
+    }
+  }
+
+  applyTemplateSlotToScene(normalizedSlotId)
+}
+
 function matchesTemplateCategoryFilter(slot, filter = templateSlotCategory.value) {
   if (filter === 'Alle') return true
   return getTemplateEditorSlotCategories(slot).includes(filter)
@@ -733,7 +806,7 @@ function deleteTemplateSlot(slotId = templateEditorSlotId.value) {
     return
   }
 
-  const label = String(slot.label || slot.id)
+  const label = getTemplateSlotDisplayLabel(slot)
   if (typeof window !== 'undefined' && !window.confirm(`Slot "${label}" verwijderen?`)) {
     return
   }
@@ -824,18 +897,18 @@ async function replaceSelectedTemplateObject(model) {
 
 function applyTemplateSlotToScene(slotId) {
   const slot = getTemplateSlot(slotId)
-  const slotState = slotStates.get(slotId)
+  const slotState = slotStates.get(slotId) || {}
   if (!slot || !slotState) return
 
   isSyncingSlotFromTransform = true
 
-  slotState.position.copy(slot.position)
+  slotState.position = slot.position.clone()
   slotState.rotationY = slot.rotationY
-  slotState.label = String(slot?.label || slot.id)
+  slotState.label = getTemplateSlotDisplayLabel(slot)
   slotState.accepts = Array.isArray(slot.accepts) ? [...slot.accepts] : ['meubel']
   slotState.categories = getTemplateEditorSlotCategories(slot)
 
-  if (slotState.root) {
+  if (slotState.root && slotState.root.userData) {
     slotState.root.position.set(slot.position.x, slot.position.y, slot.position.z)
     const yOffset = Number(slotState.root.userData?.rotationYOffset || 0)
     slotState.root.rotation.set(0, slot.rotationY + yOffset, 0)
@@ -844,7 +917,7 @@ function applyTemplateSlotToScene(slotId) {
     slotState.root.userData.slotCategories = [...slotState.categories]
   }
 
-  if (slotState.marker) {
+  if (slotState.marker && slotState.marker.userData) {
     slotState.marker.position.set(slot.position.x, slot.position.y, slot.position.z)
     slotState.marker.rotation.set(0, slot.rotationY, 0)
     slotState.marker.userData.slotLabel = slotState.label
@@ -955,17 +1028,14 @@ function applyTemplateDraft() {
     return
   }
 
-  if (!slotCategories.length) {
-    templateEditorMessage.value = 'Selecteer minstens 1 categorie voor dit slot.'
-    return
-  }
+  const resolvedSlotCategories = slotCategories.length ? slotCategories : resolveTemplateSlotCategories(slot)
 
   const elevatedCategories = new Set(['Muurdecoratie', 'Decoratie klein'])
-  const yValue = elevatedCategories.has(slotCategories[0]) || slotCategories.some((category) => elevatedCategories.has(category)) ? y : FLOOR_Y
+  const yValue = elevatedCategories.has(resolvedSlotCategories[0]) || resolvedSlotCategories.some((category) => elevatedCategories.has(category)) ? y : FLOOR_Y
   slot.position.set(x, yValue, z)
   slot.rotationY = (rotationDeg * Math.PI) / 180
   slot.accepts = accepts
-  slot.categories = slotCategories
+  slot.categories = resolvedSlotCategories
   // apply markerSize if present
   if (Object.prototype.hasOwnProperty.call(templateDraft.value, 'markerSize')) {
     const ms = Number(templateDraft.value.markerSize)
@@ -1000,7 +1070,7 @@ function applyTemplateDraft() {
 function createNewTemplateSlot() {
   if (!canEditTemplate.value) return
   const currentSlot = getTemplateSlot()
-  const currentCategories = normalizeCategoryList(templateDraft.value.slotCategories.length ? templateDraft.value.slotCategories : getTemplateEditorSlotCategories(currentSlot))
+  const currentCategories = resolveTemplateSlotCategories(currentSlot)
   const currentAccepts = []
   if (templateDraft.value.acceptsMeubel) currentAccepts.push('meubel')
   if (templateDraft.value.acceptsPersoonlijk) currentAccepts.push('persoonlijk')
@@ -1934,10 +2004,10 @@ function createDefaultFurnitureForSlot(slot) {
   root.userData.isRootModel = true
   root.userData.isSlotMarker = false
   root.userData.slotId = slot.id
-  root.userData.slotLabel = String(slot?.label || slot.id)
+  root.userData.slotLabel = getTemplateSlotDisplayLabel(slot)
   root.userData.slotAccepts = Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel']
   root.userData.id = slot.id
-  root.userData.title = String(slot?.label || slot.id.replace('slot-', '').replace('-', ' '))
+  root.userData.title = getTemplateSlotDisplayLabel(slot) || String(slot.id.replace('slot-', '').replace('-', ' '))
 
   const makeMaterial = (texture, color, roughness = 0.95, metalness = 0) => new THREE.MeshStandardMaterial({
     map: texture,
@@ -2010,7 +2080,7 @@ function createSlotMarker(slotId) {
   root.userData.isRootModel = true
   root.userData.isSlotMarker = true
   root.userData.slotId = slotId
-  root.userData.slotLabel = String(slot?.label || slotId)
+  root.userData.slotLabel = getTemplateSlotDisplayLabel(slot)
   root.userData.slotAccepts = Array.isArray(slot?.accepts) ? [...slot.accepts] : ['meubel']
   root.userData.slotCategories = getTemplateEditorSlotCategories(slot)
   root.userData.rotationYOffset = preferredRotationYOffset
@@ -2516,11 +2586,27 @@ defineExpose({
     templateEditorSlotId.value = String(slotId || '')
   },
   setTemplateSlotCategory: (category) => {
-    templateSlotCategory.value = String(category || 'Alle')
+    const next = String(category || 'Alle')
+    templateSlotCategory.value = next
+    try {
+      // also update the draft's slotCategories so the UI changes are immediately editable
+      if (!templateDraft.value || typeof templateDraft.value !== 'object') templateDraft.value = {}
+      templateDraft.value.slotCategories = next === 'Alle' ? [] : [next]
+    } catch (err) {
+      // ignore
+    }
   },
   updateTemplateDraftField: (field, value) => {
     if (templateDraft.value && Object.prototype.hasOwnProperty.call(templateDraft.value, field)) {
       templateDraft.value[field] = value
+
+      if (field === 'slotCategories') {
+        const nextCategories = normalizeCategoryList(value)
+        const slotId = String(templateEditorSlotId.value || '').trim()
+        if (slotId && nextCategories.length) {
+          syncTemplateSlotCategories(slotId, nextCategories)
+        }
+      }
     }
   },
   applyTemplateDraft,
@@ -2529,6 +2615,15 @@ defineExpose({
   resetTemplateDefaults,
   toggleTemplateDrag,
   setTemplateDragMode
+  ,
+  // Expose reactive template editor state for external panels that use a component ref
+  templateEditorSlotId,
+  templateSlotCategory,
+  templateDraft,
+  filteredTemplateSlots,
+  templateEditorMessage,
+  getTemplateSlotDisplayLabel,
+  TEMPLATE_SLOT_EDITOR_CATEGORIES
 })
 
 function onPointerDown(e) {
@@ -3168,7 +3263,7 @@ onBeforeUnmount(() => {
                 :class="{ active: templateEditorSlotId === slot.id }"
                 @click="templateEditorSlotId = slot.id"
               >
-                {{ slot.label || slot.id }}
+                {{ getTemplateSlotDisplayLabel(slot) }}
               </button>
             </div>
             <div class="template-slot-summary">

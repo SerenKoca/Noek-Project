@@ -1,15 +1,18 @@
 <script setup>
-import { nextTick, onMounted, ref } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useNoekState } from '../composables/useNoekState.js'
 import ThreeScene from '../components/ThreeScene.vue'
 import { applyBrandingTheme } from '../services/brandTheme.js'
+import { fetchModels, setPolyPizzaCategoryMapCache, setPolyPizzaCategoryListCache } from '../services/polyPizzaService.js'
 import {
   createFuneralDirector,
   deleteFuneralDirector,
   getFuneralDirectorDetails,
   getFuneralDirectors,
+  getPolyPizzaCategoryMap,
   getTemplateRoom,
+  updatePolyPizzaCategoryMap,
   updateTemplateRoom
 } from '../services/adminService.js'
 import './styles/home-page.css'
@@ -34,10 +37,19 @@ const templateRoomName = ref('')
 const templateSceneData = ref(null)
 const selectedTemplateKey = ref('template-a')
 const templateSceneRef = ref(null)
+const polyPizzaLoading = ref(false)
+const polyPizzaSaving = ref(false)
+const polyPizzaError = ref('')
+const polyPizzaStatus = ref('')
+const polyPizzaModels = ref([])
+const polyPizzaCategoryMap = ref({})
+const polyPizzaSearch = ref('')
 const templateOptions = [
   { key: 'template-a', label: 'Template 1' },
   { key: 'template-b', label: 'Template 2' }
 ]
+const polyPizzaCategories = ref(['Zetel', 'Lamp', 'Tafel', 'Kast', 'Muurdecoratie', 'Decoratie klein', 'Decoratie groot', 'Dieren', 'Foto', 'Video', 'Muziek', 'Persoonlijk'])
+const polyPizzaNewCategory = ref('')
 const form = ref({
   displayName: '',
   email: '',
@@ -60,6 +72,141 @@ function formatApiError(err, fallback) {
       : fallback
   const code = data.code ? ` (${String(data.code)})` : ''
   return `${message}${code}`
+}
+
+function normalizeCategoryList(value) {
+  return [...new Set(
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => item !== 'Alle')
+  )]
+}
+
+function addPolyPizzaCategory() {
+  const next = String(polyPizzaNewCategory.value || '').trim()
+  if (!next) return
+  if (!polyPizzaCategories.value.includes(next)) polyPizzaCategories.value.push(next)
+  polyPizzaNewCategory.value = ''
+}
+
+function removePolyPizzaCategory(category) {
+  const idx = polyPizzaCategories.value.indexOf(category)
+  if (idx >= 0) polyPizzaCategories.value.splice(idx, 1)
+}
+
+function getPolyPizzaModelId(model) {
+  return String(model?.ID || model?.id || model?.raw?.ID || '').trim()
+}
+
+function getPolyPizzaModelTitle(model) {
+  return String(model?.Title || model?.title || model?.name || 'Onbekend model').trim()
+}
+
+function getPolyPizzaModelPreviewUrl(model) {
+  return String(model?.Thumbnail || model?.thumbnailUrl || model?.previewUrl || '').trim()
+}
+
+function getPolyPizzaModelCategories(model) {
+  const modelId = getPolyPizzaModelId(model)
+  const overrideCategories = normalizeCategoryList(polyPizzaCategoryMap.value[modelId] || [])
+  if (overrideCategories.length) return overrideCategories
+
+  const currentCategories = normalizeCategoryList(model?.metadata?.categories || model?.Categories || [])
+  if (currentCategories.length) return currentCategories
+
+  const single = String(model?.metadata?.category || model?.Category || '').trim()
+  return single ? [single] : []
+}
+
+function matchesPolyPizzaSearch(model) {
+  const query = String(polyPizzaSearch.value || '').trim().toLowerCase()
+  if (!query) return true
+
+  const modelId = getPolyPizzaModelId(model).toLowerCase()
+  const title = getPolyPizzaModelTitle(model).toLowerCase()
+  const categories = getPolyPizzaModelCategories(model).join(' ').toLowerCase()
+
+  return title.includes(query) || modelId.includes(query) || categories.includes(query)
+}
+
+const filteredPolyPizzaModels = computed(() => {
+  return polyPizzaModels.value.filter((model) => matchesPolyPizzaSearch(model))
+})
+
+function updatePolyPizzaModelCategories(modelId, category, checked) {
+  const id = String(modelId || '').trim()
+  if (!id) return
+
+  const nextCategories = normalizeCategoryList(polyPizzaCategoryMap.value[id])
+  const normalizedCategory = String(category || '').trim()
+  if (!normalizedCategory) return
+
+  if (checked) {
+    if (!nextCategories.includes(normalizedCategory)) nextCategories.push(normalizedCategory)
+  } else {
+    const index = nextCategories.indexOf(normalizedCategory)
+    if (index >= 0) nextCategories.splice(index, 1)
+  }
+
+  const nextMap = { ...polyPizzaCategoryMap.value }
+  if (nextCategories.length) {
+    nextMap[id] = nextCategories
+  } else {
+    delete nextMap[id]
+  }
+  polyPizzaCategoryMap.value = nextMap
+}
+
+async function loadPolyPizzaCategoryEditor() {
+  polyPizzaLoading.value = true
+  polyPizzaError.value = ''
+  polyPizzaStatus.value = ''
+
+  try {
+    const [modelsResult, mapResult] = await Promise.all([
+      fetchModels({ max: 200 }),
+      getPolyPizzaCategoryMap()
+    ])
+
+    polyPizzaModels.value = Array.isArray(modelsResult?.models) ? modelsResult.models : []
+    polyPizzaCategoryMap.value = mapResult?.categoryMap && typeof mapResult.categoryMap === 'object'
+      ? { ...mapResult.categoryMap }
+      : {}
+    polyPizzaCategories.value = Array.isArray(mapResult?.categories) && mapResult.categories.length
+      ? [...mapResult.categories]
+      : [...polyPizzaCategories.value]
+
+    if (modelsResult?.error) {
+      polyPizzaError.value = modelsResult.error
+    }
+  } catch (err) {
+    polyPizzaModels.value = []
+    polyPizzaCategoryMap.value = {}
+    polyPizzaError.value = formatApiError(err, 'Kon Poly Pizza categorie-editor niet laden.')
+  } finally {
+    polyPizzaLoading.value = false
+  }
+}
+
+async function savePolyPizzaCategoryEditor() {
+  polyPizzaSaving.value = true
+  polyPizzaError.value = ''
+  polyPizzaStatus.value = ''
+
+  try {
+    const result = await updatePolyPizzaCategoryMap({ categoryMap: polyPizzaCategoryMap.value, categories: polyPizzaCategories.value })
+    polyPizzaCategoryMap.value = result?.categoryMap && typeof result.categoryMap === 'object'
+      ? { ...result.categoryMap }
+      : { ...polyPizzaCategoryMap.value }
+    setPolyPizzaCategoryMapCache(polyPizzaCategoryMap.value)
+    setPolyPizzaCategoryListCache(Array.isArray(result?.categories) ? result.categories : polyPizzaCategories.value)
+    polyPizzaStatus.value = 'Poly Pizza categorieën opgeslagen.'
+  } catch (err) {
+    polyPizzaError.value = formatApiError(err, 'Opslaan van Poly Pizza categorieën mislukt.')
+  } finally {
+    polyPizzaSaving.value = false
+  }
 }
 
 async function loadDirectors() {
@@ -137,6 +284,7 @@ onMounted(async () => {
   }
 
   await loadTemplateRoom()
+  await loadPolyPizzaCategoryEditor()
   await loadDirectors()
 })
 
@@ -358,6 +506,88 @@ async function logout() {
                 </div>
               </div>
             </article>
+          </div>
+        </section>
+
+        <section class="admin-panel poly-pizza-panel">
+          <div class="template-panel-header">
+            <div>
+              <h2>Poly Pizza categorieën</h2>
+              <p>Stel hier per model in in welke categorie of categorieën het in de editor mag verschijnen.</p>
+            </div>
+            <button type="button" class="admin-secondary-btn" @click="loadPolyPizzaCategoryEditor">Herladen</button>
+          </div>
+
+          <div class="poly-pizza-toolbar">
+            <label class="admin-field poly-pizza-search">
+              <span>Zoeken</span>
+              <input v-model="polyPizzaSearch" type="text" placeholder="Zoek op naam, id of categorie" />
+            </label>
+            <label class="admin-field poly-pizza-new-category">
+              <span>Nieuwe categorie</span>
+              <div class="poly-pizza-new-category-row">
+                <input v-model="polyPizzaNewCategory" type="text" placeholder="Nieuwe categorie naam" />
+                <button type="button" class="admin-secondary-btn" @click="addPolyPizzaCategory">Toevoegen</button>
+              </div>
+            </label>
+            <div class="poly-pizza-actions">
+              <button type="button" class="admin-primary-btn" :disabled="polyPizzaSaving" @click="savePolyPizzaCategoryEditor">
+                {{ polyPizzaSaving ? 'Opslaan...' : 'Categorieën opslaan' }}
+              </button>
+            </div>
+          </div>
+
+          <div v-if="polyPizzaStatus" class="admin-inline-status success">{{ polyPizzaStatus }}</div>
+          <div v-if="polyPizzaError" class="admin-inline-status error">{{ polyPizzaError }}</div>
+
+          <div v-if="polyPizzaLoading" class="admin-empty compact">Poly Pizza modellen laden...</div>
+
+          <div v-else class="poly-pizza-list">
+            <article v-for="model in filteredPolyPizzaModels" :key="getPolyPizzaModelId(model)" class="poly-pizza-card">
+              <div class="poly-pizza-card-head">
+                <div class="poly-pizza-preview">
+                  <img
+                    v-if="getPolyPizzaModelPreviewUrl(model)"
+                    :src="getPolyPizzaModelPreviewUrl(model)"
+                    :alt="`${getPolyPizzaModelTitle(model)} voorbeeld`"
+                    class="poly-pizza-preview-image"
+                  />
+                  <div v-else class="poly-pizza-preview-fallback">Geen preview</div>
+                </div>
+
+                <div class="poly-pizza-card-copy">
+                  <strong>{{ getPolyPizzaModelTitle(model) }}</strong>
+                  <small>{{ getPolyPizzaModelId(model) }}</small>
+                  <div class="poly-pizza-category-summary">
+                    <span
+                      v-for="category in getPolyPizzaModelCategories(model)"
+                      :key="category"
+                      class="poly-pizza-category-chip"
+                    >
+                      {{ category }}
+                    </span>
+                    <span v-if="getPolyPizzaModelCategories(model).length === 0" class="poly-pizza-category-chip is-empty">
+                      Geen categorie
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="poly-pizza-category-pills">
+                <label v-for="category in polyPizzaCategories" :key="category" class="poly-pizza-pill">
+                  <input
+                    :checked="getPolyPizzaModelCategories(model).includes(category)"
+                    type="checkbox"
+                    @change="(event) => updatePolyPizzaModelCategories(getPolyPizzaModelId(model), category, event.target.checked)"
+                  />
+                  <span>{{ category }}</span>
+                </label>
+              </div>
+            </article>
+
+            <div v-if="filteredPolyPizzaModels.length === 0" class="admin-empty compact">
+              Geen modellen gevonden voor deze zoekopdracht.
+            </div>
           </div>
         </section>
 
@@ -605,6 +835,135 @@ async function logout() {
 
 .template-panel-primary {
   margin-bottom: 2px;
+}
+
+.poly-pizza-panel {
+  gap: 16px;
+}
+
+.poly-pizza-toolbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: end;
+}
+
+.poly-pizza-search {
+  max-width: 540px;
+}
+
+.poly-pizza-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.poly-pizza-list {
+  display: grid;
+  gap: 12px;
+  max-height: 560px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.poly-pizza-card {
+  padding: 14px 16px;
+  border-radius: 14px;
+  border: 1px solid var(--editor-border);
+  background: rgba(255, 255, 255, 0.86);
+  display: grid;
+  gap: 12px;
+}
+
+.poly-pizza-card-head {
+  display: grid;
+  grid-template-columns: 120px minmax(0, 1fr);
+  gap: 12px;
+  align-items: start;
+}
+
+.poly-pizza-preview {
+  width: 120px;
+  height: 120px;
+  border-radius: 14px;
+  border: 1px solid var(--editor-border);
+  background: #fff;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.5);
+}
+
+.poly-pizza-preview-image {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: linear-gradient(180deg, #fff 0%, #f7f1fb 100%);
+}
+
+.poly-pizza-preview-fallback {
+  color: var(--editor-text-soft);
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+.poly-pizza-card-copy {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.poly-pizza-card-copy strong {
+  color: var(--editor-brand);
+}
+
+.poly-pizza-card-copy small {
+  color: var(--editor-text-soft);
+  word-break: break-all;
+}
+
+.poly-pizza-category-summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.poly-pizza-category-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 999px;
+  background: rgba(52, 32, 88, 0.08);
+  border: 1px solid rgba(52, 32, 88, 0.1);
+  color: var(--editor-text);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.poly-pizza-category-chip.is-empty {
+  opacity: 0.7;
+}
+
+.poly-pizza-category-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.poly-pizza-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--editor-border);
+  background: #fff;
+  color: var(--editor-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.poly-pizza-pill input {
+  margin: 0;
 }
 
 .admin-panel {

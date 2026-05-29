@@ -54,3 +54,13 @@ export async function updateTemplateRoom(payload) {
   const response = await http.put('/admin/template-room', payload)
   return response.data
 }
+
+export async function getPolyPizzaCategoryMap() {
+  const response = await http.get('/admin/poly-pizza-category-map')
+  return response.data
+}
+
+export async function updatePolyPizzaCategoryMap(payload) {
+  const response = await http.put('/admin/poly-pizza-category-map', payload)
+  return response.data
+}

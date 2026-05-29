@@ -1,6 +1,7 @@
 const express = require('express')
 const Room = require('../models/Room')
 const RoomContribution = require('../models/RoomContribution')
+const PolyPizzaCategoryMap = require('../models/PolyPizzaCategoryMap')
 const User = require('../models/User')
 const { readBearerToken, verifyToken } = require('../lib/auth')
 
@@ -82,6 +83,21 @@ async function findPublicRoom(roomId) {
 function resolveOwnerId(room) {
   return String(room?.ownerId || room?.userId || '').trim()
 }
+
+router.get('/polypizza-category-map', async (req, res) => {
+  try {
+    const doc = await PolyPizzaCategoryMap.findOne({ key: 'default' })
+    res.json({
+      key: 'default',
+      categoryMap: doc?.categoryMap || {},
+      categories: Array.isArray(doc?.categories) ? doc.categories : [],
+      updatedAt: doc?.updatedAt || null
+    })
+  } catch (error) {
+    console.error('getPolyPizzaCategoryMap error:', error)
+    res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet ophalen.' })
+  }
+})
 
 router.get('/rooms/:id', async (req, res) => {
   try {

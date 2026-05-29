@@ -21,6 +21,13 @@ const templateDraft = computed(() => props.sceneRef?.templateDraft || {})
 const TEMPLATE_SLOT_EDITOR_CATEGORIES = computed(() => props.sceneRef?.TEMPLATE_SLOT_EDITOR_CATEGORIES || [])
 const filteredTemplateSlots = computed(() => props.sceneRef?.filteredTemplateSlots || [])
 const templateEditorMessage = computed(() => props.sceneRef?.templateEditorMessage || '')
+const activeTemplateDraftCategories = computed(() => {
+  const categories = Array.isArray(templateDraft.value?.slotCategories)
+    ? templateDraft.value.slotCategories
+    : []
+
+  return [...new Set(categories.map((item) => String(item || '').trim()).filter(Boolean))]
+})
 
 // Methods that delegate to scene
 function updateSlotId(newId) {
@@ -114,6 +121,13 @@ function handleClose() {
               {{ category }}
             </button>
           </div>
+          <div class="template-editor-label-row template-editor-label-row-secondary">
+            <span>Slotcategorieën</span>
+            <span v-if="activeTemplateDraftCategories.length" class="category-badge is-multi">
+              {{ activeTemplateDraftCategories.join(', ') }}
+            </span>
+            <span v-else class="category-badge is-empty">Geen</span>
+          </div>
         </div>
 
         <div class="template-editor-section">
@@ -125,7 +139,7 @@ function handleClose() {
               @change="(e) => updateSlotId(e.target.value)"
             >
               <option v-for="slot in filteredTemplateSlots" :key="slot.id" :value="slot.id">
-                {{ slot.label || slot.id }}
+                {{ props.sceneRef?.getTemplateSlotDisplayLabel ? props.sceneRef.getTemplateSlotDisplayLabel(slot) : (slot.label || slot.id) }}
               </option>
             </select>
           </label>

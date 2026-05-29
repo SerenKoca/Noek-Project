@@ -6,7 +6,9 @@ const {
   createFuneralDirector,
   deleteFuneralDirector,
   getTemplateRoom,
-  updateTemplateRoom
+  updateTemplateRoom,
+  getPolyPizzaCategoryMap,
+  updatePolyPizzaCategoryMap
 } = require('../controllers/adminController')
 
 const router = express.Router()
@@ -21,5 +23,7 @@ router.post('/funeral-directors', createFuneralDirector)
 router.delete('/funeral-directors/:id', deleteFuneralDirector)
 router.get('/template-room', getTemplateRoom)
 router.put('/template-room', updateTemplateRoom)
+router.get('/poly-pizza-category-map', getPolyPizzaCategoryMap)
+router.put('/poly-pizza-category-map', updatePolyPizzaCategoryMap)
 
 module.exports = router
