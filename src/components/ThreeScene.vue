@@ -949,8 +949,8 @@ function syncSlotFromRoot(root) {
   const slotState = slotStates.get(slotId)
   if (!slot || !slotState) return
 
-  // allow vertical positioning for small decorations
-  const allowVertical = isSmallDecorationSlot(slotId)
+  // allow vertical positioning for wall decor and small decorations
+  const allowVertical = isVerticalDecorationSlot(slotId)
   slot.position.set(root.position.x, allowVertical ? root.position.y : FLOOR_Y, root.position.z)
   slot.rotationY = root.rotation.y - Number(root.userData?.rotationYOffset || 0)
 
@@ -977,9 +977,9 @@ function updateTemplateDragBinding() {
   }
 
   transform.setMode(templateDragMode.value)
-  // enable vertical axis for small decorations when translating
+  // enable vertical axis for wall decor and small decorations when translating
   try {
-    const allowY = templateDragMode.value === 'translate' && selectedRoot && isSmallDecorationSlot(selectedRoot.userData?.slotId)
+    const allowY = templateDragMode.value === 'translate' && selectedRoot && isVerticalDecorationSlot(selectedRoot.userData?.slotId)
     transform.showY = Boolean(allowY)
   } catch (err) {
     transform.showY = false
@@ -2751,6 +2751,16 @@ function isSmallDecorationSlot(slotId = '') {
   return categories.includes('Decoratie klein')
 }
 
+function isVerticalDecorationSlot(slotId = '') {
+  const normalizedSlotId = String(slotId || '').trim()
+  if (!normalizedSlotId) return false
+
+  const templateSlot = TEMPLATE_SLOTS.value.find((slot) => slot.id === normalizedSlotId)
+  const categories = normalizeCategoryList(templateSlot?.categories || getDefaultTemplateCategories(normalizedSlotId))
+
+  return categories.some((category) => ['Muurdecoratie', 'Decoratie klein'].includes(category))
+}
+
 function isTableModel({ title = '', modelCategory = '' } = {}) {
   const normalizedCategory = String(modelCategory || '').trim().toLowerCase()
   if (normalizedCategory === 'tafel') return true
@@ -2971,7 +2981,7 @@ async function loadModelAsset({ url, title, id, replaceRoot = null, transform = 
           if (!holder.userData.appliedModelScale) holder.userData.appliedModelScale = Number(transform?.scaleMultiplier) || 1
           assignRootToSlot(holder, targetSlotId)
           // don't force-snap small decorations to the floor so saved Y offsets are preserved
-          if (!isSmallDecorationSlot(targetSlotId)) {
+          if (!isVerticalDecorationSlot(targetSlotId)) {
             snapRootToFloor(holder, FLOOR_Y)
           }
 
