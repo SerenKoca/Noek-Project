@@ -917,6 +917,21 @@ body {
   cursor: pointer;
 }
 
+.scene-tool-rotate {
+  border: 1px solid var(--editor-border);
+  border-radius: 3px;
+  height: 18px;
+  width: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  line-height: 1;
+  color: var(--editor-text);
+  background: #fff;
+  cursor: pointer;
+}
+
 .scene-tool-main {
   padding: 0 6px;
 }

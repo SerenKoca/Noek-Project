@@ -3128,24 +3128,14 @@ watch(
         // animate rotation for clearer visual feedback
         animateRotation(target, angleRad, 300).then(() => {
           console.debug('[ThreeScene] rotated target', target?.uuid, 'by', angleDeg)
-          try {
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-              window.alert(`Rotated object ${target.uuid} by ${angleDeg}°`)
-            }
-          } catch (e) {
-            /* ignore */
-          }
+          // Non-blocking feedback only (no modal alert) so editor rotations don't interrupt workflow.
+          templateEditorMessage.value = `Gedraaid: ${angleDeg}°`
+          setTimeout(() => { templateEditorMessage.value = '' }, 1800)
         })
         return
       }
       console.debug('[ThreeScene] rotate-selected: no valid target found')
-      try {
-        if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-          window.alert('Rotate command received but no valid target was found in the scene.')
-        }
-      } catch (e) {
-        /* ignore */
-      }
+      console.debug('[ThreeScene] rotate-selected: no valid target found')
     }
 
     if (command.type === 'apply-room-colors') {

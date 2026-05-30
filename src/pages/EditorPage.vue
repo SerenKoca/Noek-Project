@@ -315,6 +315,7 @@ async function openSettings() {
             :selected="state.selected.value"
             :selected-anchor="state.selectedAnchor.value"
             @delete-selected="state.onDeleteSelected"
+            @rotate-selected="handleRotateSelected"
           />
         </div>
       </div>

@@ -14,7 +14,7 @@ defineProps({
   }
 })
 
-defineEmits(['delete-selected'])
+defineEmits(['delete-selected', 'rotate-selected'])
 </script>
 
 <template>
@@ -30,6 +30,7 @@ defineEmits(['delete-selected'])
     :style="{ left: `${selectedAnchor.x}px`, top: `${selectedAnchor.y}px` }"
   >
     <button class="scene-tool-main">{{ selected?.isSlotMarker ? 'plaats' : 'aanpassen' }}</button>
+    <button v-if="!selected?.isSlotMarker" class="scene-tool-rotate" @click="$emit('rotate-selected', 90)">⟳</button>
     <button v-if="!selected?.isSlotMarker" class="scene-tool-danger" @click="$emit('delete-selected')">x</button>
   </div>
 </template>
