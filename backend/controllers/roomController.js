@@ -184,26 +184,6 @@ exports.getRoomTemplate = async (req, res) => {
         });
       }
 
-      if (templateKey === 'template-b') {
-        const seedRoom = await Room.findOne({
-          ownerId: templateOwner._id,
-          $or: [
-            { templateKey: 'template-a' },
-            { templateKey: '' },
-            { templateKey: { $exists: false } }
-          ]
-        }).sort({ createdAt: 1 });
-
-        if (seedRoom?.sceneData) {
-          return res.json({
-            sceneData: JSON.parse(JSON.stringify(seedRoom.sceneData)),
-            roomId: seedRoom._id,
-            templateKey,
-            name: getTemplateRoomName(templateKey),
-            source: 'template-copy'
-          });
-        }
-      }
     }
 
     return res.json({
@@ -265,20 +245,6 @@ async function resolveTemplateSceneData(templateKey = 'template-a') {
       return JSON.parse(JSON.stringify(templateRoom.sceneData))
     }
 
-    if (normalizedTemplateKey === 'template-b') {
-      const seedRoom = await Room.findOne({
-        ownerId: templateOwner._id,
-        $or: [
-          { templateKey: 'template-a' },
-          { templateKey: '' },
-          { templateKey: { $exists: false } }
-        ]
-      }).sort({ createdAt: 1 })
-
-      if (seedRoom?.sceneData) {
-        return JSON.parse(JSON.stringify(seedRoom.sceneData))
-      }
-    }
   }
 
   return buildFallbackTemplateSceneData(buildTemplateSlots(), normalizedTemplateKey)

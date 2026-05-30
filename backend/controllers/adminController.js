@@ -246,20 +246,6 @@ exports.getTemplateRoom = async (req, res) => {
       return
     }
 
-    if (templateKey === 'template-b') {
-      const seedRoom = await findTemplateRoom('template-a')
-      if (seedRoom?.sceneData) {
-        res.json({
-          roomId: seedRoom._id,
-          name: getTemplateRoomName(templateKey),
-          templateKey,
-          sceneData: JSON.parse(JSON.stringify(seedRoom.sceneData)),
-          source: 'template-copy'
-        })
-        return
-      }
-    }
-
     res.json({
       roomId: '',
       name: getTemplateRoomName(templateKey),

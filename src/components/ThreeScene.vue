@@ -1542,10 +1542,9 @@ function createScene() {
     addVRPhotos()
   }
 
-  // Only add furniture in non-VR mode
-  if (!props.vrMode) {
-    initializeFurnitureSlots()
-    hydrateCuratedDefaultFurniture()
+  // Defer furniture hydration until the room data is loaded.
+  // This keeps the scene blank while existing rooms/templates are still resolving.
+  if (props.vrMode) {
     syncContributionCandles()
   }
   
@@ -2776,7 +2775,16 @@ function isVerticalDecorationSlot(slotId = '') {
   const templateSlot = TEMPLATE_SLOTS.value.find((slot) => slot.id === normalizedSlotId)
   const categories = normalizeCategoryList(templateSlot?.categories || getDefaultTemplateCategories(normalizedSlotId))
 
-  return categories.some((category) => ['Muurdecoratie', 'Decoratie klein'].includes(category))
+  // Allow wall decorations, small decorations, media and computer-related categories to be adjusted in Y.
+  const lowerCats = categories.map((c) => String(c || '').toLowerCase())
+  const verticalCategoryKeywords = ['muurdecoratie', 'decoratie klein', 'media', 'computer', 'desktop', 'monitor', 'laptop']
+  if (lowerCats.some((category) => verticalCategoryKeywords.includes(category))) return true
+
+  // Fallback: treat slots with obvious ids as vertical (e.g. 'tv', 'computer')
+  const idLower = normalizedSlotId.toLowerCase()
+  if (idLower.includes('tv') || idLower.includes('computer') || idLower.includes('monitor') || idLower.includes('screen')) return true
+
+  return false
 }
 
 function isTableModel({ title = '', modelCategory = '' } = {}) {

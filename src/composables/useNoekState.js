@@ -783,7 +783,6 @@ async function openEditor(room = null) {
   syncRoomMusicDraft(room)
   roomCommentDraft.value = ''
   roomCommentState.value = { loading: false, error: '' }
-  await startRoomAudioFromRoom(room)
 
   let roomData = room?.sceneData ? JSON.parse(JSON.stringify(room.sceneData)) : null
   if (!roomData && authState.value?.user?.role === 'editor') {
@@ -795,10 +794,12 @@ async function openEditor(room = null) {
     }
   }
   currentRoomData.value = roomData
-  if (!room && roomData && sceneRef.value?.loadRoom) {
+  if (!room && !roomData && sceneRef.value?.loadRoom) {
     await nextTick()
     await sceneRef.value.loadRoom(roomData)
   }
+
+  await startRoomAudioFromRoom(room)
   syncRoomAppearanceDraft(room)
 }
 
