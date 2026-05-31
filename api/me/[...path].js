@@ -1,5 +1,6 @@
 import Room from '../../backend/models/Room.js'
 import RoomContribution from '../../backend/models/RoomContribution.js'
+import bcrypt from 'bcryptjs'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
 
@@ -19,6 +20,20 @@ function parseBody(req) {
   if (!req.body) return {}
   if (typeof req.body === 'string') return JSON.parse(req.body)
   return req.body
+}
+
+function sanitizeUser(user) {
+  return {
+    id: user._id,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role || 'editor',
+    funeralDirectorId: user.funeralDirectorId || null
+  }
+}
+
+function isValidEmail(value) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 }
 
 // Handler for /api/me/branding
@@ -100,6 +115,138 @@ async function handleContributions(req, res, auth) {
   }
 }
 
+async function handleProfile(req, res, auth) {
+  try {
+    setJsonHeaders(res)
+
+    if (req.method !== 'PATCH') {
+      res.setHeader('Allow', ['PATCH'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
+    }
+
+    const [{ User }, authModule] = await Promise.all([
+      import('../../src/server/models/User.js'),
+      import('../../src/server/lib/auth.js')
+    ])
+
+    const { createToken } = authModule
+    await connectToDatabase()
+
+    const currentUser = await User.findById(auth.userId)
+    if (!currentUser) {
+      res.status(404).json({ error: 'Gebruiker niet gevonden.' })
+      return
+    }
+
+    const body = parseBody(req)
+    const nextDisplayName = String(body?.displayName || '').trim()
+    const nextEmail = String(body?.email || '').trim().toLowerCase()
+
+    if (!nextDisplayName) {
+      res.status(400).json({ error: 'Naam is verplicht.' })
+      return
+    }
+
+    if (!nextEmail) {
+      res.status(400).json({ error: 'Email is verplicht.' })
+      return
+    }
+
+    if (!isValidEmail(nextEmail)) {
+      res.status(400).json({ error: 'Ongeldig emailadres.' })
+      return
+    }
+
+    const existing = await User.findOne({ email: nextEmail, _id: { $ne: currentUser._id } })
+    if (existing) {
+      res.status(409).json({ error: 'Er bestaat al een account met dit emailadres.' })
+      return
+    }
+
+    currentUser.displayName = nextDisplayName.slice(0, 80)
+    currentUser.email = nextEmail
+    await currentUser.save()
+
+    const token = createToken({
+      userId: String(currentUser._id),
+      email: currentUser.email,
+      role: currentUser.role || 'editor'
+    })
+
+    res.status(200).json({ token, user: sanitizeUser(currentUser) })
+  } catch (error) {
+    console.error('ME_PROFILE handler error:', error)
+    if (!res.headersSent) {
+      setJsonHeaders(res)
+      res.status(500).json({ error: 'Profiel kon niet worden opgeslagen.', code: 'ME_PROFILE_ERROR' })
+    }
+  }
+}
+
+async function handlePassword(req, res, auth) {
+  try {
+    setJsonHeaders(res)
+
+    if (req.method !== 'PATCH') {
+      res.setHeader('Allow', ['PATCH'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
+    }
+
+    const [{ User }, authModule] = await Promise.all([
+      import('../../src/server/models/User.js'),
+      import('../../src/server/lib/auth.js')
+    ])
+
+    const { createToken } = authModule
+    await connectToDatabase()
+
+    const currentUser = await User.findById(auth.userId)
+    if (!currentUser) {
+      res.status(404).json({ error: 'Gebruiker niet gevonden.' })
+      return
+    }
+
+    const body = parseBody(req)
+    const currentPassword = String(body?.currentPassword || '')
+    const newPassword = String(body?.newPassword || '')
+
+    if (!currentPassword || !newPassword) {
+      res.status(400).json({ error: 'Huidig en nieuw wachtwoord zijn verplicht.' })
+      return
+    }
+
+    if (newPassword.length < 8) {
+      res.status(400).json({ error: 'Nieuw wachtwoord moet minstens 8 tekens hebben.' })
+      return
+    }
+
+    const ok = await bcrypt.compare(currentPassword, currentUser.passwordHash)
+    if (!ok) {
+      res.status(401).json({ error: 'Huidig wachtwoord is onjuist.' })
+      return
+    }
+
+    currentUser.passwordHash = await bcrypt.hash(newPassword, 10)
+    await currentUser.save()
+
+    const token = createToken({
+      userId: String(currentUser._id),
+      email: currentUser.email,
+      role: currentUser.role || 'editor'
+    })
+
+    res.status(200).json({ token, user: sanitizeUser(currentUser) })
+  } catch (error) {
+    console.error('ME_PASSWORD handler error:', error)
+    if (!res.headersSent) {
+      setJsonHeaders(res)
+      res.status(500).json({ error: 'Wachtwoord kon niet worden opgeslagen.', code: 'ME_PASSWORD_ERROR' })
+    }
+  }
+}
+
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
@@ -120,6 +267,14 @@ export default async function handler(req, res) {
 
   if (path === 'contributions') {
     return handleContributions(req, res, auth)
+  }
+
+  if (path === 'profile') {
+    return handleProfile(req, res, auth)
+  }
+
+  if (path === 'password') {
+    return handlePassword(req, res, auth)
   }
 
   res.status(404).json({ error: 'Endpoint niet gevonden.' })
