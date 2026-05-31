@@ -3180,12 +3180,76 @@ watch(
         replaceRoot = slot?.root || slot?.marker || null
       }
 
+      const resolvedSlotId = String(
+        replaceRoot?.userData?.slotId ||
+        replaceRoot?.slotId ||
+        targetSlotId ||
+        ''
+      ).trim()
+      const slotState = resolvedSlotId && slotStates.has(resolvedSlotId)
+        ? slotStates.get(resolvedSlotId)
+        : null
+      const explicitFixedTargetSize = Number(req.fixedTargetSize)
+      const slotTargetSize = Number(slotState?.targetSize || 0)
+      const currentTargetSize = Number(replaceRoot?.userData?.targetSize || 0)
+      const fixedTargetSize = Number.isFinite(explicitFixedTargetSize) && explicitFixedTargetSize > 0
+        ? explicitFixedTargetSize
+        : Number.isFinite(slotTargetSize) && slotTargetSize > 0
+          ? slotTargetSize
+          : Number.isFinite(currentTargetSize) && currentTargetSize > 0
+            ? currentTargetSize
+            : undefined
+
+      const explicitRotationYOffset = Number(req.rotationYOffset)
+      const inheritedRotationYOffset = Number(replaceRoot?.userData?.rotationYOffset)
+      let rotationYOffset = Number.isFinite(explicitRotationYOffset)
+        ? explicitRotationYOffset
+        : Number.isFinite(inheritedRotationYOffset)
+          ? inheritedRotationYOffset
+          : undefined
+      if (
+        !Number.isFinite(rotationYOffset) &&
+        replaceRoot &&
+        !replaceRoot?.userData?.isSlotMarker &&
+        slotState?.position?.isVector3
+      ) {
+        const slotRotationY = Number(slotState.rotationY || 0)
+        const currentRotationY = Number(replaceRoot.rotation?.y)
+        if (Number.isFinite(currentRotationY)) {
+          rotationYOffset = currentRotationY - slotRotationY
+        }
+      }
+
+      let positionOffset = null
+      const explicitPositionOffset = Array.isArray(req.positionOffset) && req.positionOffset.length >= 3
+        ? req.positionOffset
+        : null
+      if (explicitPositionOffset) {
+        positionOffset = explicitPositionOffset.map((v) => Number(v) || 0)
+      } else if (Array.isArray(replaceRoot?.userData?.positionOffset) && replaceRoot.userData.positionOffset.length >= 3) {
+        positionOffset = replaceRoot.userData.positionOffset.map((v) => Number(v) || 0)
+      } else if (
+        replaceRoot &&
+        !replaceRoot?.userData?.isSlotMarker &&
+        slotState?.position?.isVector3 &&
+        replaceRoot?.position?.isVector3
+      ) {
+        positionOffset = [
+          Number(replaceRoot.position.x - slotState.position.x) || 0,
+          Number(replaceRoot.position.y - slotState.position.y) || 0,
+          Number(replaceRoot.position.z - slotState.position.z) || 0
+        ]
+      }
+
       await loadModelAssetWithFallback({
         url: adaptStaticAssetUrl(assetUrl),
         title,
         id,
         replaceRoot,
         transform: {
+          fixedTargetSize,
+          positionOffset,
+          rotationYOffset,
           sizeMultiplier: Number(req.sizeMultiplier) || 1,
           modelCategory: req.modelCategory || ''
         }
