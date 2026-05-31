@@ -997,6 +997,8 @@ async function uploadToCloudinary(file, resourceType) {
 }
 
 async function addContribution() {
+  if (submitState.value.loading) return
+
   submitState.value = { loading: true, error: '', success: '' }
 
   try {
@@ -1801,7 +1803,9 @@ onBeforeUnmount(() => {
 
                 <div class="panel-actions">
                   <button v-if="musicStep === 1" type="button" class="visitor-pill-btn" @click="openMusicPreview">Verder</button>
-                  <button v-else-if="musicStep === 2" type="button" class="visitor-pill-btn" @click="postMusicAndClose">Posten</button>
+                  <button v-else-if="musicStep === 2" type="button" class="visitor-pill-btn" :disabled="submitState.loading" @click="postMusicAndClose">
+                    {{ submitState.loading ? 'Posten...' : 'Posten' }}
+                  </button>
                 </div>
               </div>
             </div>
@@ -1866,7 +1870,9 @@ onBeforeUnmount(() => {
 
                   <div class="panel-actions">
                     <button v-if="videoStep === 1" type="button" class="visitor-pill-btn" @click="openVideoPreview">Verder</button>
-                    <button v-else-if="videoStep === 2" type="button" class="visitor-pill-btn" @click="postVideoAndClose">Posten</button>
+                    <button v-else-if="videoStep === 2" type="button" class="visitor-pill-btn" :disabled="submitState.loading" @click="postVideoAndClose">
+                      {{ submitState.loading ? 'Posten...' : 'Posten' }}
+                    </button>
                   </div>
                 </div>
               </div>
@@ -2010,7 +2016,9 @@ onBeforeUnmount(() => {
                 </template>
                 <div class="panel-actions">
                   <button v-if="photosStep === 1" type="button" class="visitor-pill-btn" @click="nextPhotosStep">Verder</button>
-                  <button v-else-if="photosStep === 2" type="button" class="visitor-pill-btn" @click="postPhotoAndClose">Posten</button>
+                  <button v-else-if="photosStep === 2" type="button" class="visitor-pill-btn" :disabled="submitState.loading" @click="postPhotoAndClose">
+                    {{ submitState.loading ? 'Posten...' : 'Posten' }}
+                  </button>
                 </div>
               </div>
             </div>
