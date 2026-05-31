@@ -101,13 +101,24 @@ async function handlePolyPizzaCategoryMap(req, res) {
 		return true
 	}
 
-	const doc = await PolyPizzaCategoryMap.findOne({ key: 'default' })
-	res.status(200).json({
-		key: 'default',
-		categoryMap: doc?.categoryMap || {},
-		categories: Array.isArray(doc?.categories) ? doc.categories : [],
-		updatedAt: doc?.updatedAt || null
-	})
+	try {
+		const doc = await PolyPizzaCategoryMap.findOne({ key: 'default' })
+		res.status(200).json({
+			key: 'default',
+			categoryMap: doc?.categoryMap || {},
+			categories: Array.isArray(doc?.categories) ? doc.categories : [],
+			updatedAt: doc?.updatedAt || null
+		})
+	} catch (error) {
+		console.error('getPolyPizzaCategoryMap fallback error:', error)
+		res.status(200).json({
+			key: 'default',
+			categoryMap: {},
+			categories: [],
+			updatedAt: null
+		})
+	}
+
 	return true
 }
 
