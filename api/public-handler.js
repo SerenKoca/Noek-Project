@@ -1,5 +1,6 @@
 import Room from '../backend/models/Room.js'
 import RoomContribution from '../backend/models/RoomContribution.js'
+import PolyPizzaCategoryMap from '../backend/models/PolyPizzaCategoryMap.js'
 import { User } from '../src/server/models/User.js'
 import { connectToDatabase } from '../src/server/lib/mongodb.js'
 import { getOptionalAuth } from '../src/server/middleware/optionalAuth.js'
@@ -93,6 +94,23 @@ async function resolveRoomBranding(room) {
 	return buildBrandingResponse(director)
 }
 
+async function handlePolyPizzaCategoryMap(req, res) {
+	if (req.method !== 'GET') {
+		res.setHeader('Allow', ['GET'])
+		res.status(405).json({ error: 'Method Not Allowed' })
+		return true
+	}
+
+	const doc = await PolyPizzaCategoryMap.findOne({ key: 'default' })
+	res.status(200).json({
+		key: 'default',
+		categoryMap: doc?.categoryMap || {},
+		categories: Array.isArray(doc?.categories) ? doc.categories : [],
+		updatedAt: doc?.updatedAt || null
+	})
+	return true
+}
+
 export default async function handler(req, res) {
 	setJsonHeaders(res)
 
@@ -100,6 +118,10 @@ export default async function handler(req, res) {
 		await connectToDatabase()
 
 		const segments = normalizePathSegments(req.query.path)
+		if (segments[0] === 'polypizza-category-map') {
+			return await handlePolyPizzaCategoryMap(req, res)
+		}
+
 		const { roomId, action } = resolveRoomRequestPath(segments)
 
 		if (!roomId) {
