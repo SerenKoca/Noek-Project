@@ -204,7 +204,7 @@ function openTemplates() {
               class="primary-btn editor-home-create-btn"
               :disabled="state.rooms.value.length >= 2"
               :title="state.rooms.value.length >= 2 ? 'Elk account mag maar 2 kamers hebben.' : ''"
-              @click="createRoomModal = true"
+              @click="openTemplates"
             >
               + Maak een kamer
             </button>
@@ -301,49 +301,7 @@ function openTemplates() {
         </div>
       </div>
 
-      <div v-if="createRoomModal" class="modal-backdrop room-choice-backdrop" @click.self="createRoomModal = false">
-        <div class="modal-card room-choice-modal" role="dialog" aria-modal="true" aria-label="Kies een ruimte">
-          <div class="room-choice-top">
-            <h3 class="room-choice-title">Kies een ruimte</h3>
-            <button type="button" class="room-choice-close" @click="createRoomModal = false" aria-label="Sluiten">
-              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6 L18 18" /><path d="M18 6 L6 18" /></svg>
-            </button>
-          </div>
-          <div class="room-choice-grid">
-            <button type="button" class="room-choice-card" @click="createEmptyRoom" :disabled="creatingRoom || state.rooms.value.length >= 2">
-              <div class="room-choice-icon empty-room-icon">
-                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                  <g fill="#0e4e84">
-                    <polygon points="60,20 100,45 100,95 60,120 20,95 20,45"/>
-                    <polygon points="60,20 100,45 60,70 20,45" opacity="0.9"/>
-                    <polygon points="20,45 20,95 60,120 60,70" opacity="0.7"/>
-                  </g>
-                </svg>
-              </div>
-              <h4>Lege ruimte</h4>
-              <p>Begin vanaf 0 en ontwerp zelf je kamer</p>
-            </button>
-
-            <button type="button" class="room-choice-card" @click="openTemplates">
-              <div class="room-choice-icon template-room-icon">
-                <svg viewBox="0 0 120 120" xmlns="http://www.w3.org/2000/svg">
-                  <g fill="#0e4e84">
-                    <polygon points="60,20 100,45 100,95 60,120 20,95 20,45"/>
-                    <polygon points="60,20 100,45 60,70 20,45" opacity="0.9"/>
-                    <polygon points="20,45 20,95 60,120 60,70" opacity="0.7"/>
-                    <g fill="white" opacity="0.8">
-                      <circle cx="50" cy="60" r="6"/>
-                      <rect x="62" y="52" width="16" height="16" rx="2"/>
-                    </g>
-                  </g>
-                </svg>
-              </div>
-              <h4>Templates</h4>
-              <p>Kies een vooraf ontworpen kamer die je zelf kan aanpassen</p>
-            </button>
-          </div>
-        </div>
-      </div>
+      <!-- Choice popup removed: always use templates for new rooms -->
 
       <div
         v-if="showDesktopOnlyOverlay"
