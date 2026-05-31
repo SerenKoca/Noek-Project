@@ -1073,6 +1073,18 @@ async function onSave(options = {}) {
   isSavingRoom.value = true
 
   try {
+    // Debug: inspect sceneData being saved to catch size mismatches
+    try {
+      console.log('[onSave] sceneData.furniture (pre-save):', Array.isArray(sceneData?.furniture) ? sceneData.furniture.map(f => ({ slotId: f.slotId, targetSize: f.targetSize, scale: f.scale, appliedModelScale: f.appliedModelScale })) : sceneData?.furniture)
+    } catch (e) {
+      /* ignore logging errors */
+    }
+    // Persist a pending scene snapshot to localStorage so a full page reload can show it immediately
+    try {
+      localStorage.setItem('noek.pendingSavedScene', JSON.stringify({ ts: Date.now(), sceneData }))
+      console.log('[onSave] wrote pendingSavedScene to localStorage')
+    } catch (e) { /* ignore */ }
+
     let saved
     if (currentRoom.value) {
       saved = await updateRoom(currentRoom.value._id, { name, sceneData })
@@ -1089,8 +1101,43 @@ async function onSave(options = {}) {
     })
     await loadRooms({ skipLoader: true })
 
-    if (!currentRoom.value) {
-      currentRoom.value = saved
+    const nextSceneData = saved?.sceneData
+      ? JSON.parse(JSON.stringify(saved.sceneData))
+      : JSON.parse(JSON.stringify(sceneData))
+
+    // store last-saved snapshot so a reload can pick it up
+    try {
+      localStorage.setItem('noek.lastSavedScene', JSON.stringify({ ts: Date.now(), sceneData: nextSceneData }))
+      localStorage.removeItem('noek.pendingSavedScene')
+      console.log('[onSave] wrote lastSavedScene to localStorage')
+    } catch (e) { /* ignore */ }
+
+    if (currentRoom.value) {
+      currentRoom.value = {
+        ...currentRoom.value,
+        ...saved,
+        sceneData: nextSceneData
+      }
+    } else {
+      currentRoom.value = {
+        ...saved,
+        sceneData: nextSceneData
+      }
+    }
+
+    if (!isAutoSave) {
+      currentRoomData.value = nextSceneData
+
+      // Force immediate rehydrate of the live scene from the saved data so visuals update
+      try {
+        if (sceneRef.value?.loadRoom) {
+          console.log('[onSave] rehydrating scene with saved sceneData')
+          // call async but don't await full network behavior; this updates visuals immediately
+          await sceneRef.value.loadRoom(nextSceneData)
+        }
+      } catch (e) {
+        console.error('[onSave] rehydrate failed', e)
+      }
     }
 
     if (!isAutoSave) {

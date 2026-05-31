@@ -220,16 +220,6 @@ function handleClose() {
                 @change="(e) => updateDraftField('modelScale', Number(e.target.value))"
               />
             </label>
-            <label class="position-input">
-              <span>Puntgrootte</span>
-              <input
-                :value="templateDraft.markerSize"
-                type="number"
-                step="0.1"
-                min="0.1"
-                @change="(e) => updateDraftField('markerSize', Number(e.target.value))"
-              />
-            </label>
           </div>
         </div>
 

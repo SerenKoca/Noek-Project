@@ -258,9 +258,14 @@ async function saveTemplateRoom() {
 
   try {
     const sceneData = templateSceneRef.value.serializeRoom()
+    const savedSceneData = JSON.parse(JSON.stringify(sceneData))
     const result = await updateTemplateRoom({ sceneData, templateKey: selectedTemplateKey.value })
     templateRoomName.value = String(result?.name || templateRoomName.value || 'Template kamer')
-    templateSceneData.value = result?.sceneData ? JSON.parse(JSON.stringify(result.sceneData)) : sceneData
+    templateSceneData.value = savedSceneData
+    await nextTick()
+    if (templateSceneRef.value?.loadRoom) {
+      await templateSceneRef.value.loadRoom(savedSceneData)
+    }
     templateStatus.value = 'Template opgeslagen.'
   } catch (err) {
     templateError.value = formatApiError(err, 'Kon template niet opslaan.')
