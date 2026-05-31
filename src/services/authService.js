@@ -14,6 +14,14 @@ const http = axios.create({
 
 attachGlobalLoaderToAxios(http)
 
+http.interceptors.request.use((config) => {
+  const token = getAuthToken()
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
+})
+
 function safeParse(json) {
   try {
     return JSON.parse(json)
@@ -43,6 +51,24 @@ export function storeAuth(payload) {
 export function clearAuth() {
   if (typeof window === 'undefined') return
   window.localStorage.removeItem(AUTH_STORAGE_KEY)
+}
+
+export async function updateMyProfile({ displayName, email }) {
+  const response = await http.patch('/me/profile', {
+    displayName,
+    email
+  })
+  storeAuth(response.data)
+  return response.data
+}
+
+export async function changeMyPassword({ currentPassword, newPassword }) {
+  const response = await http.patch('/me/password', {
+    currentPassword,
+    newPassword
+  })
+  storeAuth(response.data)
+  return response.data
 }
 
 export async function registerAccount({ email, password, displayName, registrationCode, registerRole }) {
