@@ -1177,7 +1177,14 @@ function handleRoomNameUpdate(value) {
   roomName.value = value
 }
 
-function onHistoryAction() {
+function onHistoryAction(action) {
+  const normalizedAction = String(action || '').trim().toLowerCase()
+  if (normalizedAction !== 'undo' && normalizedAction !== 'redo') return
+
+  sceneCommand.value = {
+    type: normalizedAction,
+    _requestId: Date.now()
+  }
 }
 
 async function bootstrap() {

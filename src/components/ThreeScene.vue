@@ -72,6 +72,9 @@ let currentLookYaw = 0
 let isLookDragging = false
 let lookDragStartX = 0
 let lookDragStartYaw = 0
+let isRestoringHistory = false
+const sceneHistoryStack = []
+let sceneHistoryIndex = -1
 
 // VR camera rotation
 let vrYaw = 0
@@ -1467,6 +1470,11 @@ function createScene() {
   transform.rotationSnap = Math.PI / 24
   transform.addEventListener('dragging-changed', (e) => {
     orbit.enabled = !e.value
+    if (!e.value && selectedRoot) {
+      syncSlotFromRoot(selectedRoot)
+      pushSceneHistorySnapshot()
+      emit('scene-mutated')
+    }
   })
   transform.addEventListener('objectChange', () => {
     if (!selectedRoot) return
@@ -2384,6 +2392,55 @@ function getRootByUuid(uuid) {
   return selectableRoots.find((root) => root.uuid === uuid) || null
 }
 
+function cloneSceneSnapshot(sceneData) {
+  try {
+    return JSON.parse(JSON.stringify(sceneData))
+  } catch {
+    return null
+  }
+}
+
+function pushSceneHistorySnapshot(sceneData = null) {
+  if (isRestoringHistory) return
+
+  const snapshot = cloneSceneSnapshot(sceneData || serializeRoom())
+  if (!snapshot) return
+
+  const lastSnapshot = sceneHistoryIndex >= 0 ? sceneHistoryStack[sceneHistoryIndex] : null
+  if (lastSnapshot && JSON.stringify(lastSnapshot) === JSON.stringify(snapshot)) {
+    return
+  }
+
+  if (sceneHistoryIndex < sceneHistoryStack.length - 1) {
+    sceneHistoryStack.splice(sceneHistoryIndex + 1)
+  }
+
+  sceneHistoryStack.push(snapshot)
+  sceneHistoryIndex = sceneHistoryStack.length - 1
+}
+
+async function restoreSceneHistory(direction) {
+  if (!sceneHistoryStack.length) return false
+
+  const nextIndex = direction === 'undo'
+    ? sceneHistoryIndex - 1
+    : sceneHistoryIndex + 1
+
+  if (nextIndex < 0 || nextIndex >= sceneHistoryStack.length) return false
+
+  const snapshot = cloneSceneSnapshot(sceneHistoryStack[nextIndex])
+  if (!snapshot) return false
+
+  isRestoringHistory = true
+  try {
+    sceneHistoryIndex = nextIndex
+    await loadRoom(snapshot)
+    return true
+  } finally {
+    isRestoringHistory = false
+  }
+}
+
 function animateRotation(target, deltaRad, duration = 300) {
   return new Promise((resolve) => {
     if (!target) return resolve()
@@ -2663,6 +2720,10 @@ async function loadRoom(sceneData) {
   syncTargetToCurrentYaw()
 
   deselect()
+
+  if (!isRestoringHistory) {
+    pushSceneHistorySnapshot(sceneData)
+  }
 }
 
 function resetSceneToDefault({ hydrateCurated = true } = {}) {
@@ -3254,6 +3315,10 @@ watch(
           modelCategory: req.modelCategory || ''
         }
       })
+
+      if (!isRestoringHistory) {
+        pushSceneHistorySnapshot()
+      }
     } catch (error) {
       const detail = error?.message || 'Unknown error'
       const message = `Failed to load model: ${title}, Error: ${detail}`
@@ -3284,10 +3349,17 @@ watch(
   (command) => {
     console.debug('[ThreeScene] received sceneCommand ->', command)
     if (!command || !command.type) return
+    if (command.type === 'undo' || command.type === 'redo') {
+      restoreSceneHistory(command.type)
+      return
+    }
     if (command.type === 'delete-selected' && selectedRoot && !selectedRoot.userData?.isSlotMarker) {
       const slotId = selectedRoot.userData?.slotId || ''
       if (slotId) {
         removeFurnitureFromSlot(slotId)
+        if (!isRestoringHistory) {
+          pushSceneHistorySnapshot()
+        }
         emit('scene-mutated')
       }
       return
@@ -3317,6 +3389,9 @@ watch(
       if (target && !target.userData?.isSlotMarker) {
         // animate rotation for clearer visual feedback
         animateRotation(target, angleRad, 300).then(() => {
+          if (!isRestoringHistory) {
+            pushSceneHistorySnapshot()
+          }
           console.debug('[ThreeScene] rotated target', target?.uuid, 'by', angleDeg)
           // Non-blocking feedback only (no modal alert) so editor rotations don't interrupt workflow.
           templateEditorMessage.value = `Gedraaid: ${angleDeg}°`
@@ -3336,6 +3411,9 @@ watch(
         wallTextureColorsById: command.wallTextureColorsById
       })
       syncTemplateSurfaceEditorFromScene()
+      if (!isRestoringHistory) {
+        pushSceneHistorySnapshot()
+      }
     }
   }
 )
