@@ -2,13 +2,13 @@ import Room from '../../backend/models/Room.js'
 import RoomContribution from '../../backend/models/RoomContribution.js'
 import { User } from '../../src/server/models/User.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
-import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
+import { getOptionalAuth } from '../../src/server/middleware/optionalAuth.js'
 import { ROOM_TEMPLATE } from '../../src/services/roomTemplate.js'
 import templateRoomsModule from '../../backend/lib/templateRooms.js'
 import roomEditAuthModule from '../../backend/lib/roomEditAuth.js'
 
 const { normalizeTemplateKey, getTemplateRoomName } = templateRoomsModule
-const { createRoomEditKey } = roomEditAuthModule
+const { createRoomEditKey, verifyRoomEditKey } = roomEditAuthModule
 
 const ROOM_TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
@@ -34,12 +34,46 @@ function normalizePathSegments(value) {
   return []
 }
 
+function readHeader(req, headerName) {
+  const value = req?.headers?.[headerName] ?? req?.headers?.[headerName.toLowerCase()]
+  if (Array.isArray(value)) return value[0] || ''
+  return String(value || '')
+}
+
 async function findOwnedRoom(roomId, ownerId) {
   return Room.findOne({ _id: roomId, ownerId })
 }
 
 async function findOwnedContribution(roomId, ownerId, contributionId) {
   return RoomContribution.findOne({ _id: contributionId, roomId, ownerId })
+}
+
+async function resolveRoomAuth(req, roomId) {
+  const tokenAuth = getOptionalAuth(req)
+  if (tokenAuth?.userId) {
+    return tokenAuth
+  }
+
+  const editKey = String(readHeader(req, 'x-room-edit-key') || req.query?.editKey || '').trim()
+  if (!roomId || !editKey) {
+    return null
+  }
+
+  if (!verifyRoomEditKey(roomId, editKey)) {
+    return null
+  }
+
+  const room = await Room.findById(roomId).select('ownerId')
+  if (!room) {
+    return null
+  }
+
+  return {
+    userId: room.ownerId || room._id.toString(),
+    email: '',
+    role: 'editor',
+    editAccess: true
+  }
 }
 
 function buildFallbackTemplateSceneData() {
@@ -68,14 +102,6 @@ function normalizeRoomReactionType(value) {
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
-  const auth = requireAuth(req, res)
-  if (!auth) return
-
-  if (auth.role !== 'editor') {
-    res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' })
-    return
-  }
-
   try {
     await connectToDatabase()
   } catch (error) {
@@ -87,6 +113,17 @@ export default async function handler(req, res) {
   const segments = normalizePathSegments(req.query.path)
 
   if (segments[0] === 'template' && segments.length === 1) {
+    const auth = getOptionalAuth(req)
+    if (!auth) {
+      res.status(401).json({ error: 'Login vereist.' })
+      return
+    }
+
+    if (auth.role !== 'editor') {
+      res.status(403).json({ error: 'Alleen editors kunnen kamers beheren.' })
+      return
+    }
+
     try {
       const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
       const templateOwner = await User.findOne({
@@ -138,6 +175,12 @@ export default async function handler(req, res) {
   }
 
   const action = segments.slice(1)
+  const auth = await resolveRoomAuth(req, roomId)
+
+  if (!auth) {
+    res.status(401).json({ error: 'Login vereist.' })
+    return
+  }
 
   if (action.length === 0) {
     if (req.method === 'GET') {
