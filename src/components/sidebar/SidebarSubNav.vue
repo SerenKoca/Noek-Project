@@ -51,7 +51,7 @@ const subCategories = computed(() => {
     <div class="editor-sub-nav-top">
       <button type="button" class="editor-back-btn" @click="$emit('back')" aria-label="Terug">
       <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path d="M15.41 7.41 14 6l-6 6 6 6 1.41-1.41L10.83 12z"/></svg>
-      <span>back</span>
+      <span>terug</span>
       </button>
     </div>
     <div class="editor-sub-title">{{ activeCategory }}</div>

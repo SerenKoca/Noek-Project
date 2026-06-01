@@ -11,7 +11,7 @@ defineEmits(['update:activeCategory'])
 
 <template>
   <section class="editor-assets-nav">
-    <h2 class="editor-assets-title">Assets</h2>
+    <h2 class="editor-assets-title">Menu</h2>
     <div class="editor-assets-actions">
       <button
         class="editor-assets-btn"
@@ -34,7 +34,7 @@ defineEmits(['update:activeCategory'])
         :class="{ active: activeCategory === 'Kamer' }"
         @click="$emit('update:activeCategory', 'Kamer')"
       >
-        <span class="chip-icon">C</span>
+        <span class="chip-icon">K</span>
         <span>Kamer</span>
       </button>
     </div>
