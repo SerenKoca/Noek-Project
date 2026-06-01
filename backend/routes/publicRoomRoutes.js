@@ -84,6 +84,86 @@ function resolveOwnerId(room) {
   return String(room?.ownerId || room?.userId || '').trim()
 }
 
+function splitConfigList(value) {
+  return String(value || '')
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function extractListId(value) {
+  const input = String(value || '').trim()
+  if (!input) return ''
+
+  if (/^[A-Za-z0-9_-]{6,}$/.test(input)) {
+    return input
+  }
+
+  try {
+    const parsed = new URL(input)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const listIndex = parts.findIndex((part) => part.toLowerCase() === 'list' || part.toLowerCase() === 'l')
+    if (listIndex >= 0 && parts[listIndex + 1]) {
+      return String(parts[listIndex + 1]).trim()
+    }
+
+    const bundleIndex = parts.findIndex((part) => part.toLowerCase() === 'bundle')
+    if (bundleIndex >= 0 && parts[bundleIndex + 1]) {
+      const slug = String(parts[bundleIndex + 1]).trim()
+      return slug.split('-').filter(Boolean).pop() || ''
+    }
+
+    return String(parts[parts.length - 1] || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function extractModelId(value) {
+  const input = String(value || '').trim()
+  if (!input) return ''
+
+  if (/^[A-Za-z0-9_-]{6,}$/.test(input)) {
+    return input
+  }
+
+  try {
+    const parsed = new URL(input)
+    const parts = parsed.pathname.split('/').filter(Boolean)
+    const modelIndex = parts.findIndex((part) => part.toLowerCase() === 'm' || part.toLowerCase() === 'model')
+    if (modelIndex >= 0 && parts[modelIndex + 1]) {
+      return String(parts[modelIndex + 1]).trim()
+    }
+
+    return String(parts[parts.length - 1] || '').trim()
+  } catch {
+    return ''
+  }
+}
+
+function resolveConfiguredPolyPizzaSources() {
+  const rawList = [
+    process.env.VITE_POLYPIZZA_FURNITURE_LIST,
+    process.env.VITE_POLYPIZZA_FURNITURE_LISTS,
+    process.env.POLYPIZZA_FURNITURE_LIST,
+    process.env.POLYPIZZA_FURNITURE_LISTS
+  ]
+    .filter(Boolean)
+    .join(',')
+
+  const listIds = [...new Set(splitConfigList(rawList).map((item) => extractListId(item)).filter(Boolean))]
+  const pinnedModelIds = [...new Set(splitConfigList([
+    process.env.VITE_POLYPIZZA_PINNED_MODELS,
+    process.env.POLYPIZZA_PINNED_MODELS
+  ].filter(Boolean).join(',')).map((item) => extractModelId(item)).filter(Boolean))]
+
+  return {
+    listIds,
+    pinnedModelIds,
+    onlyConfiguredSources: listIds.length > 0 || pinnedModelIds.length > 0
+  }
+}
+
 router.get('/polypizza-category-map', async (req, res) => {
   try {
     const doc = await PolyPizzaCategoryMap.findOne({ key: 'default' })
@@ -96,6 +176,15 @@ router.get('/polypizza-category-map', async (req, res) => {
   } catch (error) {
     console.error('getPolyPizzaCategoryMap error:', error)
     res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet ophalen.' })
+  }
+})
+
+router.get('/polypizza-sources', async (req, res) => {
+  try {
+    res.json(resolveConfiguredPolyPizzaSources())
+  } catch (error) {
+    console.error('getPolyPizzaSources error:', error)
+    res.status(500).json({ error: 'Kon Poly Pizza bronnen niet ophalen.' })
   }
 })
 

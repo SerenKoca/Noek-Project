@@ -40,15 +40,17 @@ const CONFIGURED_FURNITURE_LISTS = String(import.meta.env.VITE_POLYPIZZA_FURNITU
 const CONFIGURED_PINNED_MODELS = String(import.meta.env.VITE_POLYPIZZA_PINNED_MODELS || '').trim()
 const CONFIGURED_EXCLUDE_IDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_IDS || '').trim()
 const CONFIGURED_EXCLUDE_KEYWORDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_KEYWORDS || '').trim().toLowerCase()
-const HAS_CONFIGURED_SOURCES = Boolean(CONFIGURED_FURNITURE_LIST || CONFIGURED_FURNITURE_LISTS || CONFIGURED_PINNED_MODELS)
-const ONLY_CONFIGURED_SOURCES = HAS_CONFIGURED_SOURCES || String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
+const ONLY_CONFIGURED_SOURCES = String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
 const BACKEND_BASE_URL = String(import.meta.env.VITE_NOEK_BACKEND_URL || '/api').trim() || '/api'
 const POLY_PIZZA_CATEGORY_MAP_URL = `${BACKEND_BASE_URL.replace(/\/$/, '')}/public/polypizza-category-map`
+const POLY_PIZZA_SOURCES_URL = `${BACKEND_BASE_URL.replace(/\/$/, '')}/public/polypizza-sources`
 
 let categoryMapCachePromise = null
 let categoryMapCache = {}
 let categoryListCachePromise = null
 let categoryListCache = []
+let configuredSourceCachePromise = null
+let configuredSourceCache = { listIds: [], pinnedModelIds: [], onlyConfiguredSources: false }
 
 const http = axios.create({
   baseURL: API_BASE_URL,
@@ -133,6 +135,28 @@ async function loadPolyPizzaCategoryMap() {
   }
 
   return categoryMapCachePromise
+}
+
+async function loadConfiguredPolyPizzaSources() {
+  if (!configuredSourceCachePromise) {
+  configuredSourceCachePromise = fetch(POLY_PIZZA_SOURCES_URL, { credentials: 'same-origin' })
+    .then(async (response) => {
+    if (!response.ok) return { listIds: [], pinnedModelIds: [], onlyConfiguredSources: false }
+    const data = await response.json()
+    return {
+      listIds: Array.isArray(data?.listIds) ? data.listIds.map((item) => String(item || '').trim()).filter(Boolean) : [],
+      pinnedModelIds: Array.isArray(data?.pinnedModelIds) ? data.pinnedModelIds.map((item) => String(item || '').trim()).filter(Boolean) : [],
+      onlyConfiguredSources: Boolean(data?.onlyConfiguredSources)
+    }
+    })
+    .catch(() => ({ listIds: [], pinnedModelIds: [], onlyConfiguredSources: false }))
+    .then((result) => {
+    configuredSourceCache = result || { listIds: [], pinnedModelIds: [], onlyConfiguredSources: false }
+    return configuredSourceCache
+    })
+  }
+
+  return configuredSourceCachePromise
 }
 
 export function setPolyPizzaCategoryMapCache(nextMap = {}) {
@@ -502,6 +526,15 @@ function resolveConfiguredPinnedModelIds() {
   return [...new Set(splitConfigList(CONFIGURED_PINNED_MODELS).map((value) => extractModelId(value)).filter(Boolean))]
 }
 
+async function resolveConfiguredSources() {
+  const remote = await loadConfiguredPolyPizzaSources()
+  const listIds = Array.isArray(remote?.listIds) && remote.listIds.length ? remote.listIds : resolveConfiguredListInputs()
+  const pinnedModelIds = Array.isArray(remote?.pinnedModelIds) && remote.pinnedModelIds.length ? remote.pinnedModelIds : resolveConfiguredPinnedModelIds()
+  const onlyConfiguredSources = remote?.onlyConfiguredSources || Boolean(listIds.length || pinnedModelIds.length || ONLY_CONFIGURED_SOURCES)
+
+  return { listIds, pinnedModelIds, onlyConfiguredSources }
+}
+
 async function fetchListModels(listId, headers) {
   const res = await http.get(`/list/${encodeURIComponent(listId)}`, { headers })
   const items = Array.isArray(res?.data?.Models) ? res.data.Models : []
@@ -523,8 +556,7 @@ async function fetchModelById(modelId, headers) {
 
 async function fetchConfiguredFurnitureSources() {
   const headers = getAuthHeaders()
-  const listIds = resolveConfiguredListInputs()
-  const pinnedModelIds = resolveConfiguredPinnedModelIds()
+  const { listIds, pinnedModelIds, onlyConfiguredSources } = await resolveConfiguredSources()
   const errors = []
 
   if (!headers || (!listIds.length && !pinnedModelIds.length)) {
@@ -560,7 +592,8 @@ async function fetchConfiguredFurnitureSources() {
   return {
     ok: collected.length > 0,
     models: uniqueById(collected),
-    error: errors.length ? `Poly Pizza configuratie fout: ${errors.join(' | ')}` : ''
+    error: errors.length ? `Poly Pizza configuratie fout: ${errors.join(' | ')}` : '',
+    onlyConfiguredSources
   }
 }
 
@@ -633,17 +666,10 @@ export async function fetchModels({ max = 200 } = {}) {
     .map((model) => normalizeModel(model, 'fallback', categoryMapCache))
     .filter((m) => isAllowedModel(m) && isCompatibleAssetUrl(m?.Download) && isAllowedCategory(m))
 
-  if (ONLY_CONFIGURED_SOURCES) {
-    if (pinnedFromConfig.length > 0) {
-      return {
-        models: pinnedFromConfig.slice(0, limit),
-        error: sourceResult.error || ''
-      }
-    }
-
+  if (sourceResult.onlyConfiguredSources || ONLY_CONFIGURED_SOURCES) {
     return {
-      models: fallbackList.slice(0, limit),
-      error: sourceResult.error || 'Geen modellen gevonden in geconfigureerde lijsten/modellen. Toon fallbackmodellen.'
+      models: pinnedFromConfig.slice(0, limit),
+      error: sourceResult.error || (pinnedFromConfig.length ? '' : 'Geen modellen gevonden in geconfigureerde lijsten/modellen.')
     }
   }
 
