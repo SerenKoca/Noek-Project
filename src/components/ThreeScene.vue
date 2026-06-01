@@ -1463,7 +1463,7 @@ function createScene() {
   renderer.outputColorSpace = THREE.SRGBColorSpace
   renderer.toneMapping = THREE.ACESFilmicToneMapping
   // tune exposure for better contrast with page gradient
-  renderer.toneMappingExposure = 0.92
+  renderer.toneMappingExposure = props.vrMode ? 1.2 : 0.92
   renderer.domElement.style.width = '100%'
   renderer.domElement.style.height = '100%'
   renderer.domElement.style.display = 'block'
@@ -1484,34 +1484,40 @@ function createScene() {
   if (props.vrMode) {
     // VR mode: disable OrbitControls, use custom rotation
     orbit.enabled = false
-    
-    // Custom VR mouse handlers
-    const onVRMouseDown = (e) => {
+
+    // Use pointer events so touch on mobile can also rotate the VR view.
+    const onVRPointerDown = (e) => {
+      // prevent pointer from triggering selection handlers
+      e.stopPropagation()
       vrIsDragging = true
       vrDragStartX = e.clientX
       vrDragStartY = e.clientY
+      // capture to keep receiving pointer events
+      try { e.target.setPointerCapture?.(e.pointerId) } catch (err) {}
     }
-    
-    const onVRMouseMove = (e) => {
+
+    const onVRPointerMove = (e) => {
       if (!vrIsDragging) return
       const deltaX = e.clientX - vrDragStartX
       const deltaY = e.clientY - vrDragStartY
-      
+
       vrYaw -= deltaX * 0.01
       vrPitch = Math.max(-Math.PI / 3, Math.min(Math.PI / 3, vrPitch - deltaY * 0.01))
-      
+
       vrDragStartX = e.clientX
       vrDragStartY = e.clientY
     }
-    
-    const onVRMouseUp = () => {
+
+    const onVRPointerUp = (e) => {
       vrIsDragging = false
+      try { e.target.releasePointerCapture?.(e.pointerId) } catch (err) {}
     }
-    
-    renderer.domElement.addEventListener('mousedown', onVRMouseDown)
-    renderer.domElement.addEventListener('mousemove', onVRMouseMove)
-    renderer.domElement.addEventListener('mouseup', onVRMouseUp)
-    renderer.domElement.addEventListener('mouseleave', onVRMouseUp)
+
+    renderer.domElement.addEventListener('pointerdown', onVRPointerDown)
+    renderer.domElement.addEventListener('pointermove', onVRPointerMove)
+    renderer.domElement.addEventListener('pointerup', onVRPointerUp)
+    renderer.domElement.addEventListener('pointercancel', onVRPointerUp)
+    renderer.domElement.addEventListener('pointerleave', onVRPointerUp)
   } else {
     // Normal mode: keep existing settings
     orbit.enableRotate = false
@@ -1599,6 +1605,21 @@ function createScene() {
   accent.target.position.set(0, 2, -10)
   accent.castShadow = true
   scene.add(accent)
+
+  // If we're in VR mode for visitors, boost overall light so scene is brighter on headsets/phones
+  if (props.vrMode) {
+    const VR_LIGHT_BOOST = 1.6
+    try {
+      hemi.intensity = (hemi.intensity || 1) * VR_LIGHT_BOOST
+      dir.intensity = (dir.intensity || 1) * VR_LIGHT_BOOST
+      fill.intensity = (fill.intensity || 1) * VR_LIGHT_BOOST
+      warmLamp.intensity = (warmLamp.intensity || 1) * VR_LIGHT_BOOST
+      cornerWarm.intensity = (cornerWarm.intensity || 1) * VR_LIGHT_BOOST
+      accent.intensity = (accent.intensity || 1) * VR_LIGHT_BOOST
+    } catch (e) {
+      // ignore if something isn't present
+    }
+  }
 
   // watch debug mode to apply visual tests
   watch(debugMode, (val) => {
