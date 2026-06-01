@@ -1,5 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
+import CopyToast from './CopyToast.vue'
 
 const props = defineProps({
   roomName: String,
@@ -11,24 +12,31 @@ const props = defineProps({
 const emit = defineEmits(['close'])
 
 const copied = ref(false)
+const copiedMessage = ref('Link gekopieerd.')
+let copiedTimer = null
 
-function copyToClipboard() {
+function showCopiedToast(message) {
+  copiedMessage.value = message
+  copied.value = true
+  if (copiedTimer) {
+    window.clearTimeout(copiedTimer)
+  }
+  copiedTimer = window.setTimeout(() => {
+    copied.value = false
+  }, 2200)
+}
+
+async function copyToClipboard() {
   if (props.visitUrl && navigator?.clipboard?.writeText) {
-    navigator.clipboard.writeText(props.visitUrl)
-    copied.value = true
-    setTimeout(() => {
-      copied.value = false
-    }, 2000)
+    await navigator.clipboard.writeText(props.visitUrl)
+    showCopiedToast('Publieke link gekopieerd.')
   }
 }
 
-function copyEditLink() {
+async function copyEditLink() {
   if (props.editUrl && navigator?.clipboard?.writeText) {
-    navigator.clipboard.writeText(props.editUrl)
-    copied.value = true
-    setTimeout(() => {
-      copied.value = false
-    }, 2000)
+    await navigator.clipboard.writeText(props.editUrl)
+    showCopiedToast('Bewerklink gekopieerd.')
   }
 }
 
@@ -124,6 +132,7 @@ function downloadQR() {
       </div>
     </div>
   </div>
+  <CopyToast :visible="copied" :message="copiedMessage" />
 </template>
 
 <style scoped>

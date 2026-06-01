@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
+import CopyToast from '../components/CopyToast.vue'
 import { useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import { useNoekState } from '../composables/useNoekState.js'
@@ -9,6 +10,9 @@ const state = useNoekState()
 const createRoomModal = ref(false)
 const creatingRoom = ref(false)
 const showDesktopOnlyOverlay = ref(false)
+const visitLinkCopied = ref(false)
+const visitLinkCopyMessage = ref('Link gekopieerd.')
+let visitLinkCopyTimer = null
 const EDITOR_DESKTOP_MIN_WIDTH = 1024
 
 import { saveRoom } from '../services/roomService.js'
@@ -76,7 +80,14 @@ async function copyVisitLink(room) {
       window.prompt('Kopieer deze link', visitUrl)
       return
     }
-    window.alert('Publieke link gekopieerd.')
+    visitLinkCopyMessage.value = 'Publieke link gekopieerd.'
+    visitLinkCopied.value = true
+    if (visitLinkCopyTimer) {
+      window.clearTimeout(visitLinkCopyTimer)
+    }
+    visitLinkCopyTimer = window.setTimeout(() => {
+      visitLinkCopied.value = false
+    }, 2200)
   } catch {
     window.prompt('Kopieer deze link', visitUrl)
   }
@@ -318,6 +329,7 @@ function openTemplates() {
       </div>
     </div>
   </div>
+    <CopyToast :visible="visitLinkCopied" :message="visitLinkCopyMessage" />
 </template>
 
 <style src="./styles/home-page.css"></style>

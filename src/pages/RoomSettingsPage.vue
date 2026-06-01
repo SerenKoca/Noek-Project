@@ -1,5 +1,6 @@
 <script setup>
 import { ref, onMounted, computed } from 'vue'
+import CopyToast from '../components/CopyToast.vue'
 import ContributionsOverlay from '../components/ContributionsOverlay.vue'
 import { useRouter, useRoute } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
@@ -27,6 +28,8 @@ const editLink = ref('')
 const editLinkLoading = ref(false)
 const editLinkError = ref('')
 const editLinkCopied = ref(false)
+const editLinkCopyMessage = ref('Link gekopieerd.')
+let editLinkCopyTimer = null
 const creating = ref(false)
 const showContributions = ref(false)
 const route = useRoute()
@@ -114,9 +117,13 @@ async function copyEditLink() {
   if (!editLink.value || !navigator?.clipboard?.writeText) return
   await navigator.clipboard.writeText(editLink.value)
   editLinkCopied.value = true
-  window.setTimeout(() => {
+  editLinkCopyMessage.value = 'Bewerklink gekopieerd.'
+  if (editLinkCopyTimer) {
+    window.clearTimeout(editLinkCopyTimer)
+  }
+  editLinkCopyTimer = window.setTimeout(() => {
     editLinkCopied.value = false
-  }, 2000)
+  }, 2200)
 }
 
 async function createFromTemplate() {
@@ -255,6 +262,7 @@ function closeContributions() { showContributions.value = false }
     </div>
   </div>
   <ContributionsOverlay v-if="showContributions" :roomId="roomId" @close="closeContributions" />
+  <CopyToast :visible="editLinkCopied" :message="editLinkCopyMessage" />
 </template>
 
 <style scoped>
