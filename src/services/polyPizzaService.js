@@ -40,7 +40,8 @@ const CONFIGURED_FURNITURE_LISTS = String(import.meta.env.VITE_POLYPIZZA_FURNITU
 const CONFIGURED_PINNED_MODELS = String(import.meta.env.VITE_POLYPIZZA_PINNED_MODELS || '').trim()
 const CONFIGURED_EXCLUDE_IDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_IDS || '').trim()
 const CONFIGURED_EXCLUDE_KEYWORDS = String(import.meta.env.VITE_POLYPIZZA_EXCLUDE_KEYWORDS || '').trim().toLowerCase()
-const ONLY_CONFIGURED_SOURCES = String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
+const HAS_CONFIGURED_SOURCES = Boolean(CONFIGURED_FURNITURE_LIST || CONFIGURED_FURNITURE_LISTS || CONFIGURED_PINNED_MODELS)
+const ONLY_CONFIGURED_SOURCES = HAS_CONFIGURED_SOURCES || String(import.meta.env.VITE_POLYPIZZA_ONLY_CONFIGURED || '').trim().toLowerCase() === 'true'
 const BACKEND_BASE_URL = String(import.meta.env.VITE_NOEK_BACKEND_URL || '/api').trim() || '/api'
 const POLY_PIZZA_CATEGORY_MAP_URL = `${BACKEND_BASE_URL.replace(/\/$/, '')}/public/polypizza-category-map`
 
