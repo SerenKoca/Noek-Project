@@ -3879,8 +3879,9 @@ text-shadow:
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light) 70%, white), color-mix(in srgb, var(--brand-light) 42%, var(--brand-dark)));
-  box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-dark) 14%, transparent);
+  color: var(--brand-dark, #0b4f86);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--brand-light, #d7ebff) 72%, white), color-mix(in srgb, var(--brand-light, #d7ebff) 46%, var(--brand-dark, #0b4f86)));
+  box-shadow: 0 6px 16px color-mix(in srgb, var(--brand-dark, #0b4f86) 14%, transparent);
   position: relative;
   flex: 0 0 auto;
 }
@@ -3894,7 +3895,7 @@ text-shadow:
   height: 10px;
   transform: translateX(-50%);
   border-radius: 50%;
-  background: var(--visitor-color-dark);
+  background: currentColor;
 }
 
 .visitor-gallery-comment-avatar::after {
@@ -3906,7 +3907,7 @@ text-shadow:
   height: 8px;
   transform: translateX(-50%);
   border-radius: 10px 10px 4px 4px;
-  background: #0b4b80;
+  background: color-mix(in srgb, currentColor 86%, white);
 }
 
 .visitor-gallery-comment-bubble {

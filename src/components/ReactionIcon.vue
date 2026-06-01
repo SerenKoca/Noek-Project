@@ -44,7 +44,7 @@ const iconSize = computed(() => `${Number(props.size) || 28}px`)
 .reaction-icon {
   display: inline-block;
   vertical-align: middle;
-  background-color: var(--brand-dark, #003b70);
+  background-color: currentColor;
   -webkit-mask-repeat: no-repeat;
   mask-repeat: no-repeat;
   -webkit-mask-position: center;
