@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import Sidebar from '../components/Sidebar.vue'
 import ThreeScene from '../components/ThreeScene.vue'
@@ -14,6 +14,7 @@ import { useNoekState } from '../composables/useNoekState.js'
 const route = useRoute()
 const router = useRouter()
 const state = useNoekState()
+const slotMarkers = ref([])
 
 function handleRotateSelected(angle) {
   console.debug('[EditorPage] handleRotateSelected ->', angle)
@@ -21,6 +22,7 @@ function handleRotateSelected(angle) {
 }
 const showRoomReactions = false
 const showShareModal = ref(false)
+const isPositionEditMode = ref(false)
 const shareRoomData = ref({ roomName: '', visitUrl: '', editUrl: '', directorName: '' })
 let autoSaveIntervalId = null
 let desktopViewportQuery = null
@@ -58,6 +60,33 @@ function handleDesktopViewportChange(event) {
   stopAutoSave()
   redirectToHomeForMobileEditor()
 }
+
+function handleStartPositionEdit() {
+  if (!state.selected.value || state.selected.value.isSlotMarker) return
+  isPositionEditMode.value = true
+  state.onStartPositionEdit()
+}
+
+function handleConfirmPositionEdit() {
+  if (!isPositionEditMode.value) return
+  state.onConfirmPositionEdit()
+  isPositionEditMode.value = false
+}
+
+function handleCancelPositionEdit() {
+  if (!isPositionEditMode.value) return
+  state.onCancelPositionEdit()
+  isPositionEditMode.value = false
+}
+
+watch(
+  () => state.selected.value,
+  (selected) => {
+    if (!selected) {
+      isPositionEditMode.value = false
+    }
+  }
+)
 
 onMounted(async () => {
   await state.bootstrap()
@@ -286,13 +315,16 @@ async function openSettings() {
           <Sidebar
           class="editor-sidebar"
           :selected="state.selected.value"
+          :is-position-edit-mode="isPositionEditMode"
           :room-appearance="state.roomAppearanceDraft.value"
           @load-model="state.onLoadModel"
           @delete-selected="state.onDeleteSelected"
           @select-sound="state.onSelectRoomSound"
           @apply-room-colors="state.onApplyRoomColors"
-            @edit-selected="state.onSelected"
-            @rotate-selected="handleRotateSelected"
+          @edit-selected="handleStartPositionEdit"
+          @confirm-edit-selected="handleConfirmPositionEdit"
+          @cancel-edit-selected="handleCancelPositionEdit"
+          @rotate-selected="handleRotateSelected"
         />
 
         <div class="editor-scene-panel">
@@ -306,6 +338,7 @@ async function openSettings() {
             :admin-mode="false"
             @selected="state.onSelected"
             @selected-anchor="state.onSelectedAnchor"
+                    @slot-markers="(markers) => { slotMarkers.value = markers }"
             @load-error="state.onLoadError"
             @scene-mutated="state.onSave({ source: 'autosave' })"
           />
@@ -314,8 +347,14 @@ async function openSettings() {
             :error-message="state.lastLoadError.value"
             :selected="state.selected.value"
             :selected-anchor="state.selectedAnchor.value"
+            :is-position-edit-mode="isPositionEditMode"
+            :slot-markers="slotMarkers"
             @delete-selected="state.onDeleteSelected"
             @rotate-selected="handleRotateSelected"
+            @confirm-edit-selected="handleConfirmPositionEdit"
+            @cancel-edit-selected="handleCancelPositionEdit"
+            @edit-selected="handleStartPositionEdit"
+            @place-slot="(slotId) => { state.sceneRef.value?.selectMarkerBySlotId(slotId) }"
           />
         </div>
       </div>

@@ -15,14 +15,38 @@ defineProps({
   models: {
     type: Array,
     default: () => []
+  },
+  isPositionEditMode: {
+    type: Boolean,
+    default: false
   }
 })
 
-const emit = defineEmits(['reload', 'delete-selected', 'request-load', 'request-load-with-mode', 'edit-selected', 'rotate-selected', 'close'])
+const emit = defineEmits([
+  'reload',
+  'delete-selected',
+  'request-load',
+  'request-load-with-mode',
+  'edit-selected',
+  'confirm-edit-selected',
+  'cancel-edit-selected',
+  'rotate-selected',
+  'close'
+])
 
 function handleEditSelected() {
   console.debug('[SidebarModelsPanel] emit edit-selected')
   emit('edit-selected')
+}
+
+function handleConfirmEditSelected() {
+  console.debug('[SidebarModelsPanel] emit confirm-edit-selected')
+  emit('confirm-edit-selected')
+}
+
+function handleCancelEditSelected() {
+  console.debug('[SidebarModelsPanel] emit cancel-edit-selected')
+  emit('cancel-edit-selected')
 }
 
 function handleRotateSelected() {
@@ -68,9 +92,31 @@ function handleDeleteSelected() {
 
     <div class="editor-quick-actions">
       <template v-if="selected">
-        <button type="button" class="editor-action-btn" @click="handleEditSelected">Aanpassen</button>
-        <button type="button" class="editor-action-btn" @click="handleRotateSelected">Draaien 90°</button>
-        <button type="button" class="editor-action-btn" @click="handleDeleteSelected">Verwijder</button>
+        <template v-if="isPositionEditMode">
+          <button
+            type="button"
+            class="editor-action-btn editor-action-btn-icon editor-action-btn-cancel"
+            aria-label="Wijziging annuleren"
+            title="Wijziging annuleren"
+            @click="handleCancelEditSelected"
+          >
+            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+          </button>
+          <button
+            type="button"
+            class="editor-action-btn editor-action-btn-icon editor-action-btn-confirm"
+            aria-label="Wijziging opslaan"
+            title="Wijziging opslaan"
+            @click="handleConfirmEditSelected"
+          >
+            <i class="fa-solid fa-check" aria-hidden="true"></i>
+          </button>
+        </template>
+        <template v-else>
+          <button type="button" class="editor-action-btn" @click="handleEditSelected">Aanpassen</button>
+          <button type="button" class="editor-action-btn" @click="handleRotateSelected">Draaien 90°</button>
+          <button type="button" class="editor-action-btn" @click="handleDeleteSelected">Verwijder</button>
+        </template>
       </template>
       <template v-else>
         <button type="button" class="editor-action-btn" @click="$emit('reload')">Herladen</button>

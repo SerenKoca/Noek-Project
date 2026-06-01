@@ -53,7 +53,7 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['selected', 'selected-anchor', 'load-error', 'contribution-candle-selected', 'scene-mutated'])
+const emit = defineEmits(['selected', 'selected-anchor', 'slot-markers', 'load-error', 'contribution-candle-selected', 'scene-mutated'])
 
 const containerEl = ref(null)
 const cameraCoords = ref('')
@@ -86,6 +86,9 @@ let vrDragStartY = 0
 const selectableRoots = []
 const contributionCandleRoots = []
 let selectedRoot = null
+let positionEditMode = false
+let positionEditTargetUuid = ''
+let positionEditStartTransform = null
 
 const sceneReady = ref(false)
 const canEditTemplate = computed(() => props.canEditTemplate === true)
@@ -982,8 +985,77 @@ function syncSlotFromRoot(root) {
   writeDraftFromSlot(slotId)
 }
 
+function getPositionEditTargetRoot() {
+  if (!positionEditTargetUuid) return null
+  if (selectedRoot?.uuid === positionEditTargetUuid) return selectedRoot
+  return getRootByUuid(positionEditTargetUuid)
+}
+
+function beginPositionEditMode() {
+  if (!selectedRoot || selectedRoot.userData?.isSlotMarker) return false
+  positionEditMode = true
+  positionEditTargetUuid = String(selectedRoot.uuid || '')
+  positionEditStartTransform = {
+    position: selectedRoot.position.clone(),
+    rotation: selectedRoot.rotation.clone()
+  }
+  updateTemplateDragBinding()
+  return true
+}
+
+function finishPositionEditMode({ commit }) {
+  if (!positionEditMode) return false
+  const targetRoot = getPositionEditTargetRoot()
+
+  if (targetRoot) {
+    if (commit) {
+      syncSlotFromRoot(targetRoot)
+      if (!isRestoringHistory) {
+        pushSceneHistorySnapshot()
+      }
+      emit('scene-mutated')
+    } else if (positionEditStartTransform?.position && positionEditStartTransform?.rotation) {
+      targetRoot.position.copy(positionEditStartTransform.position)
+      targetRoot.rotation.copy(positionEditStartTransform.rotation)
+      syncSlotFromRoot(targetRoot)
+    }
+  }
+
+  positionEditMode = false
+  positionEditTargetUuid = ''
+  positionEditStartTransform = null
+  updateTemplateDragBinding()
+  updateSelectedAnchor()
+  return true
+}
+
 function updateTemplateDragBinding() {
-  if (!transform || !canEditTemplate.value) {
+  if (!transform) {
+    return
+  }
+
+  if (positionEditMode) {
+    const targetRoot = getPositionEditTargetRoot()
+    if (!targetRoot || targetRoot.userData?.isSlotMarker) {
+      transform.detach()
+      transform.visible = false
+      transform.enabled = false
+      return
+    }
+
+    transform.setMode('translate')
+    transform.setSpace('world')
+    transform.translationSnap = 0.25
+    transform.showX = true
+    transform.showY = true
+    transform.showZ = true
+    transform.attach(targetRoot)
+    transform.visible = true
+    transform.enabled = true
+    return
+  }
+
+  if (!canEditTemplate.value) {
     transform?.detach()
     if (transform) {
       transform.visible = false
@@ -1003,9 +1075,13 @@ function updateTemplateDragBinding() {
   // enable vertical axis for wall decor and small decorations when translating
   try {
     const allowY = templateDragMode.value === 'translate' && selectedRoot && isVerticalDecorationSlot(selectedRoot.userData?.slotId)
+    transform.showX = true
     transform.showY = Boolean(allowY)
+    transform.showZ = true
   } catch (err) {
+    transform.showX = true
     transform.showY = false
+    transform.showZ = true
   }
   transform.attach(selectedRoot)
   transform.visible = true
@@ -1471,6 +1547,10 @@ function createScene() {
   transform.addEventListener('dragging-changed', (e) => {
     orbit.enabled = !e.value
     if (!e.value && selectedRoot) {
+      if (positionEditMode) {
+        updateSelectedAnchor()
+        return
+      }
       syncSlotFromRoot(selectedRoot)
       pushSceneHistorySnapshot()
       emit('scene-mutated')
@@ -1478,6 +1558,10 @@ function createScene() {
   })
   transform.addEventListener('objectChange', () => {
     if (!selectedRoot) return
+    if (positionEditMode) {
+      updateSelectedAnchor()
+      return
+    }
     syncSlotFromRoot(selectedRoot)
   })
   scene.add(transform)
@@ -1903,6 +1987,7 @@ function animate() {
 
     updateCameraDebug()
     updateSelectedAnchor()
+    updateAllSlotAnchors()
     
     // Animate VR photos
     if (props.vrMode) {
@@ -2045,6 +2130,38 @@ function updateSelectedAnchor() {
   emit('selected-anchor', { x, y })
 }
 
+function updateAllSlotAnchors() {
+  if (!camera || !renderer) {
+    emit('slot-markers', [])
+    return
+  }
+
+  const anchors = []
+  for (const [slotId, slotState] of slotStates.entries()) {
+    if (!slotState || !slotState.position) continue
+
+    // Only show marker if slot currently has no root (empty)
+    const visible = !slotState.root
+    if (!visible) continue
+
+    const center = slotState.position.clone()
+    // lift popup above slot a bit
+    center.y = (center.y || 0) + 0.9
+
+    const projected = center.project(camera)
+    if (projected.z > 1 || projected.z < -1) continue
+
+    const width = renderer.domElement.clientWidth
+    const height = renderer.domElement.clientHeight
+    const x = ((projected.x + 1) / 2) * width
+    const y = ((-projected.y + 1) / 2) * height
+
+    anchors.push({ slotId, x, y })
+  }
+
+  emit('slot-markers', anchors)
+}
+
 function initializeFurnitureSlots() {
   for (const slot of TEMPLATE_SLOTS.value) {
     slotStates.set(slot.id, {
@@ -2180,22 +2297,79 @@ function createSlotMarker(slotId) {
   root.userData.id = `marker-${slotId}`
   root.userData.title = `Plaats hier (${root.userData.slotLabel})`
 
-  const markerMat = new THREE.MeshStandardMaterial({ color: 0x2b7dd8, roughness: 0.75, metalness: 0.1 })
-  const h = new THREE.Mesh(new THREE.BoxGeometry(0.7, 0.12, 0.12), markerMat)
-  h.position.set(0, 0.3, 0)
-  root.add(h)
+  // background rounded rect using Shape + ExtrudeGeometry
+  const bgShape = new THREE.Shape()
+  const w = 0.9
+  const hrect = 0.9
+  const r = 0.12
+  bgShape.moveTo(-w / 2 + r, -hrect / 2)
+  bgShape.lineTo(w / 2 - r, -hrect / 2)
+  bgShape.absarc(w / 2 - r, -hrect / 2 + r, r, -Math.PI / 2, 0, false)
+  bgShape.lineTo(w / 2, hrect / 2 - r)
+  bgShape.absarc(w / 2 - r, hrect / 2 - r, r, 0, Math.PI / 2, false)
+  bgShape.lineTo(-w / 2 + r, hrect / 2)
+  bgShape.absarc(-w / 2 + r, hrect / 2 - r, r, Math.PI / 2, Math.PI, false)
+  bgShape.lineTo(-w / 2, -hrect / 2 + r)
+  bgShape.absarc(-w / 2 + r, -hrect / 2 + r, r, Math.PI, (3 * Math.PI) / 2, false)
 
-  const v = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.7, 0.12), markerMat)
-  v.position.set(0, 0.3, 0)
-  root.add(v)
+  // Only create a small upright plus sign (no background/frame)
+  // Use branding light color if available (CSS var `--brand-light`), fallback to dark blue
+  let brandColorNum = 0x123a57
+  try {
+    if (typeof window !== 'undefined' && window.getComputedStyle) {
+      const cssVal = (getComputedStyle(document.documentElement).getPropertyValue('--brand-light') || '').trim()
+      if (/^#[0-9a-f]{6}$/i.test(cssVal)) {
+        brandColorNum = parseInt(cssVal.replace('#', ''), 16)
+      }
+    }
+  } catch (e) {
+    // ignore and use fallback
+  }
+  // Create a small CTA-style marker: colored disc behind a white upright plus
+  let brandColorNumLocal = brandColorNum
+  if (!brandColorNumLocal) brandColorNumLocal = 0x0b5ea6
+
+  // colored disc (CTA background)
+  try {
+    const discRadius = 0.28
+    const discGeo = new THREE.CircleGeometry(discRadius, 32)
+    const discMat = new THREE.MeshStandardMaterial({ color: brandColorNumLocal, roughness: 0.35, metalness: 0.1, emissive: brandColorNumLocal, emissiveIntensity: 0.2 })
+    const disc = new THREE.Mesh(discGeo, discMat)
+    disc.rotation.x = 0
+    disc.position.set(0, 0.45, 0.02)
+    root.add(disc)
+  } catch (e) {}
+
+  // white plus sign (upright)
+  const plusMat = new THREE.MeshStandardMaterial({ color: 0xffffff, roughness: 0.35, metalness: 0.05, emissive: 0xffffff, emissiveIntensity: 0.05 })
+  const armLen = 0.34
+  const armThickness = 0.08
+  const armDepth = 0.04
+
+  const vArm = new THREE.Mesh(new THREE.BoxGeometry(armThickness, armLen, armDepth), plusMat)
+  vArm.position.set(0, 0.45, 0.045)
+  root.add(vArm)
+
+  const hArm = new THREE.Mesh(new THREE.BoxGeometry(armLen, armThickness, armDepth), plusMat)
+  hArm.position.set(0, 0.45, 0.045)
+  root.add(hArm)
 
   // Apply per-slot marker size scaling (default 1)
   try {
     const size = Number(slot?.markerSize) || 1
-    if (size !== 1) root.scale.set(size, size, size)
+    // default smaller marker to match design
+    const base = 0.78
+    const final = base * size
+    if (final !== 1) root.scale.set(final, final, final)
   } catch {
     // ignore invalid markerSize
   }
+
+  // Make the slot marker mesh visible so the plus is shown in the editor UI.
+  // Visibility of the HTML overlay markers is handled separately by `updateAllSlotAnchors`.
+  try {
+    root.visible = !!canEditTemplate.value
+  } catch {}
 
   return root
 }
@@ -2285,15 +2459,34 @@ function removeFurnitureFromSlot(slotId) {
     slot.preferredRotationYOffset = previousYOffset
   }
 
+  // Capture the removed root's world position and rotation so the marker
+  // can be placed exactly where the furniture stood.
+  const prevPos = new THREE.Vector3()
+  slot.root.getWorldPosition(prevPos)
+  const prevRotY = Number(slot.root.rotation?.y) || 0
+
   removeRoot(slot.root)
   slot.root = null
 
-  if (slot.marker) {
-    removeRoot(slot.marker)
-    slot.marker = null
-  }
+  // Ensure the slot marker (plus) remains visible so the user can re-add items,
+  // but only create markers for editors (visitors should not see them).
+  if (canEditTemplate.value) {
+    if (!slot.marker) {
+      const marker = createSlotMarker(slotId)
+      // place marker at the previous furniture world position
+      marker.position.copy(prevPos)
+      marker.rotation.set(0, prevRotY, 0)
+      scene.add(marker)
+      selectableRoots.push(marker)
+      slot.marker = marker
+    }
 
-  deselect()
+    // Select the marker so the plus is visible/active after deleting the furniture.
+    select(slot.marker)
+  } else {
+    // For visitors, clear selection
+    deselect()
+  }
 }
 
 function getRootModel(obj) {
@@ -2307,6 +2500,9 @@ function getRootModel(obj) {
 
 function deselect() {
   console.debug('[ThreeScene] deselect() - clearing selectedRoot', selectedRoot?.uuid || null)
+  if (positionEditMode) {
+    finishPositionEditMode({ commit: false })
+  }
   selectedRoot = null
   selectedTemplateTarget.value = null
   if (transform) {
@@ -2319,6 +2515,9 @@ function deselect() {
 }
 
 function select(root) {
+  if (positionEditMode && selectedRoot && selectedRoot !== root) {
+    finishPositionEditMode({ commit: false })
+  }
   selectedRoot = root
   selectedTemplateTarget.value = root?.userData?.isSlotMarker
     ? null
@@ -2347,6 +2546,56 @@ function select(root) {
   console.debug('[ThreeScene] select() ->', info)
   emit('selected', info)
   updateSelectedAnchor()
+}
+
+function selectMarkerBySlotId(slotId) {
+  const slotState = slotStates.get(slotId)
+  const marker = slotState?.marker
+  if (marker) {
+    select(marker)
+    return
+  }
+
+  // Virtual slot selection (no 3D marker present)
+  if (!slotState || !camera || !renderer) return
+
+  selectedRoot = null
+  selectedTemplateTarget.value = {
+    uuid: '',
+    id: `marker-${slotId}`,
+    title: `Plaats hier (${slotState.label || slotId})`,
+    slotId,
+    slotLabel: slotState.label || slotId
+  }
+
+  const info = {
+    uuid: '',
+    id: `marker-${slotId}`,
+    title: `Plaats hier (${slotState.label || slotId})`,
+    slotId,
+    slotLabel: slotState.label || slotId,
+    isSlotMarker: true
+  }
+
+  emit('selected', info)
+
+  // compute screen anchor from slot position
+  try {
+    const center = slotState.position.clone()
+    center.y = (center.y || 0) + 0.9
+    const projected = center.project(camera)
+    if (projected.z > 1 || projected.z < -1) {
+      emit('selected-anchor', null)
+      return
+    }
+    const width = renderer.domElement.clientWidth
+    const height = renderer.domElement.clientHeight
+    const x = ((projected.x + 1) / 2) * width
+    const y = ((-projected.y + 1) / 2) * height
+    emit('selected-anchor', { x, y })
+  } catch (e) {
+    emit('selected-anchor', null)
+  }
 }
 
 function removeRoot(root) {
@@ -2766,6 +3015,7 @@ defineExpose({
   serializeRoom,
   loadRoom,
   deleteTemplateSlot,
+  selectMarkerBySlotId,
   updateTemplateEditorSlotId: (slotId) => {
     templateEditorSlotId.value = String(slotId || '')
   },
@@ -3349,6 +3599,18 @@ watch(
   (command) => {
     console.debug('[ThreeScene] received sceneCommand ->', command)
     if (!command || !command.type) return
+    if (command.type === 'start-position-edit') {
+      beginPositionEditMode()
+      return
+    }
+    if (command.type === 'confirm-position-edit') {
+      finishPositionEditMode({ commit: true })
+      return
+    }
+    if (command.type === 'cancel-position-edit') {
+      finishPositionEditMode({ commit: false })
+      return
+    }
     if (command.type === 'undo' || command.type === 'redo') {
       restoreSceneHistory(command.type)
       return

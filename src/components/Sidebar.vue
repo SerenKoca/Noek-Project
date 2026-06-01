@@ -15,6 +15,10 @@ const props = defineProps({
   roomAppearance: {
     type: Object,
     default: () => ({})
+  },
+  isPositionEditMode: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -24,6 +28,8 @@ const emit = defineEmits([
   'select-sound',
   'apply-room-colors',
   'edit-selected',
+  'confirm-edit-selected',
+  'cancel-edit-selected',
   'rotate-selected'
 ])
 
@@ -35,6 +41,16 @@ function handleEditSelected() {
 function handleRotateSelected(angle) {
   console.debug('[Sidebar] forward rotate-selected', angle)
   emit('rotate-selected', angle)
+}
+
+function handleConfirmEditSelected() {
+  console.debug('[Sidebar] forward confirm-edit-selected')
+  emit('confirm-edit-selected')
+}
+
+function handleCancelEditSelected() {
+  console.debug('[Sidebar] forward cancel-edit-selected')
+  emit('cancel-edit-selected')
 }
 
 const loading = ref(false)
@@ -523,12 +539,15 @@ watch(() => props.selected, (sel) => {
         :loading="loading"
         :error="error"
         :selected="props.selected"
+        :is-position-edit-mode="props.isPositionEditMode"
         :models="filteredModels"
         @reload="loadFromApi"
         @delete-selected="deleteSelected"
         @request-load="requestLoad"
         @request-load-with-mode="requestLoadWithMode"
         @edit-selected="handleEditSelected"
+        @confirm-edit-selected="handleConfirmEditSelected"
+        @cancel-edit-selected="handleCancelEditSelected"
         @rotate-selected="handleRotateSelected"
         @close="closeContentPanel"
       />

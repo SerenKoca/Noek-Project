@@ -965,6 +965,18 @@ function onDeleteSelected() {
   sceneCommand.value = { type: 'delete-selected', _requestId: Date.now() }
 }
 
+function onStartPositionEdit() {
+  sceneCommand.value = { type: 'start-position-edit', _requestId: Date.now() }
+}
+
+function onConfirmPositionEdit() {
+  sceneCommand.value = { type: 'confirm-position-edit', _requestId: Date.now() }
+}
+
+function onCancelPositionEdit() {
+  sceneCommand.value = { type: 'cancel-position-edit', _requestId: Date.now() }
+}
+
 async function onSelectRoomSound(sound) {
   const soundUrl = String(sound?.url || '').trim()
   if (!soundUrl) return
@@ -1288,6 +1300,9 @@ export function useNoekState() {
     submitRoomComment,
     onLoadModel,
     onDeleteSelected,
+    onStartPositionEdit,
+    onConfirmPositionEdit,
+    onCancelPositionEdit,
     onSelectRoomSound,
     onApplyRoomColors,
     onSelected,
