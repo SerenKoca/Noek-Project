@@ -1,6 +1,7 @@
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
+import ReactionIcon from '../components/ReactionIcon.vue'
 import Sidebar from '../components/Sidebar.vue'
 import ThreeScene from '../components/ThreeScene.vue'
 import EditorTopLeftControls from '../components/EditorTopLeftControls.vue'
@@ -261,7 +262,7 @@ async function openSettings() {
               :class="{ active: state.getUserRoomReaction(state.currentRoom.value) === 'heart' }"
               @click="state.reactOnRoom('heart')"
             >
-              ❤️ {{ state.currentRoom.value?.roomReactions?.heartCount || 0 }}
+              <ReactionIcon kind="heart" :size="28" /> {{ state.currentRoom.value?.roomReactions?.heartCount || 0 }}
             </button>
             <button
               type="button"
@@ -269,7 +270,7 @@ async function openSettings() {
               :class="{ active: state.getUserRoomReaction(state.currentRoom.value) === 'support' }"
               @click="state.reactOnRoom('support')"
             >
-              🤍 {{ state.currentRoom.value?.roomReactions?.supportCount || 0 }}
+              <ReactionIcon kind="support" :size="28" /> {{ state.currentRoom.value?.roomReactions?.supportCount || 0 }}
             </button>
             <button
               type="button"
@@ -277,7 +278,7 @@ async function openSettings() {
               :class="{ active: state.getUserRoomReaction(state.currentRoom.value) === 'candle' }"
               @click="state.reactOnRoom('candle')"
             >
-              🕯️ {{ state.currentRoom.value?.roomReactions?.candleCount || 0 }}
+              <ReactionIcon kind="candle" :size="28" /> {{ state.currentRoom.value?.roomReactions?.candleCount || 0 }}
             </button>
           </div>
 

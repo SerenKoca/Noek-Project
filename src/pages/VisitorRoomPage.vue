@@ -1,5 +1,6 @@
 <script setup>
 import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import ReactionIcon from '../components/ReactionIcon.vue'
 import { useRoute, useRouter } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import VR3DScene from '../components/VR3DScene.vue'
@@ -1459,9 +1460,9 @@ onBeforeUnmount(() => {
                   <div class="visitor-gallery-lightbox-reactions-wrap">
                     <div class="visitor-gallery-lightbox-reactions">
                               <div class="visitor-gallery-reaction-toggle">
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')">❤ <span class="reaction-count">{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')">🤝 <span class="reaction-count">{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')">🕯 <span class="reaction-count">{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')"><ReactionIcon kind="heart" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')"><ReactionIcon kind="support" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')"><ReactionIcon kind="candle" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
                                 </div>
 
                       <button
@@ -1908,13 +1909,13 @@ onBeforeUnmount(() => {
 
                     <div class="candle-detail-reactions" aria-label="Reacties">
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'heart')" aria-label="Hartje reactie">
-                        ❤️ <span>{{ selectedCandleFromScene.reactions?.heartCount || 0 }}</span>
+                        <ReactionIcon kind="heart" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.heartCount || 0 }}</span>
                       </button>
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'support')" aria-label="Steun reactie">
-                        🤝 <span>{{ selectedCandleFromScene.reactions?.supportCount || 0 }}</span>
+                        <ReactionIcon kind="support" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.supportCount || 0 }}</span>
                       </button>
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'candle')" aria-label="Kaars reactie">
-                        😢 <span>{{ selectedCandleFromScene.reactions?.candleCount || 0 }}</span>
+                        <ReactionIcon kind="candle" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.candleCount || 0 }}</span>
                       </button>
                     </div>
                   </div>
@@ -1953,9 +1954,9 @@ onBeforeUnmount(() => {
 
           <template v-else-if="activePanel === 'messages'">
             <div class="item-reactions-row" aria-hidden="true">
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')">❤</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')">🤝</button>
-              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')">🕯</button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('heart')"><ReactionIcon kind="heart" :size="28" /></button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('support')"><ReactionIcon kind="support" :size="28" /></button>
+              <button type="button" class="reaction-chip" @click="toggleRoomReaction('candle')"><ReactionIcon kind="candle" :size="28" /></button>
             </div>
             <ul class="item-comments-items visitor-gallery-comments" v-if="room?.roomComments?.length">
               <li v-for="comment in room.roomComments" :key="comment._id || comment.createdAt" class="visitor-gallery-comment-entry">
@@ -2070,9 +2071,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="item-reactions-row">
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')">❤ <span class="reaction-count">{{ item.reactions?.heartCount || 0 }}</span></button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')">🤝 <span class="reaction-count">{{ item.reactions?.supportCount || 0 }}</span></button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')">🕯 <span class="reaction-count">{{ item.reactions?.candleCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')"><ReactionIcon kind="heart" :size="28" /> <span class="reaction-count">{{ item.reactions?.heartCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')"><ReactionIcon kind="support" :size="28" /> <span class="reaction-count">{{ item.reactions?.supportCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')"><ReactionIcon kind="candle" :size="28" /> <span class="reaction-count">{{ item.reactions?.candleCount || 0 }}</span></button>
                 </div>
 
                 <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
@@ -3741,7 +3742,7 @@ text-shadow:
 
 .visitor-gallery-lightbox-reactions {
   display: flex;
-  gap: 8px;
+  gap: 6px;
   align-items: center;
   flex-wrap: wrap;
 }
@@ -3935,17 +3936,17 @@ text-shadow:
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  padding: 6px 8px;
+  gap: 3px;
+  padding: 4px 6px;
 }
 
 .visitor-gallery-reaction-btn span {
-  min-width: 16px;
-  height: 16px;
+  min-width: 18px;
+  height: 18px;
   border-radius: 50%;
   background: var(--visitor-color-dark);
   color: var(--visitor-btn-text);
-  font-size: 0.66rem;
+  font-size: 0.62rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;

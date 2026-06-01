@@ -1,5 +1,6 @@
 <script setup>
 import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
+import ReactionIcon from './ReactionIcon.vue'
 import { addRoomContributionComment, getRoomContributions, reactToRoomContribution } from '../services/roomService.js'
 
 const props = defineProps({ roomId: { type: String, default: '' } })
@@ -261,9 +262,9 @@ onUnmounted(() => {
 
             <div class="card-footer">
               <div class="icons">
-                <button type="button" class="icon" @click="react('heart')">Hart <span class="count">{{ currentItem.reactions?.heartCount || 0 }}</span></button>
-                <button type="button" class="icon" @click="react('support')">Steun <span class="count">{{ currentItem.reactions?.supportCount || 0 }}</span></button>
-                <button type="button" class="icon" @click="react('candle')">Kaars <span class="count">{{ currentItem.reactions?.candleCount || 0 }}</span></button>
+                <button type="button" class="icon" @click="react('heart')"><ReactionIcon kind="heart" :size="28" /> <span class="count">{{ currentItem.reactions?.heartCount || 0 }}</span></button>
+                <button type="button" class="icon" @click="react('support')"><ReactionIcon kind="support" :size="28" /> <span class="count">{{ currentItem.reactions?.supportCount || 0 }}</span></button>
+                <button type="button" class="icon" @click="react('candle')"><ReactionIcon kind="candle" :size="28" /> <span class="count">{{ currentItem.reactions?.candleCount || 0 }}</span></button>
               </div>
               <button class="chat-btn" type="button" @click="activeCategory = 'reactions'">Reacties</button>
             </div>
