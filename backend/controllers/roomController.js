@@ -1,4 +1,4 @@
-const Room = require('../models/Room');
+﻿const Room = require('../models/Room');
 const RoomContribution = require('../models/RoomContribution');
 const { createRoomEditKey } = require('../lib/roomEditAuth')
 const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
@@ -153,37 +153,16 @@ exports.getRoomTemplate = async (req, res) => {
     }
 
     const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
-
-    // Load User model first, then optionally attempt to load the frontend ROOM_TEMPLATE.
-    const userModule = await import('../models/User.js')
-    const UserModel = userModule.default || userModule.User || userModule
     const templateSlots = buildTemplateSlots()
-    const templateOwner = await UserModel.findOne({
-      email: ROOM_TEMPLATE_OWNER_EMAIL,
-      role: { $in: ['editor', 'admin'] }
-    });
-
-    if (templateOwner) {
-      const templateRoom = templateKey === 'template-a'
-        ? await Room.findOne({
-            ownerId: templateOwner._id,
-            $or: [
-              { templateKey: 'template-a' },
-              { templateKey: '' },
-              { templateKey: { $exists: false } }
-            ]
-          }).sort({ createdAt: 1 })
-        : await Room.findOne({ ownerId: templateOwner._id, templateKey }).sort({ createdAt: 1 });
-      if (templateRoom?.sceneData) {
-        return res.json({
-          sceneData: templateRoom.sceneData,
-          roomId: templateRoom._id,
-          templateKey,
-          name: templateRoom.name || getTemplateRoomName(templateKey),
-          source: 'template-room'
-        });
-      }
-
+    const templateRoom = await findTemplateRoom(templateKey)
+    if (templateRoom?.sceneData) {
+      return res.json({
+        sceneData: templateRoom.sceneData,
+        roomId: templateRoom._id,
+        templateKey,
+        name: templateRoom.name || getTemplateRoomName(templateKey),
+        source: 'template-room'
+      })
     }
 
     return res.json({
@@ -222,6 +201,16 @@ exports.issueRoomEditLink = async (req, res) => {
 
 async function resolveTemplateSceneData(templateKey = 'template-a') {
   const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+  const templateRoom = await findTemplateRoom(normalizedTemplateKey)
+  if (templateRoom?.sceneData) {
+    return JSON.parse(JSON.stringify(templateRoom.sceneData))
+  }
+
+  return buildFallbackTemplateSceneData(buildTemplateSlots(), normalizedTemplateKey)
+}
+
+async function findTemplateRoom(templateKey = 'template-a') {
+  const normalizedTemplateKey = normalizeTemplateKey(templateKey)
   const userModule = await import('../models/User.js')
   const UserModel = userModule.default || userModule.User || userModule
   const templateOwner = await UserModel.findOne({
@@ -229,25 +218,20 @@ async function resolveTemplateSceneData(templateKey = 'template-a') {
     role: { $in: ['editor', 'admin'] }
   })
 
-  if (templateOwner) {
-    const templateRoom = normalizedTemplateKey === 'template-a'
-      ? await Room.findOne({
-          ownerId: templateOwner._id,
-          $or: [
-            { templateKey: 'template-a' },
-            { templateKey: '' },
-            { templateKey: { $exists: false } }
-          ]
-        }).sort({ createdAt: 1 })
-      : await Room.findOne({ ownerId: templateOwner._id, templateKey: normalizedTemplateKey }).sort({ createdAt: 1 })
+  if (!templateOwner) return null
 
-    if (templateRoom?.sceneData) {
-      return JSON.parse(JSON.stringify(templateRoom.sceneData))
-    }
-
+  if (normalizedTemplateKey === 'template-a') {
+    return Room.findOne({
+      ownerId: templateOwner._id,
+      $or: [
+        { templateKey: 'template-a' },
+        { templateKey: '' },
+        { templateKey: { $exists: false } }
+      ]
+    }).sort({ createdAt: 1 })
   }
 
-  return buildFallbackTemplateSceneData(buildTemplateSlots(), normalizedTemplateKey)
+  return Room.findOne({ ownerId: templateOwner._id, templateKey: normalizedTemplateKey }).sort({ createdAt: 1 })
 }
 
 exports.createRoom = async (req, res) => {

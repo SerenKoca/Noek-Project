@@ -28,6 +28,7 @@ const STATIC_BASE_URL = (() => {
 })()
 
 const RELATIVE_URL_BASE = typeof window !== 'undefined' ? window.location.origin : 'http://localhost'
+const IS_DEV = Boolean(import.meta.env.DEV)
 const BASE_EXCLUDED_IDS = new Set()
 const EXCLUDED_ID_PREFIXES = new Set()
 
@@ -80,6 +81,38 @@ function normalizeCategoryMap(input = {}) {
     out[id] = categories
   }
   return out
+}
+
+function toProxyStaticAssetUrl(url) {
+  if (!url) return ''
+
+  if (url.startsWith('/api/poly-static/')) {
+    return url
+  }
+
+  if (url.startsWith('/poly-static/')) {
+    return IS_DEV ? url : `/api${url}`
+  }
+
+  try {
+    const parsed = new URL(url, RELATIVE_URL_BASE)
+    const host = String(parsed.hostname || '').toLowerCase()
+    const isStaticHost = host === 'static.poly.pizza'
+    const isLocalHost = host === 'localhost' || host === '127.0.0.1'
+
+    if (isStaticHost || isLocalHost) {
+      const suffix = `${parsed.pathname || ''}${parsed.search || ''}${parsed.hash || ''}`
+      if (suffix.startsWith('/api/poly-static/')) return suffix
+      if (suffix.startsWith('/poly-static/')) {
+        return IS_DEV ? suffix : `/api${suffix}`
+      }
+      return IS_DEV ? `/poly-static${suffix}` : `/api/poly-static${suffix}`
+    }
+  } catch {
+    // Ignore URL parsing errors and fall through to the original value.
+  }
+
+  return url
 }
 
 async function loadPolyPizzaCategoryMap() {
@@ -270,7 +303,7 @@ function normalizeModel(raw, source = 'api', categoryMap = categoryMapCache) {
   const id = raw?.ID
   const title = raw?.Title
   const download = adaptStaticAssetUrl(raw?.Download)
-  const thumbnail = adaptStaticAssetUrl(raw?.Thumbnail)
+  const thumbnail = toProxyStaticAssetUrl(raw?.Thumbnail)
   const tags = Array.isArray(raw?.Tags) ? raw.Tags : []
   const overrideCategories = getOverrideCategoriesForModel(raw, categoryMap)
   const resolvedCategory = overrideCategories[0] || raw?.Category || FALLBACK_CATEGORY

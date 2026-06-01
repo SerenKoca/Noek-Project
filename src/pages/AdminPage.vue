@@ -104,7 +104,7 @@ function getPolyPizzaModelTitle(model) {
 }
 
 function getPolyPizzaModelPreviewUrl(model) {
-  return String(model?.Thumbnail || model?.thumbnailUrl || model?.previewUrl || '').trim()
+  return String(model?.previewUrl || model?.thumbnailUrl || model?.Thumbnail || '').trim()
 }
 
 function getPolyPizzaModelCategories(model) {

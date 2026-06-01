@@ -4,6 +4,9 @@ import { User } from '../../src/server/models/User.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
 import { ROOM_TEMPLATE } from '../../src/services/roomTemplate.js'
+import templateRoomsModule from '../../backend/lib/templateRooms.js'
+
+const { normalizeTemplateKey, getTemplateRoomName } = templateRoomsModule
 
 const ROOM_TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
@@ -83,17 +86,29 @@ export default async function handler(req, res) {
 
   if (segments[0] === 'template' && segments.length === 1) {
     try {
+      const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
       const templateOwner = await User.findOne({
         email: ROOM_TEMPLATE_OWNER_EMAIL,
         role: 'editor'
       })
 
       if (templateOwner) {
-        const templateRoom = await Room.findOne({ ownerId: templateOwner._id }).sort({ createdAt: 1 })
+        const templateRoom = templateKey === 'template-a'
+          ? await Room.findOne({
+              ownerId: templateOwner._id,
+              $or: [
+                { templateKey: 'template-a' },
+                { templateKey: '' },
+                { templateKey: { $exists: false } }
+              ]
+            }).sort({ createdAt: 1 })
+          : await Room.findOne({ ownerId: templateOwner._id, templateKey }).sort({ createdAt: 1 })
         if (templateRoom?.sceneData) {
           res.status(200).json({
             sceneData: templateRoom.sceneData,
             roomId: templateRoom._id,
+            templateKey,
+            name: templateRoom.name || getTemplateRoomName(templateKey),
             source: 'template-room'
           })
           return
@@ -102,6 +117,8 @@ export default async function handler(req, res) {
 
       res.status(200).json({
         sceneData: buildFallbackTemplateSceneData(),
+        templateKey,
+        name: getTemplateRoomName(templateKey),
         source: 'fallback-template'
       })
     } catch (error) {
