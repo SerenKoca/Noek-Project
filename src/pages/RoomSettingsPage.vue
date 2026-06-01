@@ -4,7 +4,7 @@ import ContributionsOverlay from '../components/ContributionsOverlay.vue'
 import { useRouter, useRoute } from 'vue-router'
 import ThreeScene from '../components/ThreeScene.vue'
 import EditorBrand from '../components/EditorBrand.vue'
-import { getRoomTemplate, saveRoom } from '../services/roomService.js'
+import { getRoomTemplate, saveRoom, updateRoom } from '../services/roomService.js'
 import { useNoekState } from '../composables/useNoekState.js'
 
 const router = useRouter()
@@ -32,6 +32,12 @@ const showContributions = ref(false)
 const route = useRoute()
 const roomId = computed(() => String(route.params.id || ''))
 
+function syncRoomNameFromRoom(room) {
+  const name = String(room?.name || '').trim() || 'Naam kamer'
+  roomName.value = name
+  state.handleRoomNameUpdate(name)
+}
+
 onMounted(async () => {
   await state.bootstrap()
   const editKey = String(route.query.editKey || '').trim()
@@ -48,12 +54,44 @@ onMounted(async () => {
   }
 
   const room = await state.loadRoomById(roomId.value, { skipLoader: true })
+  syncRoomNameFromRoom(room)
   if (room?.editKey) {
     editLink.value = `${window.location.origin}/rooms/${roomId.value}/editor?editKey=${encodeURIComponent(room.editKey)}`
   } else if (state.authState.value?.token) {
     await generateEditLink()
   }
 })
+
+async function saveRoomName() {
+  const nextName = String(roomName.value || '').trim()
+  if (!nextName) {
+    window.alert('Geef eerst een kamernaam op.')
+    return
+  }
+
+  state.handleRoomNameUpdate(nextName)
+
+  if (!roomId.value) {
+    state.saveStatus.value = 'Kamer opslaan mislukt: geen kamer geselecteerd.'
+    state.saveStatusType.value = 'error'
+    return
+  }
+
+  state.saveStatus.value = 'Naam wordt opgeslagen...'
+  state.saveStatusType.value = 'loading'
+
+  try {
+    const saved = await updateRoom(roomId.value, { name: nextName })
+    state.saveStatus.value = `Kamer "${saved?.name || nextName}" is succesvol opgeslagen!`
+    state.saveStatusType.value = 'success'
+    await state.loadRooms({ skipLoader: true })
+    await state.loadRoomById(roomId.value, { skipLoader: true })
+  } catch (error) {
+    console.error('Room name save failed', error)
+    state.saveStatus.value = error?.response?.data?.error || 'Kamernaam opslaan mislukt.'
+    state.saveStatusType.value = 'error'
+  }
+}
 
 async function generateEditLink() {
   const id = roomId.value
@@ -155,6 +193,10 @@ function closeContributions() { showContributions.value = false }
       <section class="settings-content-v2 two-column">
         <div class="settings-left-v2 left-column">
           <input v-model="roomName" class="create-room-name big" placeholder="Naam kamer" />
+          <button type="button" class="primary-btn wide name-save-btn" @click="saveRoomName">Naam opslaan</button>
+          <div v-if="state.saveStatus.value" class="save-status" :class="state.saveStatusType.value">
+            {{ state.saveStatus.value }}
+          </div>
 
           <div class="preview-shell large">
             <ThreeScene v-if="templateScene" :room-data="templateScene" />
@@ -230,9 +272,28 @@ function closeContributions() { showContributions.value = false }
   max-width: 680px;
   font-size: 2.6rem;
   padding: 22px 24px;
-  background: #e9f2fb;
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 60%, white);
   border-radius: 14px;
   box-shadow: none;
+}
+.name-save-btn {
+  max-width: 280px;
+  align-self: flex-start;
+}
+.save-status {
+  max-width: 680px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 55%, white);
+  color: var(--editor-text, #1e2b37);
+}
+.save-status.error {
+  background: color-mix(in srgb, #ffd7de 60%, white);
+  color: #8a2431;
+}
+.save-status.success {
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 70%, white);
 }
 .preview-shell {
   border-radius: 12px;
@@ -259,7 +320,7 @@ function closeContributions() { showContributions.value = false }
 .settings-title { margin-top:0; margin-bottom:8px }
 .edit-link-card {
   width: 100%;
-  background: color-mix(in srgb, var(--brand-light, #d7ebff) 76%, white);
+  background: color-mix(in srgb, var(--brand-light, #d7ebff) 84%, white);
   border: 1px solid var(--editor-border);
   border-radius: 12px;
   padding: 14px;
@@ -334,7 +395,7 @@ function closeContributions() { showContributions.value = false }
 .settings-header-center-v2 { text-align:center }
 .settings-step-v2 { font-weight:600; margin-top:6px }
 
-.collaborators-card { background: color-mix(in srgb, var(--brand-light, #d7ebff) 70%, white); padding: 14px; border-radius: 12px; margin-top: 12px; border:1px solid var(--editor-border) }
+.collaborators-card { background: color-mix(in srgb, var(--brand-light, #d7ebff) 78%, white); padding: 14px; border-radius: 12px; margin-top: 12px; border:1px solid var(--editor-border) }
 .collaborator-top { display:flex; justify-content:space-between; align-items:flex-start; padding-bottom:8px }
 .close-x { background:#ffffff; border:0; border-radius:10px; padding:6px 8px; box-shadow:0 6px 12px #0b3f7420 }
 .collaborator-add input { background: white; border-radius:8px; border:1px solid var(--editor-border); padding:12px }
