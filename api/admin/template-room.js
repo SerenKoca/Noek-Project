@@ -2,6 +2,7 @@ import Room from '../../backend/models/Room.js'
 import { User } from '../../src/server/models/User.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth, requireRole } from '../../src/server/middleware/authMiddleware.js'
+import { ROOM_TEMPLATE } from '../../src/services/roomTemplate.js'
 import templateRoomsModule from '../../backend/lib/templateRooms.js'
 
 const {
@@ -19,7 +20,7 @@ function setJsonHeaders(res) {
 
 function buildFallbackTemplateSceneData(templateKey = 'template-a') {
   return {
-    templateSlots: [],
+    templateSlots: JSON.parse(JSON.stringify(ROOM_TEMPLATE?.slots || [])),
     furniture: [],
     appearance: {},
     metadata: {
