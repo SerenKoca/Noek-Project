@@ -391,9 +391,9 @@ onUnmounted(() => {
 .card-label { display:block; font-weight:700; color:var(--brand-dark, #0b3f72); margin-bottom:8px }
 .message { background:#fff; min-height:140px; border-radius:10px; padding:12px; color:#123; box-shadow:inset 0 1px 0 rgba(0,0,0,0.02) }
 .card-footer { display:flex; justify-content:space-between; align-items:center; margin-top:12px }
-.icons { display:flex; gap:8px; flex-wrap:wrap }
-.icon { background:#fff; padding:8px 10px; border-radius:8px; display:flex; align-items:center; gap:6px; box-shadow:0 6px 12px rgba(11,63,116,0.06); border:0; cursor:pointer; color:var(--brand-dark, #0b3f72); font-weight:600 }
-.count { background:var(--brand-dark, #0b3f72); color:#fff; border-radius:999px; padding:2px 6px; margin-left:6px; font-size:0.85rem }
+.icons { display:flex; gap:12px; flex-wrap:wrap; align-items:center }
+.icon { background:#fff; padding:8px 12px; border-radius:8px; display:inline-flex; align-items:center; justify-content:center; gap:8px; min-height:44px; box-shadow:0 6px 12px rgba(11,63,116,0.06); border:0; cursor:pointer; color:var(--brand-dark, #0b3f72); font-weight:600; line-height:1; white-space:nowrap }
+.count { background:var(--brand-dark, #0b3f72); color:#fff; border-radius:999px; padding:2px 6px; margin-left:0; font-size:0.85rem; line-height:1; min-width:18px; text-align:center }
 .chat-btn { background:var(--brand-dark, #0b3f72); color:#fff; border:0; padding:10px 14px; border-radius:10px; cursor:pointer }
 .comment-box { margin-top:12px; display:grid; grid-template-columns:1fr auto; gap:8px }
 .comment-box input { border:1px solid color-mix(in srgb, var(--brand-dark, #0b3f72) 16%, white); border-radius:8px; padding:10px 12px; color:#0d2d49 }

@@ -847,9 +847,8 @@ async function postCandleAndContinue() {
   type.value = 'candle'
   await addContribution()
   if (submitState.value.success) {
-    candlePanelMode.value = 'create'
-    selectedCandleFromScene.value = null
-    candleStep.value = 2
+    // sluit het zijpaneel na het plaatsen van een kaarsje zodat de gebruiker in de kamer blijft
+    closePanel()
   }
 }
 
@@ -1460,9 +1459,9 @@ onBeforeUnmount(() => {
                   <div class="visitor-gallery-lightbox-reactions-wrap">
                     <div class="visitor-gallery-lightbox-reactions">
                               <div class="visitor-gallery-reaction-toggle">
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')"><ReactionIcon kind="heart" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')"><ReactionIcon kind="support" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
-                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')"><ReactionIcon kind="candle" :size="28" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'heart')"><ReactionIcon kind="heart" :size="34" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.heartCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'support')"><ReactionIcon kind="support" :size="34" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.supportCount || 0 }}</span></button>
+                                  <button type="button" class="visitor-gallery-reaction-btn" @click="toggleContributionReaction(gallerySelectedItem._id, 'candle')"><ReactionIcon kind="candle" :size="34" /> <span class="reaction-count">{{ gallerySelectedItem.reactions?.candleCount || 0 }}</span></button>
                                 </div>
 
                       <button
@@ -1909,13 +1908,13 @@ onBeforeUnmount(() => {
 
                     <div class="candle-detail-reactions" aria-label="Reacties">
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'heart')" aria-label="Hartje reactie">
-                        <ReactionIcon kind="heart" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.heartCount || 0 }}</span>
+                        <ReactionIcon kind="heart" :size="34" /> <span>{{ selectedCandleFromScene.reactions?.heartCount || 0 }}</span>
                       </button>
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'support')" aria-label="Steun reactie">
-                        <ReactionIcon kind="support" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.supportCount || 0 }}</span>
+                        <ReactionIcon kind="support" :size="34" /> <span>{{ selectedCandleFromScene.reactions?.supportCount || 0 }}</span>
                       </button>
                       <button type="button" class="candle-detail-reaction-chip" @click="toggleContributionReaction(selectedCandleFromScene.contributionId, 'candle')" aria-label="Kaars reactie">
-                        <ReactionIcon kind="candle" :size="28" /> <span>{{ selectedCandleFromScene.reactions?.candleCount || 0 }}</span>
+                        <ReactionIcon kind="candle" :size="34" /> <span>{{ selectedCandleFromScene.reactions?.candleCount || 0 }}</span>
                       </button>
                     </div>
                   </div>
@@ -2071,9 +2070,9 @@ onBeforeUnmount(() => {
                 </div>
 
                 <div class="item-reactions-row">
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')"><ReactionIcon kind="heart" :size="28" /> <span class="reaction-count">{{ item.reactions?.heartCount || 0 }}</span></button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')"><ReactionIcon kind="support" :size="28" /> <span class="reaction-count">{{ item.reactions?.supportCount || 0 }}</span></button>
-                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')"><ReactionIcon kind="candle" :size="28" /> <span class="reaction-count">{{ item.reactions?.candleCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'heart')"><ReactionIcon kind="heart" :size="34" /> <span class="reaction-count">{{ item.reactions?.heartCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'support')"><ReactionIcon kind="support" :size="34" /> <span class="reaction-count">{{ item.reactions?.supportCount || 0 }}</span></button>
+                  <button type="button" class="reaction-chip" @click="toggleContributionReaction(item._id, 'candle')"><ReactionIcon kind="candle" :size="34" /> <span class="reaction-count">{{ item.reactions?.candleCount || 0 }}</span></button>
                 </div>
 
                 <form class="item-comment-form" @submit.prevent="submitContributionComment(item._id)">
@@ -2996,7 +2995,7 @@ text-shadow:
   display: flex;
   align-items: center;
   justify-content: flex-start;
-  gap: 16px;
+  gap: 28px;
   margin-top: 18px;
   margin-bottom: 6px;
 }
@@ -3006,23 +3005,21 @@ text-shadow:
   border: 0;
   background: transparent;
   color: var(--visitor-color-dark);
-  font-size: 1.9rem;
+  font-size: 1.7rem;
   font-weight: 700;
   cursor: pointer;
-  padding: 0;
-  position: relative;
+  padding: 0 2px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  gap: 10px;
+  min-height: 42px;
 }
 
 .candle-detail-reaction-chip span {
-  position: absolute;
-  top: -4px;
-  right: -8px;
   display: inline-flex;
-  min-width: 20px;
-  height: 20px;
+  min-width: 22px;
+  height: 22px;
   align-items: center;
   justify-content: center;
   border-radius: 999px;
@@ -3030,7 +3027,8 @@ text-shadow:
   color: #fff;
   font-size: 0.78rem;
   font-weight: 700;
-  padding: 0 4px;
+  padding: 0 5px;
+  position: static;
 }
 
 .candle-detail-actions {
@@ -3932,24 +3930,29 @@ text-shadow:
   border: 0;
   background: transparent;
   color: var(--visitor-color-dark);
-  font-size: 1.1rem;
+  font-size: 1rem;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  gap: 3px;
-  padding: 4px 6px;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 8px 14px;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .visitor-gallery-reaction-btn span {
-  min-width: 18px;
-  height: 18px;
-  border-radius: 50%;
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
   background: var(--visitor-color-dark);
   color: var(--visitor-btn-text);
   font-size: 0.62rem;
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  flex: 0 0 auto;
 }
 
 .visitor-gallery-comment-form {

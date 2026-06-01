@@ -1456,8 +1456,13 @@ body {
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.18);
   color: var(--editor-text);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   padding: 4px 10px;
   cursor: pointer;
+  white-space: nowrap;
+  line-height: 1;
 }
 
 .reaction-chip:hover {
