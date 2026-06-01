@@ -6,6 +6,10 @@
       "destination": "/api/admin/funeral-directors?path=:path*"
     },
     {
+      "source": "/api/admin/poly-pizza-category-map",
+      "destination": "/api/admin/template-room?adminAction=poly-pizza-category-map"
+    },
+    {
       "source": "/api/poly-api",
       "destination": "/api/poly-api-handler"
     },

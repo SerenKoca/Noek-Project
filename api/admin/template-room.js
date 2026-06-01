@@ -1,4 +1,5 @@
 import Room from '../../backend/models/Room.js'
+import PolyPizzaCategoryMap from '../../backend/models/PolyPizzaCategoryMap.js'
 import { User } from '../../src/server/models/User.js'
 import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth, requireRole } from '../../src/server/middleware/authMiddleware.js'
@@ -13,9 +14,22 @@ const {
 const TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
 ).trim().toLowerCase()
+const POLY_PIZZA_CATEGORY_KEY = 'default'
 
 function setJsonHeaders(res) {
   res.setHeader('Content-Type', 'application/json')
+}
+
+function parseBody(req) {
+  if (!req.body) return {}
+  if (typeof req.body === 'string') {
+    try {
+      return JSON.parse(req.body)
+    } catch {
+      return {}
+    }
+  }
+  return req.body
 }
 
 function buildFallbackTemplateSceneData(templateKey = 'template-a') {
@@ -50,6 +64,83 @@ async function findTemplateRoom(templateKey = 'template-a') {
   return Room.findOne({ ownerId: templateOwner._id, templateKey: normalizedTemplateKey }).sort({ createdAt: 1 })
 }
 
+function normalizeCategoryList(value) {
+  return [...new Set(
+    (Array.isArray(value) ? value : [value])
+      .map((item) => String(item || '').trim())
+      .filter(Boolean)
+      .filter((item) => item !== 'Alle')
+  )]
+}
+
+function normalizeCategoryMap(input = {}) {
+  const categoryMap = {}
+
+  for (const [modelId, value] of Object.entries(input || {})) {
+    const id = String(modelId || '').trim()
+    const categories = normalizeCategoryList(value)
+    if (!id || !categories.length) continue
+    categoryMap[id] = categories
+  }
+
+  return categoryMap
+}
+
+async function handlePolyPizzaCategoryMap(req, res) {
+  if (req.method === 'GET') {
+    try {
+      const doc = await PolyPizzaCategoryMap.findOne({ key: POLY_PIZZA_CATEGORY_KEY })
+      res.status(200).json({
+        key: POLY_PIZZA_CATEGORY_KEY,
+        categoryMap: doc?.categoryMap || {},
+        categories: Array.isArray(doc?.categories) ? doc.categories : [],
+        updatedAt: doc?.updatedAt || null
+      })
+    } catch (error) {
+      console.error('getPolyPizzaCategoryMap error:', error)
+      res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet ophalen.' })
+    }
+    return true
+  }
+
+  if (req.method === 'PUT') {
+    try {
+      const body = parseBody(req)
+      const categoryMap = normalizeCategoryMap(body?.categoryMap || {})
+      const categories = normalizeCategoryList(body?.categories || body?.categoryList || [])
+
+      const doc = await PolyPizzaCategoryMap.findOneAndUpdate(
+        { key: POLY_PIZZA_CATEGORY_KEY },
+        {
+          key: POLY_PIZZA_CATEGORY_KEY,
+          categoryMap,
+          categories
+        },
+        {
+          new: true,
+          upsert: true,
+          setDefaultsOnInsert: true
+        }
+      )
+
+      res.status(200).json({
+        key: POLY_PIZZA_CATEGORY_KEY,
+        categoryMap: doc.categoryMap || {},
+        categories: Array.isArray(doc.categories) ? doc.categories : [],
+        updatedAt: doc.updatedAt || null
+      })
+    } catch (error) {
+      console.error('updatePolyPizzaCategoryMap error:', error)
+      res.status(500).json({ error: 'Kon Poly Pizza categoriemap niet opslaan.' })
+    }
+    return true
+  }
+
+  res.setHeader('Allow', ['GET', 'PUT'])
+  res.status(405).json({ error: 'Method Not Allowed' })
+  return true
+}
+
 export default async function handler(req, res) {
   setJsonHeaders(res)
 
@@ -66,6 +157,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'GET') {
+    if (String(req.query?.adminAction || '').trim() === 'poly-pizza-category-map') {
+      return handlePolyPizzaCategoryMap(req, res)
+    }
+
     try {
       const templateKey = normalizeTemplateKey(req.query?.templateKey || req.query?.variant)
       const templateRoom = await findTemplateRoom(templateKey)
@@ -95,6 +190,10 @@ export default async function handler(req, res) {
   }
 
   if (req.method === 'PUT') {
+    if (String(req.query?.adminAction || '').trim() === 'poly-pizza-category-map') {
+      return handlePolyPizzaCategoryMap(req, res)
+    }
+
     try {
       const sceneData = req.body?.sceneData
       const templateKey = normalizeTemplateKey(req.body?.templateKey || req.query?.templateKey || req.query?.variant)
@@ -136,6 +235,10 @@ export default async function handler(req, res) {
       res.status(500).json({ error: 'Kon template kamer niet opslaan.' })
     }
     return
+  }
+
+  if (String(req.query?.adminAction || '').trim() === 'poly-pizza-category-map') {
+    return handlePolyPizzaCategoryMap(req, res)
   }
 
   res.setHeader('Allow', ['GET', 'PUT'])
