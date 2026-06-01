@@ -148,6 +148,7 @@ const ROOM_TEMPLATE_STORAGE_KEY = 'noek.room-template.v1'
 const ROOM_TEMPLATE_DELETED_KEY = `${ROOM_TEMPLATE_STORAGE_KEY}.deleted`
 const FLOOR_Y = 0
 const ENFORCE_UNIFORM_MODEL_SIZE = true
+const VR_CAMERA_Y = 10.5
 
 const SLOT_SIZE_MULTIPLIERS = {
   'slot-sofa': 1.35,
@@ -1448,8 +1449,8 @@ function createScene() {
   
   // VR mode: position camera at eye level in center of room
   if (props.vrMode) {
-    camera.position.set(0, 12, 0)
-    camera.lookAt(0, 12, 1)
+    camera.position.set(0, VR_CAMERA_Y, 0)
+    camera.lookAt(0, VR_CAMERA_Y, 1)
   } else {
     camera.position.copy(START_CAMERA)
     camera.lookAt(FIXED_TARGET)
@@ -1748,11 +1749,12 @@ function addVRPhotos() {
     if (!item.mediaUrl) return
 
     const angle = (index / count) * Math.PI * 2
-    const elevation = (index % 2) * 1.5 - 0.75
+    // Reduce vertical spread and align photos to VR eye height
+    const elevation = (index % 2) * 0.8 - 0.4
     const radius = 6
 
     const x = Math.cos(angle) * radius
-    const y = 12 + elevation  // Match camera height
+    const y = VR_CAMERA_Y + elevation  // Align to VR camera eye height
     const z = Math.sin(angle) * radius
 
     const textureLoader = new THREE.TextureLoader()
@@ -1968,8 +1970,8 @@ function animate() {
   renderer.setAnimationLoop(() => {
     // VR mode: keep camera centered and handle rotation
     if (props.vrMode) {
-      // Always keep camera at center
-      camera.position.set(0, 12, 0)
+        // Always keep camera at center (use VR camera Y offset)
+        camera.position.set(0, VR_CAMERA_Y, 0)
       
       // Calculate look direction based on yaw and pitch
       const direction = new THREE.Vector3(
@@ -1999,7 +2001,11 @@ function animate() {
 
       // Safety fallback: keep camera/target finite so the scene never disappears.
       if (!Number.isFinite(camera.position.x) || !Number.isFinite(camera.position.y) || !Number.isFinite(camera.position.z)) {
-        camera.position.copy(START_CAMERA)
+        if (props.vrMode) {
+          camera.position.set(0, VR_CAMERA_Y, 0)
+        } else {
+          camera.position.copy(START_CAMERA)
+        }
       }
       if (!Number.isFinite(orbit.target.x) || !Number.isFinite(orbit.target.y) || !Number.isFinite(orbit.target.z)) {
         orbit.target.copy(FIXED_TARGET)
@@ -2090,14 +2096,22 @@ function updateCameraVerticalDrift() {
     const resetT = THREE.MathUtils.clamp(1 - (t / FAR_RESET_BLEND_START), 0, 1)
     currentLookYaw = THREE.MathUtils.lerp(currentLookYaw, initialAzimuth, resetT)
     orbit.target.lerp(FIXED_TARGET, resetT)
-    camera.position.lerp(START_CAMERA, resetT)
+      if (props.vrMode) {
+        camera.position.lerp(new THREE.Vector3(0, VR_CAMERA_Y, 0), resetT)
+      } else {
+        camera.position.lerp(START_CAMERA, resetT)
+      }
   }
 
   // Keep stable when fully zoomed out without snapping position.
-  if (t <= 0.001) {
+    if (t <= 0.001) {
     currentLookYaw = initialAzimuth
     orbit.target.copy(FIXED_TARGET)
-    camera.position.copy(START_CAMERA)
+      if (props.vrMode) {
+        camera.position.set(0, VR_CAMERA_Y, 0)
+      } else {
+        camera.position.copy(START_CAMERA)
+      }
     camera.lookAt(orbit.target)
     lastCameraYOffset = 0
     return
@@ -2980,7 +2994,11 @@ async function loadRoom(sceneData) {
 
   // Always start from the same entry camera when opening a room.
   if (camera) {
-    camera.position.copy(START_CAMERA)
+    if (props.vrMode) {
+      camera.position.set(0, VR_CAMERA_Y, 0)
+    } else {
+      camera.position.copy(START_CAMERA)
+    }
   }
   if (orbit) {
     orbit.target.copy(FIXED_TARGET)
@@ -3012,7 +3030,11 @@ function resetSceneToDefault({ hydrateCurated = true } = {}) {
 
   // Reset camera to default position
   if (camera) {
-    camera.position.copy(START_CAMERA)
+    if (props.vrMode) {
+      camera.position.set(0, VR_CAMERA_Y, 0)
+    } else {
+      camera.position.copy(START_CAMERA)
+    }
   }
   if (orbit) {
     orbit.target.copy(FIXED_TARGET)
