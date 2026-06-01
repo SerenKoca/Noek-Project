@@ -2,8 +2,11 @@
   position: relative;
   min-height: 100vh;
   overflow: hidden;
-  background:
-    linear-gradient(180deg, #eaf2fb 0%, #f8fbff 11%, #ffffff 42%, color-mix(in srgb, var(--brand-light) 30%, white) 100%);
+  background: linear-gradient(180deg,
+    color-mix(in srgb, white 92%, var(--brand-light, #d7e1eb) 8%) 0%,
+    color-mix(in srgb, white 78%, var(--brand-light, #d7e1eb) 22%) 42%,
+    color-mix(in srgb, var(--brand-light, #d7e1eb) 30%, white) 100%
+  );
 }
 
 /* Keep homepage scrollable, especially on mobile */
@@ -21,8 +24,8 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 12% 103%, rgba(77, 138, 204, 0.22) 0%, rgba(77, 138, 204, 0) 38%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 64%, rgba(63, 118, 178, 0.12) 100%);
+    radial-gradient(circle at 12% 103%, color-mix(in srgb, var(--brand-dark, #083f73) 24%, transparent) 0%, color-mix(in srgb, var(--brand-dark, #083f73) 0%, transparent) 38%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0) 64%, color-mix(in srgb, var(--brand-dark, #083f73) 12%, transparent) 100%);
 }
 
 .editor-home-topbar {
