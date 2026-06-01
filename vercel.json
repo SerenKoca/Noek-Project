@@ -38,7 +38,7 @@
       "destination": "/api/public-handler?path=:path*"
     },
     {
-      "source": "/((?!api(?:/|$)).*)",
+      "source": "/((?!api(?:/|$)|assets(?:/|$)|.*\\..*).*)",
       "destination": "/index.html"
     }
   ]
