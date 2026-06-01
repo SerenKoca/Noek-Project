@@ -5,8 +5,10 @@ import { connectToDatabase } from '../../src/server/lib/mongodb.js'
 import { requireAuth } from '../../src/server/middleware/authMiddleware.js'
 import { ROOM_TEMPLATE } from '../../src/services/roomTemplate.js'
 import templateRoomsModule from '../../backend/lib/templateRooms.js'
+import roomEditAuthModule from '../../backend/lib/roomEditAuth.js'
 
 const { normalizeTemplateKey, getTemplateRoomName } = templateRoomsModule
+const { createRoomEditKey } = roomEditAuthModule
 
 const ROOM_TEMPLATE_OWNER_EMAIL = String(
   process.env.ROOM_TEMPLATE_OWNER_EMAIL || process.env.VITE_ROOM_TEMPLATE_OWNER_EMAIL || 'editor@test.be'
@@ -218,6 +220,33 @@ export default async function handler(req, res) {
   }
 
   const [resource, contributionId, nestedAction] = action
+
+  if (resource === 'edit-link' && !contributionId && !nestedAction) {
+    if (req.method !== 'POST') {
+      res.setHeader('Allow', ['POST'])
+      res.status(405).json({ error: 'Method Not Allowed' })
+      return
+    }
+
+    try {
+      const room = await findOwnedRoom(roomId, auth.userId)
+      if (!room) {
+        res.status(404).json({ error: 'Kamer niet gevonden.' })
+        return
+      }
+
+      if (!room.editKey) {
+        room.editKey = createRoomEditKey(String(room._id))
+        await room.save()
+      }
+
+      res.status(200).json({ editKey: room.editKey })
+    } catch (error) {
+      console.error('issueRoomEditLink error:', error)
+      res.status(500).json({ error: 'Kon bewerklink niet maken.' })
+    }
+    return
+  }
 
   if (resource === 'contributions' && !contributionId) {
     if (req.method === 'GET') {
