@@ -407,6 +407,9 @@ async function loadRoomById(roomId, options = {}) {
   const room = await fetchRoomById(id, { skipLoader: options.skipLoader === true })
   if (room?._id) {
     mergeRoomUpdate(room)
+    if (room.branding) {
+      applyCurrentBranding(room.branding)
+    }
   }
 
   return room

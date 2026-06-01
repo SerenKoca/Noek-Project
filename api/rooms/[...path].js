@@ -88,6 +88,44 @@ function buildFallbackTemplateSceneData() {
   }
 }
 
+function normalizeHexColor(input, fallback) {
+  const value = String(input || '').trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(value) ? value : fallback
+}
+
+function buildBrandingResponse(director) {
+  return {
+    logoUrl: String(director?.brandLogoUrl || '').trim(),
+    darkColor: normalizeHexColor(director?.brandDarkColor, '#1e2b37'),
+    lightColor: normalizeHexColor(director?.brandLightColor, '#d7e1eb'),
+    directorName: String(director?.displayName || '').trim()
+  }
+}
+
+function resolveOwnerId(room) {
+  return String(room?.ownerId || room?.userId || '').trim()
+}
+
+async function resolveRoomBranding(room) {
+  const ownerId = resolveOwnerId(room)
+  if (!ownerId) return buildBrandingResponse(null)
+
+  const owner = await User.findById(ownerId).select({ role: 1, funeralDirectorId: 1 })
+  if (!owner) return buildBrandingResponse(null)
+
+  if (owner.role === 'funeral_director') {
+    const director = await User.findById(owner._id).select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+    return buildBrandingResponse(director)
+  }
+
+  if (!owner.funeralDirectorId) return buildBrandingResponse(null)
+
+  const director = await User.findOne({ _id: owner.funeralDirectorId, role: 'funeral_director' })
+    .select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+
+  return buildBrandingResponse(director)
+}
+
 function normalizeRoomReactionType(value) {
   const fieldByType = {
     heart: 'heartCount',
@@ -191,7 +229,10 @@ export default async function handler(req, res) {
           return
         }
 
-        res.status(200).json(room)
+        res.status(200).json({
+          ...room.toObject(),
+          branding: await resolveRoomBranding(room)
+        })
       } catch (error) {
         console.error('getRoomById error:', error)
         res.status(500).json({ error: 'Kon kamer niet ophalen.' })

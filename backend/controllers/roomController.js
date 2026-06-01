@@ -1,5 +1,6 @@
 ﻿const Room = require('../models/Room');
 const RoomContribution = require('../models/RoomContribution');
+const User = require('../models/User')
 const { createRoomEditKey } = require('../lib/roomEditAuth')
 const { normalizeTemplateKey, getTemplateRoomName } = require('../lib/templateRooms')
 
@@ -19,6 +20,44 @@ async function findOwnedContribution(roomId, ownerId, contributionId) {
   return RoomContribution.findOne({ _id: contributionId, roomId, ownerId });
 }
 
+function normalizeHexColor(input, fallback) {
+  const value = String(input || '').trim().toLowerCase()
+  return /^#[0-9a-f]{6}$/.test(value) ? value : fallback
+}
+
+function buildBrandingResponse(director) {
+  return {
+    logoUrl: String(director?.brandLogoUrl || '').trim(),
+    darkColor: normalizeHexColor(director?.brandDarkColor, '#1e2b37'),
+    lightColor: normalizeHexColor(director?.brandLightColor, '#d7e1eb'),
+    directorName: String(director?.displayName || '').trim()
+  }
+}
+
+function resolveOwnerId(room) {
+  return String(room?.ownerId || room?.userId || '').trim()
+}
+
+async function resolveRoomBranding(room) {
+  const ownerId = resolveOwnerId(room)
+  if (!ownerId) return buildBrandingResponse(null)
+
+  const owner = await User.findById(ownerId).select({ role: 1, funeralDirectorId: 1 })
+  if (!owner) return buildBrandingResponse(null)
+
+  if (owner.role === 'funeral_director') {
+    const director = await User.findById(owner._id).select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+    return buildBrandingResponse(director)
+  }
+
+  if (!owner.funeralDirectorId) return buildBrandingResponse(null)
+
+  const director = await User.findOne({ _id: owner.funeralDirectorId, role: 'funeral_director' })
+    .select({ displayName: 1, brandLogoUrl: 1, brandDarkColor: 1, brandLightColor: 1 })
+
+  return buildBrandingResponse(director)
+}
+
 function buildTemplateSlots() {
   return [
     {
@@ -28,7 +67,6 @@ function buildTemplateSlots() {
       position: [-6.8, 0, -12.2],
       rotationY: Math.PI * 0.97,
       initialModel: {
-        id: 'ZOPP3KzNIk',
         title: 'Couch Small',
         url: 'https://static.poly.pizza/4e8fbbf3-9992-4068-8918-2126a0304127.glb',
         scaleMultiplier: 1.22,
@@ -313,7 +351,10 @@ exports.getRoomById = async (req, res) => {
       await room.save()
     }
 
-    res.json(room);
+    res.json({
+      ...room.toObject(),
+      branding: await resolveRoomBranding(room)
+    });
   } catch (error) {
     console.error('getRoomById error:', error);
     res.status(500).json({ error: 'Kon kamer niet ophalen.' });
