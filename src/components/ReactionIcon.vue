@@ -27,11 +27,16 @@ const iconSize = computed(() => `${Number(props.size) || 28}px`)
 </script>
 
 <template>
-  <img
-    :src="iconSrc"
-    :alt="kind"
+  <span
     :class="['reaction-icon', className]"
-    :style="{ width: iconSize, height: iconSize }"
+    :aria-label="kind"
+    aria-hidden="true"
+    :style="{
+      width: iconSize,
+      height: iconSize,
+      WebkitMaskImage: `url(${iconSrc})`,
+      maskImage: `url(${iconSrc})`
+    }"
   />
 </template>
 
@@ -39,7 +44,13 @@ const iconSize = computed(() => `${Number(props.size) || 28}px`)
 .reaction-icon {
   display: inline-block;
   vertical-align: middle;
-  object-fit: contain;
+  background-color: var(--brand-dark, #003b70);
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+  -webkit-mask-position: center;
+  mask-position: center;
+  -webkit-mask-size: contain;
+  mask-size: contain;
   flex: 0 0 auto;
 }
 </style>
