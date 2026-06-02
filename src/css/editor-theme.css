@@ -190,10 +190,11 @@ body {
 .editor-room-sound-bar {
   position: absolute;
   top: 86px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 24;
-  width: min(480px, calc(100vw - 28px));
+  right: 16px;
+  left: auto;
+  transform: none;
+  z-index: 30;
+  width: min(320px, calc(100vw - 712px));
   border: 1px solid var(--editor-border);
   border-radius: 10px;
   background: rgba(246, 250, 255, 0.95);

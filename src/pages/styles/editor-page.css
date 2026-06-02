@@ -4,5 +4,10 @@
 }
 
 .editor-shell .editor-room-sound-bar {
+  left: auto;
+  right: 16px;
+  transform: none;
+  width: min(320px, calc(100vw - 32px));
+  z-index: 27;
   box-shadow: 0 10px 30px rgba(24, 58, 98, 0.08);
 }
