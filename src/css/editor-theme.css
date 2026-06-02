@@ -190,11 +190,11 @@ body {
 .editor-room-sound-bar {
   position: absolute;
   top: 86px;
-  right: 16px;
-  left: auto;
-  transform: none;
-  z-index: 30;
-  width: min(320px, calc(100vw - 712px));
+  left: 50%;
+  right: auto;
+  transform: translateX(-50%);
+  z-index: 8;
+  width: min(480px, calc(100vw - 32px));
   border: 1px solid var(--editor-border);
   border-radius: 10px;
   background: rgba(246, 250, 255, 0.95);
@@ -883,10 +883,10 @@ body {
   transform: translateX(-50%);
   z-index: 25;
   background: rgba(255, 255, 255, 0.95);
-  border: 2px solid var(--editor-panel-strong);
-  border-radius: 6px;
-  padding: 8px 16px;
-  font-size: 14px;
+  top: 176px;
+  left: 16px;
+  right: auto;
+  transform: none;
   font-weight: 500;
   color: var(--editor-text);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
